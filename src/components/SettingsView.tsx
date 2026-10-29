@@ -32,6 +32,7 @@ import { updates, useUpdates } from "../lib/updates";
 import { native } from "./WindowControls";
 import { ProfileSettings } from "./Profiles";
 import { CatalogSettings } from "./CatalogSettings";
+import { parseKeywords, sourceKeywords, useSourceKeywords } from "../lib/sourceKeywords";
 
 export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
   return [
@@ -406,6 +407,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
                   )}
                 </div>
               </Row>
+              <KeywordRows />
               <Row label="Descargar Stremio Service" description="Página oficial de descargas de Stremio.">
                 <button
                   className="button subtle"
@@ -521,6 +523,37 @@ export function ShortcutTable({ seekShort, seekLong }: { seekShort?: number; see
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Keyword filter for sources, stored on this device only. */
+function KeywordRows() {
+  const keywords = useSourceKeywords();
+  const field = (kind: "include" | "exclude", label: string, description: string, placeholder: string) => (
+    <Row label={label} htmlFor={`keywords-${kind}`} description={description} stacked>
+      <input
+        id={`keywords-${kind}`}
+        className="input"
+        // Re-created when the stored list changes so the field shows its normalized form.
+        key={keywords[kind].join(",")}
+        defaultValue={keywords[kind].join(", ")}
+        placeholder={placeholder}
+        spellCheck={false}
+        onBlur={(event) => sourceKeywords.set({ ...keywords, [kind]: parseKeywords(event.currentTarget.value) })}
+        onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
+      />
+    </Row>
+  );
+  return (
+    <>
+      {field(
+        "include",
+        "Fuentes con estas palabras",
+        "Si escribes alguna, solo se muestran las fuentes que contengan al menos una. Separadas por comas. Solo en este equipo.",
+        "castellano, 1080p",
+      )}
+      {field("exclude", "Ocultar fuentes con estas palabras", "Se ocultan las que contengan cualquiera. Solo en este equipo.", "cam, hdcam, ts")}
+    </>
   );
 }
 

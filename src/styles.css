@@ -2087,6 +2087,15 @@ kbd {
   display: grid;
   gap: 8px;
 }
+.source-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 14px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
 .catalog-list {
   display: grid;
   max-height: 420px;

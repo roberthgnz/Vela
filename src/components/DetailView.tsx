@@ -35,6 +35,7 @@ import { sourceHistory, sourceKey, useSourceMarks } from "../lib/sourceHistory";
 import { useTranslatedMeta } from "../lib/tmdb";
 import { useRouteState } from "../lib/navigation";
 import { useUiSetting } from "../lib/ui";
+import { matchesKeywords, useSourceKeywords } from "../lib/sourceKeywords";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import {
   kindLabel,
@@ -750,6 +751,8 @@ function SourcesPanel({
   const [active, setActive] = useState<number | null>(null);
   const [qualityFilter, setQualityFilter] = useRouteState<string>("sourceQuality", "");
   const [order, setOrder] = useUiSetting<SourceOrder>("sources.order", "addon", ["addon", "seeders", "largest", "smallest"]);
+  const keywords = useSourceKeywords();
+  const [showFiltered, setShowFiltered] = useState(false);
   const marks = useSourceMarks(videoId);
   const position = videoId ? prefs.library[mediaKey(meta.type, meta.id)]?.videos?.[videoId]?.seconds : undefined;
   const lastKey = (() => {
@@ -768,7 +771,11 @@ function SourcesPanel({
       onPlay(meta, addon, videoId!, stream, mode, episode),
     onSettled: () => setActive(null),
   });
-  const streams = sources.data || [];
+  const all = sources.data || [];
+  // The device's keyword filter applies before everything else, unless the user reveals the rest.
+  const allowed = all.filter((stream) => matchesKeywords(stream, keywords));
+  const streams = showFiltered ? all : allowed;
+  const filteredOut = all.length - allowed.length;
   // Several configured copies of one addon share its name; they are told apart by number.
   const addonLabels = new Map<string, string>();
   for (const url of new Set(streams.map((stream) => stream.addonUrl))) {
@@ -934,6 +941,16 @@ function SourcesPanel({
             ))}
         </CollapsibleChips>
       )}
+      {filteredOut > 0 && (
+        <p className="source-keywords">
+          {showFiltered
+            ? `Se muestran ${filteredOut === 1 ? "la fuente" : `las ${filteredOut} fuentes`} que tus palabras clave ocultan.`
+            : `${filteredOut === 1 ? "1 fuente oculta" : `${filteredOut} fuentes ocultas`} por tus palabras clave.`}
+          <button className="link-button" onClick={() => setShowFiltered(!showFiltered)}>
+            {showFiltered ? "Ocultarlas" : "Mostrar"}
+          </button>
+        </p>
+      )}
       {play.isError && (
         <div className="panel-alert">
           <ErrorState title="No se pudo reproducir" message={errorMessage(play.error)} />
@@ -1071,6 +1088,17 @@ function SourcesPanel({
               );
             })}
           </ul>
+        ) : filteredOut > 0 ? (
+          <EmptyState
+            compact
+            title="Tus palabras clave ocultan todas las fuentes"
+            description="Cámbialas en Ajustes › Streaming o muéstralas solo esta vez."
+            action={
+              <button className="button secondary small" onClick={() => setShowFiltered(true)}>
+                Mostrar fuentes
+              </button>
+            }
+          />
         ) : (
           <EmptyState
             compact
