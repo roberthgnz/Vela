@@ -174,14 +174,6 @@ export function AddonsView({
                     >
                       <MoreHorizontal size={16} />
                     </button>
-                    <button
-                      className="icon-button danger-hover"
-                      aria-label={`Eliminar ${addon.manifest.name}`}
-                      title="Eliminar"
-                      onClick={() => setRemoving(addon)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
                   </div>
                 </article>
               );

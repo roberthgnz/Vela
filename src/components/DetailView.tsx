@@ -33,9 +33,15 @@ import { episodeCode, isUpcoming, orderedEpisodes, videoProgress, watchedEpisode
 import { getMeta, getStreams } from "../lib/protocol";
 import { sourceHistory, sourceKey, useSourceMarks } from "../lib/sourceHistory";
 import { useTranslatedMeta } from "../lib/tmdb";
+import { useRouteState } from "../lib/navigation";
+import { useUiSetting } from "../lib/ui";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import {
   kindLabel,
+  qualityTier,
+  qualityTiers,
+  sortSources,
+  type SourceOrder,
   streamDetail,
   streamFacts,
   streamLanguages,
@@ -262,7 +268,7 @@ export function DetailView({
     yearOf(meta),
     meta.runtime,
     isSeries && seasons.filter((value) => value > 0).length
-      ? `${seasons.filter((value) => value > 0).length} temporadas`
+      ? `${seasons.filter((value) => value > 0).length} ${seasons.filter((value) => value > 0).length === 1 ? "temporada" : "temporadas"}`
       : "",
   ].filter(Boolean);
   const long = (meta.description?.length || 0) > 360;
@@ -742,6 +748,8 @@ function SourcesPanel({
   const [addonFilter, setAddonFilter] = useState("");
   const [languageFilter, setLanguageFilter] = useState("");
   const [active, setActive] = useState<number | null>(null);
+  const [qualityFilter, setQualityFilter] = useRouteState<string>("sourceQuality", "");
+  const [order, setOrder] = useUiSetting<SourceOrder>("sources.order", "addon", ["addon", "seeders", "largest", "smallest"]);
   const marks = useSourceMarks(videoId);
   const position = videoId ? prefs.library[mediaKey(meta.type, meta.id)]?.videos?.[videoId]?.seconds : undefined;
   const lastKey = (() => {
@@ -776,10 +784,15 @@ function SourcesPanel({
       const current = languages.get(language.flag);
       languages.set(language.flag, { label: language.label, count: (current?.count ?? 0) + 1 });
     }
-  const visible = streams.filter(
-    (stream) =>
-      (!addonFilter || stream.addonUrl === addonFilter) &&
-      (!languageFilter || streamLanguages(stream).some((language) => language.flag === languageFilter)),
+  const tiers = qualityTiers.filter((tier) => streams.some((stream) => qualityTier(stream) === tier));
+  const visible = sortSources(
+    streams.filter(
+      (stream) =>
+        (!addonFilter || stream.addonUrl === addonFilter) &&
+        (!qualityFilter || qualityTier(stream) === qualityFilter) &&
+        (!languageFilter || streamLanguages(stream).some((language) => language.flag === languageFilter)),
+    ),
+    order,
   );
   const start = (stream: ResolvedStream, mode: PlayMode, index: number) => {
     setActive(index);
@@ -851,6 +864,34 @@ function SourcesPanel({
           <RotateCw size={14} className={sources.isFetching && !sources.isPending ? "spin" : ""} />
         </button>
       </header>
+      {streams.length > 1 && (
+        <div className="source-toolbar">
+          {tiers.length > 1 ? (
+            <div className="segmented" role="radiogroup" aria-label="Calidad">
+              {["", ...tiers].map((tier) => (
+                <button
+                  key={tier || "all"}
+                  role="radio"
+                  aria-checked={qualityFilter === tier}
+                  onClick={() => setQualityFilter(tier)}
+                >
+                  <span className="segment-text">{tier === "" ? "Todas" : tier === "?" ? "Otras" : tier}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span />
+          )}
+          <label className="select compact">
+            <select aria-label="Ordenar fuentes" value={order} onChange={(event) => setOrder(event.target.value as SourceOrder)}>
+              <option value="addon">Orden del addon</option>
+              <option value="seeders">Más pares</option>
+              <option value="largest">Mayor tamaño</option>
+              <option value="smallest">Menor tamaño</option>
+            </select>
+          </label>
+        </div>
+      )}
       {addonUrls.length > 1 && (
         <div className="chip-row" role="toolbar" aria-label="Filtrar por addon">
           {["", ...addonUrls].map((url) => (

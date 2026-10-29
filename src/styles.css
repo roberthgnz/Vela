@@ -1446,7 +1446,7 @@ kbd {
 }
 .detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 38%, 560px);
   gap: 28px;
   padding: 28px var(--gutter) 40px;
   align-items: start;
@@ -1516,7 +1516,7 @@ kbd {
   margin-top: 6px;
 }
 .detail-description {
-  max-width: 72ch;
+  max-width: 84ch;
   color: var(--fg-2);
   font-size: 13.5px;
   line-height: 1.6;
@@ -3087,4 +3087,16 @@ kbd {
 .account-avatar.connected {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.source-toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 14px 8px;
+}
+.source-toolbar .segmented button {
+  padding: 0 2px;
 }

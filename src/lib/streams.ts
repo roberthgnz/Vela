@@ -137,3 +137,43 @@ export function streamDetail(stream: ResolvedStream): string[] {
     .filter(Boolean)
     .slice(0, 3);
 }
+
+export type QualityTier = "4K" | "1080p" | "720p" | "SD" | "?";
+export const qualityTiers: QualityTier[] = ["4K", "1080p", "720p", "SD", "?"];
+
+/** Resolution group for filtering: 4K, 1080p (including 1440p), 720p, SD, or unknown. */
+export function qualityTier(stream: ResolvedStream): QualityTier {
+  const quality = streamQuality(stream);
+  if (!quality) return "?";
+  if (quality === "4K") return "4K";
+  if (quality === "1440p" || quality === "1080p") return "1080p";
+  if (quality === "720p") return "720p";
+  return "SD";
+}
+
+/** Size in bytes, from the behavior hints or the "4.82 GB" text torrent addons show. */
+export function streamSize(stream: ResolvedStream): number | undefined {
+  if (stream.behaviorHints?.videoSize) return stream.behaviorHints.videoSize;
+  const match = /\b(\d+(?:[.,]\d+)?)\s?(GB|MB|GiB|MiB)\b/i.exec(haystack(stream));
+  if (!match) return undefined;
+  const value = Number(match[1].replace(",", "."));
+  return value * (/^g/i.test(match[2]) ? 1024 ** 3 : 1024 ** 2);
+}
+
+export type SourceOrder = "addon" | "seeders" | "largest" | "smallest";
+
+/** Sorts sources; those without the value stay after the rest, in the addon's order. */
+export function sortSources<T extends ResolvedStream>(streams: T[], order: SourceOrder): T[] {
+  if (order === "addon") return streams;
+  const value = (stream: T) =>
+    order === "seeders" ? streamFacts(stream).seeders : streamSize(stream);
+  const sign = order === "smallest" ? 1 : -1;
+  return streams
+    .map((stream, index) => ({ stream, index, value: value(stream) }))
+    .sort((a, b) =>
+      a.value === undefined || b.value === undefined
+        ? (a.value === undefined ? 1 : 0) - (b.value === undefined ? 1 : 0) || a.index - b.index
+        : sign * (a.value - b.value) || a.index - b.index,
+    )
+    .map(({ stream }) => stream);
+}
