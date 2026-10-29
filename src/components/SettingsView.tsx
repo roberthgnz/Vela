@@ -421,7 +421,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-about" className="settings-group" aria-labelledby="settings-about-title">
             <h2 id="settings-about-title">Acerca de</h2>
             <div className="settings-card">
-              <Row label="Vela 0.3.0" description="Cliente de escritorio independiente compatible con el protocolo de addons de Stremio. No es una aplicación oficial de Stremio." />
+              <Row label="Vela 0.3.1" description="Cliente de escritorio independiente compatible con el protocolo de addons de Stremio. No es una aplicación oficial de Stremio." />
               <Row
                 label="Privacidad"
                 description="Tu biblioteca se guarda localmente. Cada addon recibe las consultas que le haces; Vela no envía datos a otros servicios."
