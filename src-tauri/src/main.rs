@@ -51,7 +51,10 @@ async fn request_range(
     length: u64,
     client: State<'_, HttpClient>,
 ) -> Result<tauri::ipc::Response, String> {
-    client.range(&url, start, length).await.map(tauri::ipc::Response::new)
+    client
+        .range(&url, start, length)
+        .await
+        .map(tauri::ipc::Response::new)
 }
 
 #[tauri::command]

@@ -97,7 +97,7 @@ impl HttpClient {
                 let partial = response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
                 let wanted = match range {
                     Some((start, _)) if !partial && start > 0 => {
-                        return Err("El servidor no admite lecturas parciales.".to_owned())
+                        return Err("El servidor no admite lecturas parciales.".to_owned());
                     }
                     Some((_, length)) => Some(length as usize),
                     None => None,
@@ -210,7 +210,8 @@ mod tests {
 
     #[tokio::test]
     async fn reads_ranges_and_handles_servers_that_ignore_them() {
-        let url = serve(b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\n\r\nabcd".to_vec()).await;
+        let url =
+            serve(b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\n\r\nabcd".to_vec()).await;
         assert_eq!(client().range(&url, 100, 4).await.unwrap(), b"abcd");
         // A whole-file answer is cut to the length asked for when it starts at zero…
         let url = serve(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789".to_vec()).await;
