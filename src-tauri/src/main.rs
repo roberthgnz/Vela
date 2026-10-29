@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod downloads;
 mod mpv;
 mod secrets;
 mod transport;
@@ -264,12 +265,18 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updater::PendingUpdate::default())
         .manage(client)
+        .manage(downloads::Downloads::new().expect("could not initialize downloads"))
         .invoke_handler(tauri::generate_handler![
             request_json,
             post_json,
             request_text,
             request_bytes,
             request_range,
+            downloads::download_folder,
+            downloads::download_start,
+            downloads::download_cancel,
+            downloads::download_remove,
+            downloads::download_reveal,
             open_external,
             launch_external_player,
             secrets::secret_get,
