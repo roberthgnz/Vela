@@ -423,7 +423,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-about" className="settings-group" aria-labelledby="settings-about-title">
             <h2 id="settings-about-title">Acerca de</h2>
             <div className="settings-card">
-              <Row label="Vela 0.3.2" description="Cliente de escritorio independiente compatible con el protocolo de addons de Stremio. No es una aplicación oficial de Stremio." />
+              <Row label={`Vela ${__APP_VERSION__}`} description="Cliente de escritorio independiente compatible con el protocolo de addons de Stremio. No es una aplicación oficial de Stremio." />
               {updates.supported() && <UpdateRows />}
               <Row
                 label="Privacidad"

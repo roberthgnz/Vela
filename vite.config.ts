@@ -1,9 +1,11 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 import { addonProxyPlugin } from "./dev/proxy.ts";
+import pkg from "./package.json" with { type: "json" };
 
 export default defineConfig({
   plugins: [react(), addonProxyPlugin()],
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   server: { host: "127.0.0.1", port: 1430, strictPort: true },
   preview: { host: "127.0.0.1", port: 1431, strictPort: true },
   clearScreen: false,
