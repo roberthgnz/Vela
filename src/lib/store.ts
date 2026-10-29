@@ -302,6 +302,28 @@ export function createPreferencesStore(providedStorage?: PreferenceStorage) {
     clearLibrary() {
       if (Object.keys(state.library).length) update({ ...state, library: {} });
     },
+    /** Applies a batch of synchronized entries and removals in one update. */
+    mergeLibrary(entries: LibraryEntry[], removals: { type: string; id: string }[] = []) {
+      const library = { ...state.library };
+      let changed = false;
+      for (const value of entries) {
+        const meta = media(value.meta);
+        if (!meta || typeof value.addonUrl !== 'string' || !Number.isFinite(value.addedAt) || value.addedAt < 0) continue;
+        const entry: LibraryEntry = { meta, addonUrl: value.addonUrl, addedAt: value.addedAt };
+        const savedProgress = value.progress && progress(value.progress);
+        if (savedProgress) entry.progress = savedProgress;
+        library[mediaKey(meta.type, meta.id)] = entry;
+        changed = true;
+      }
+      for (const { type, id } of removals) {
+        const key = mediaKey(type, id);
+        if (Object.hasOwn(library, key)) {
+          delete library[key];
+          changed = true;
+        }
+      }
+      if (changed) update({ ...state, library });
+    },
   };
 }
 

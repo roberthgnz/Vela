@@ -73,6 +73,8 @@ export type Stream = {
   ytId?: string;
   infoHash?: string;
   fileIdx?: number;
+  /** Extra peer discovery sources for torrents: `tracker:<url>` or `dht:<infoHash>`. */
+  sources?: string[];
   subtitles?: Subtitle[];
   behaviorHints?: {
     filename?: string;
