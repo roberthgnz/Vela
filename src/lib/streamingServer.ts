@@ -120,14 +120,20 @@ export async function prepareTorrent(
   return { url: torrentUrl(serviceUrl, infoHash, fileIdx, sources), fileIdx, fileName: file?.name, subtitles };
 }
 
-export type TorrentStats = { peers: number; unchoked: number; speed: number; downloaded: number; searching: boolean };
+export type TorrentStats = { peers: number; found: number; unchoked: number; speed: number; downloaded: number; searching: boolean };
 
-/** Swarm state of a torrent the server is streaming (`/{infoHash}/stats.json`, checked with server 4.22.3). */
+/**
+ * Swarm state of a torrent the server is streaming (`/{infoHash}/stats.json`, checked with server 4.22.3).
+ * `peers` are connections that completed the handshake (at most `btMaxConnections`); `found` are the
+ * addresses trackers and DHT returned that are still candidates (`unique`). Many of those never accept
+ * a connection. `swarmSize` is not a peer count: it is the connection limit.
+ */
 export async function torrentStats(serviceUrl: string, infoHash: string): Promise<TorrentStats> {
   const value = (await requestJson(`${base(serviceUrl)}/${encodeURIComponent(infoHash.toLowerCase())}/stats.json`)) as Record<string, unknown> | null;
   const number = (key: string) => (typeof value?.[key] === "number" && Number.isFinite(value[key]) ? (value[key] as number) : 0);
   return {
     peers: number("peers"),
+    found: number("unique"),
     unchoked: number("unchoked"),
     speed: number("downloadSpeed"),
     downloaded: number("downloaded"),
@@ -139,7 +145,12 @@ export async function torrentStats(serviceUrl: string, infoHash: string): Promis
 export function describeTorrent(stats: TorrentStats): string {
   const speed = stats.speed >= 1048576 ? `${(stats.speed / 1048576).toFixed(1)} MB/s` : `${Math.round(stats.speed / 1024)} KB/s`;
   const downloaded = `${Math.round(stats.downloaded / 1048576)} MB`;
-  return `${stats.peers} ${stats.peers === 1 ? "par" : "pares"} · ${speed} · ${downloaded} descargados`;
+  // Incoming connections are not among the found addresses, so `peers` can exceed `found`.
+  const peers =
+    stats.found > stats.peers
+      ? `${stats.peers} de ${stats.found} pares conectados`
+      : `${stats.peers} ${stats.peers === 1 ? "par conectado" : "pares conectados"}`;
+  return `${peers} · ${speed} · ${downloaded} descargados`;
 }
 
 /** Routes a URL through the server so it can add the request/response headers an addon requires. */

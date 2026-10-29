@@ -885,7 +885,7 @@ function SourcesPanel({
           <label className="select compact">
             <select aria-label="Ordenar fuentes" value={order} onChange={(event) => setOrder(event.target.value as SourceOrder)}>
               <option value="addon">Orden del addon</option>
-              <option value="seeders">Más pares</option>
+              <option value="seeders">Más semillas</option>
               <option value="largest">Mayor tamaño</option>
               <option value="smallest">Menor tamaño</option>
             </select>
@@ -1035,7 +1035,10 @@ function SourcesPanel({
                           </span>
                         )}
                         {facts.seeders !== undefined && (
-                          <span className="tag seeders" title={`${facts.seeders} pares`}>
+                          <span
+                            className="tag seeders"
+                            title={`${facts.seeders} ${facts.seeders === 1 ? "semilla" : "semillas"} según el addon. Es la cifra que registró al indexar el torrent: al conectar suelen responder bastantes menos pares.`}
+                          >
                             <Users size={11} /> {facts.seeders}
                           </span>
                         )}

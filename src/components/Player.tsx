@@ -995,7 +995,14 @@ export function Player({
                   ? "Convirtiendo con Stremio Service"
                   : playing.note || "Cargando"}
             </span>
-            {swarm && <span className="player-swarm">{describeTorrent(swarm.stats)}</span>}
+            {swarm && (
+              <span
+                className="player-swarm"
+                title="Pares que aceptaron la conexión, de los que han encontrado los trackers y la DHT. Muchos de los anunciados no responden, y Stremio Service mantiene como mucho unas decenas de conexiones a la vez."
+              >
+                {describeTorrent(swarm.stats)}
+              </span>
+            )}
             {(slow || starved) && (
               <div className="player-slow">
                 <p>

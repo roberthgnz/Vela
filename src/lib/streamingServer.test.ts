@@ -82,11 +82,13 @@ describe('streaming server client', () => {
 
 describe('torrent swarm', () => {
   it('reads the server stats and summarizes them', async () => {
-    transport.requestJson.mockResolvedValueOnce({ peers: 3, unchoked: 1, downloadSpeed: 0, downloaded: 0, peerSearchRunning: true, swarmSize: 55 });
+    // Taken from a real torrent on server 4.22.3: 145 addresses found, 55 connection slots busy, 3 handshakes.
+    transport.requestJson.mockResolvedValueOnce({ peers: 3, unchoked: 1, unique: 145, queued: 89, swarmConnections: 55, swarmSize: 55, downloadSpeed: 0, downloaded: 0, peerSearchRunning: true });
     const stats = await torrentStats('http://127.0.0.1:11470/', 'A2D9D5DE');
     expect(transport.requestJson).toHaveBeenLastCalledWith('http://127.0.0.1:11470/a2d9d5de/stats.json');
-    expect(stats).toEqual({ peers: 3, unchoked: 1, speed: 0, downloaded: 0, searching: true });
-    expect(describeTorrent(stats)).toBe('3 pares · 0 KB/s · 0 MB descargados');
-    expect(describeTorrent({ ...stats, peers: 1, speed: 2_540_000, downloaded: 290_000_000 })).toBe('1 par · 2.4 MB/s · 277 MB descargados');
+    expect(stats).toEqual({ peers: 3, found: 145, unchoked: 1, speed: 0, downloaded: 0, searching: true });
+    expect(describeTorrent(stats)).toBe('3 de 145 pares conectados · 0 KB/s · 0 MB descargados');
+    expect(describeTorrent({ ...stats, peers: 1, found: 1, speed: 2_540_000, downloaded: 290_000_000 })).toBe('1 par conectado · 2.4 MB/s · 277 MB descargados');
+    expect(describeTorrent({ ...stats, peers: 4, found: 0 })).toBe('4 pares conectados · 0 KB/s · 0 MB descargados');
   });
 });
