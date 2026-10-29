@@ -1789,7 +1789,9 @@ kbd {
   top: 64px;
   bottom: auto;
   width: 640px;
-  max-height: min(620px, calc(100vh - 96px));
+  /* A fixed height: results, skeletons and empty states replace each other while typing, and a
+     palette that resized with them would jump under the cursor. */
+  height: min(520px, calc(100vh - 96px));
   margin: 0 auto;
 }
 .palette[open] {
@@ -1823,6 +1825,10 @@ kbd {
   min-height: 0;
   padding: 6px;
   overflow-y: auto;
+}
+.palette-body[data-stale] section:not([aria-label="Comandos"]) {
+  opacity: 0.55;
+  transition: opacity 0.15s 0.1s;
 }
 .palette-body > .error-state {
   margin: 6px;

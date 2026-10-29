@@ -1,5 +1,5 @@
 import { useDeferredValue, useState, type KeyboardEvent, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { CornerDownLeft, Search } from "lucide-react";
 import type { InstalledAddon, MediaItem } from "../lib/contracts";
 import { getCatalog, getCatalogSources } from "../lib/protocol";
@@ -50,6 +50,9 @@ export function SearchPalette({
   const query = useQuery({
     queryKey: ["search", sources.map((source) => source.key), search],
     enabled: search.length >= 2,
+    // Each keystroke is a new query; keeping the last results until the next ones arrive stops the
+    // list from collapsing into skeletons and growing back while the user types.
+    placeholderData: keepPreviousData,
     queryFn: async ({ signal }) => {
       const results = await Promise.allSettled(
         sources.map(async (source) => ({
@@ -116,7 +119,7 @@ export function SearchPalette({
         {query.isFetching && <Spinner />}
         <kbd>Esc</kbd>
       </div>
-      <div className="palette-body">
+      <div className="palette-body" aria-busy={query.isFetching} data-stale={query.isPlaceholderData || undefined}>
         {search.length >= 2 && (
           <>
             {query.isPending ? (
