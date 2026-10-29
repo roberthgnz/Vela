@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const transport = vi.hoisted(() => ({ postJson: vi.fn(), requestJson: vi.fn() }));
 vi.mock('./transport', () => transport);
 
-import { describeTorrent, ensureService, isLocalService, peerSources, prepareTorrent, probeProblems, proxyUrl, torrentStats, torrentUrl, transcodeUrl } from './streamingServer';
+import { describeTorrent, ensureService, isLocalService, peerSources, prepareTorrent, setTorrentProfile, torrentProfileOf, torrentProfiles, probeProblems, proxyUrl, torrentStats, torrentUrl, transcodeUrl } from './streamingServer';
 
 const hash = '08ada5a7a6183aae1e09d831df6748d566095a10';
 const files = ['Sintel.de.srt', 'Sintel.en.srt', 'Sintel.es.srt', 'Sintel.fr.srt', 'Sintel.it.srt', 'Sintel.mp4', 'poster.jpg']
@@ -107,5 +107,24 @@ describe('ensureService', () => {
     expect(await ensureService('http://127.0.0.1:11470')).toBe(true);
     transport.requestJson.mockRejectedValueOnce(new Error('refused'));
     expect(await ensureService('http://192.168.1.10:11470')).toBe(false);
+  });
+});
+
+describe('torrent profiles', () => {
+  it('recognizes the server defaults and only sends integer limits', () => {
+    // Values reported by server 4.22.3 out of the box.
+    const shipped = { btMaxConnections: 55, btHandshakeTimeout: 20000, btRequestTimeout: 4000, btDownloadSpeedSoftLimit: 2621440, btDownloadSpeedHardLimit: 3670016, btMinPeersForStable: 5, cacheSize: 2147483648 };
+    expect(torrentProfileOf(shipped)).toBe('default');
+    expect(torrentProfileOf({ ...shipped, btMaxConnections: 70 })).toBeUndefined();
+    for (const profile of Object.values(torrentProfiles))
+      for (const value of Object.values(profile.values)) expect(Number.isInteger(value) && value > 0).toBe(true);
+  });
+
+  it('posts only the torrent limits and fails when the server does not confirm', async () => {
+    transport.postJson.mockResolvedValueOnce({ success: true });
+    await setTorrentProfile('http://127.0.0.1:11470/', 'fast');
+    expect(transport.postJson).toHaveBeenLastCalledWith('http://127.0.0.1:11470/settings', torrentProfiles.fast.values);
+    transport.postJson.mockResolvedValueOnce({ error: 'nope' });
+    await expect(setTorrentProfile('http://127.0.0.1:11470', 'soft')).rejects.toThrow();
   });
 });

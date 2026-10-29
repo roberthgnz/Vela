@@ -39,6 +39,65 @@ export async function serviceVersion(serviceUrl: string): Promise<string | undef
   return typeof values?.serverVersion === "string" ? values.serverVersion : undefined;
 }
 
+type TorrentLimits = {
+  btMaxConnections: number;
+  btHandshakeTimeout: number;
+  btRequestTimeout: number;
+  btDownloadSpeedSoftLimit: number;
+  btDownloadSpeedHardLimit: number;
+  btMinPeersForStable: number;
+};
+export type TorrentProfile = "soft" | "default" | "fast" | "ultra";
+
+const MB = 1048576;
+/**
+ * Torrent engine presets. "default" is what the server ships with (checked with 4.22.3); the others
+ * follow the profiles of Stremio's own settings. The server ignores values that are not positive
+ * integers, and reads them when a torrent is created, so a change affects the next torrents only.
+ */
+export const torrentProfiles: Record<TorrentProfile, { label: string; title: string; values: TorrentLimits }> = {
+  soft: {
+    label: "Suave",
+    title: "1,6 MB/s y 35 conexiones: deja red libre y no satura el router",
+    values: { btMaxConnections: 35, btHandshakeTimeout: 20000, btRequestTimeout: 4000, btDownloadSpeedSoftLimit: Math.round(1.6 * MB), btDownloadSpeedHardLimit: Math.round(1.6 * MB), btMinPeersForStable: 5 },
+  },
+  default: {
+    label: "Normal",
+    title: "Lo que trae Stremio: 2,5–3,5 MB/s y 55 conexiones",
+    values: { btMaxConnections: 55, btHandshakeTimeout: 20000, btRequestTimeout: 4000, btDownloadSpeedSoftLimit: 2.5 * MB, btDownloadSpeedHardLimit: 3.5 * MB, btMinPeersForStable: 5 },
+  },
+  fast: {
+    label: "Rápido",
+    title: "Hasta 37,5 MB/s y 200 conexiones",
+    values: { btMaxConnections: 200, btHandshakeTimeout: 20000, btRequestTimeout: 4000, btDownloadSpeedSoftLimit: 4 * MB, btDownloadSpeedHardLimit: 37.5 * MB, btMinPeersForStable: 10 },
+  },
+  ultra: {
+    label: "Máximo",
+    title: "Hasta 75 MB/s y 400 conexiones: puede saturar routers domésticos",
+    values: { btMaxConnections: 400, btHandshakeTimeout: 25000, btRequestTimeout: 6000, btDownloadSpeedSoftLimit: 8 * MB, btDownloadSpeedHardLimit: 75 * MB, btMinPeersForStable: 10 },
+  },
+};
+
+/** The preset the server is using, or undefined when its limits were set to something else. */
+export function torrentProfileOf(values: Record<string, unknown>): TorrentProfile | undefined {
+  return (Object.keys(torrentProfiles) as TorrentProfile[]).find((id) =>
+    Object.entries(torrentProfiles[id].values).every(([key, value]) => values[key] === value),
+  );
+}
+
+export async function torrentProfile(serviceUrl: string): Promise<TorrentProfile | undefined> {
+  const settings = await requestJson(`${base(serviceUrl)}/settings`, AbortSignal.timeout(4000));
+  const values = (settings as { values?: Record<string, unknown> } | null)?.values;
+  if (!values) throw new Error("El servidor no devolvió sus ajustes.");
+  return torrentProfileOf(values);
+}
+
+/** Saves the preset in the server's settings, which Stremio shares. Other settings are kept. */
+export async function setTorrentProfile(serviceUrl: string, profile: TorrentProfile): Promise<void> {
+  const reply = await postJson(`${base(serviceUrl)}/settings`, torrentProfiles[profile].values);
+  if (!(reply as { success?: unknown } | null)?.success) throw new Error("El servidor no guardó el perfil.");
+}
+
 /** The server answers /settings at once when it runs; a hung or unrelated host should not hold playback back. */
 export async function serviceAvailable(serviceUrl: string): Promise<boolean> {
   try {

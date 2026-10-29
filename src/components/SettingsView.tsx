@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import {
   CheckCircle2,
@@ -24,7 +24,16 @@ import {
 import type { PlayerPreferences } from "../lib/contracts";
 import { languageLabel, preferredLanguageOptions } from "../lib/languages";
 import { preferencesStore, usePreferences } from "../lib/store";
-import { ensureService, isLocalService, serviceInstalled, serviceVersion } from "../lib/streamingServer";
+import {
+  ensureService,
+  isLocalService,
+  serviceInstalled,
+  serviceVersion,
+  setTorrentProfile,
+  torrentProfile,
+  torrentProfiles,
+  type TorrentProfile,
+} from "../lib/streamingServer";
 import { openExternal } from "../lib/transport";
 import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
@@ -414,6 +423,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
                   )}
                 </div>
               </Row>
+              <TorrentProfileRow serviceUrl={prefs.serviceUrl} notify={notify} />
               <KeywordRows />
               <Row label="Descargar Stremio Service" description="Página oficial de descargas de Stremio.">
                 <button
@@ -562,6 +572,49 @@ function HardwareDecodingRow({ notify }: { notify: (message: string) => void }) 
       }
     >
       <Switch checked={enabled ?? true} label="Decodificación por hardware" onChange={() => enabled !== undefined && void toggle()} />
+    </Row>
+  );
+}
+
+/** Speed and connection limits of the server's torrent engine, stored by the server itself. */
+function TorrentProfileRow({ serviceUrl, notify }: { serviceUrl: string; notify: (message: string) => void }) {
+  const queryClient = useQueryClient();
+  const key = ["torrent-profile", serviceUrl];
+  const current = useQuery({ queryKey: key, queryFn: () => torrentProfile(serviceUrl), retry: 0 });
+  const save = useMutation({
+    mutationFn: (profile: TorrentProfile) => setTorrentProfile(serviceUrl, profile),
+    onSuccess: (_, profile) => {
+      queryClient.setQueryData(key, profile);
+      notify(`Perfil de torrents «${torrentProfiles[profile].label}» guardado.`);
+    },
+    onError: (error) => notify(errorMessage(error)),
+  });
+  const profile = current.data;
+  return (
+    <Row
+      label="Velocidad de los torrents"
+      description={
+        current.isError
+          ? "Conecta con el servidor para ver o cambiar sus límites."
+          : `Límite de descarga y de conexiones del servidor de Stremio${current.isSuccess && !profile ? " (ahora tiene valores personalizados)" : ""}. Se comparte con Stremio y se aplica a los torrents que abras después. Si el router se satura o se corta internet, usa «Suave».`
+      }
+    >
+      {current.isError ? (
+        <button className="button secondary" onClick={() => void current.refetch()}>
+          <Radio size={14} /> Reintentar
+        </button>
+      ) : (
+        <Segmented
+          label="Velocidad de los torrents"
+          value={(save.isPending ? save.variables : profile) ?? ("" as TorrentProfile)}
+          onChange={(value) => !save.isPending && value !== profile && save.mutate(value)}
+          options={(Object.keys(torrentProfiles) as TorrentProfile[]).map((id) => ({
+            value: id,
+            label: <span className="segment-text">{torrentProfiles[id].label}</span>,
+            title: torrentProfiles[id].title,
+          }))}
+        />
+      )}
     </Row>
   );
 }
