@@ -2746,32 +2746,71 @@ kbd {
   bottom: 50%;
   transform: translateY(50%);
 }
-.track-panel {
+/* Same surface as the app's menus. */
+.player-popover {
   position: absolute;
-  right: 18px;
-  bottom: 96px;
+  bottom: 84px;
   z-index: 4;
-  display: grid;
-  gap: 14px;
-  width: min(360px, calc(100% - 36px));
-  max-height: calc(100% - 180px);
-  overflow-y: auto;
-  padding: 14px;
-  border: 1px solid rgb(255 255 255 / 10%);
-  border-radius: var(--radius-xl);
-  background: rgb(20 21 24 / 95%);
-  backdrop-filter: blur(16px);
+  display: flex;
+  max-height: min(520px, calc(100% - 160px));
+  padding: 8px 4px;
+  border-radius: var(--radius-lg);
+  background: var(--popover);
+  color: var(--fg);
   box-shadow: var(--shadow-pop);
+  animation: menu-in 0.12s var(--ease);
+  user-select: none;
 }
-.track-panel h3 {
-  margin-bottom: 6px;
+.player-popover section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.speed-panel {
+  width: 160px;
+}
+.track-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  width: min(560px, calc(100% - 24px));
+}
+.track-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.track-languages {
+  min-height: 0;
+}
+.track-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+.track-divider {
+  height: 1px;
+  margin: 6px 10px;
+  border: 0;
+  background: rgb(255 255 255 / 8%);
+}
+@media (max-width: 720px) {
+  .track-panel {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: auto;
+  }
+}
+.player-popover h3 {
+  margin: 0 0 4px;
+  padding: 0 10px;
   color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
 }
-.track-panel [role="radiogroup"] {
+.player-popover [role="radiogroup"] {
   display: grid;
   gap: 2px;
 }
@@ -2780,28 +2819,30 @@ kbd {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 32px;
-  padding: 4px 10px 4px 28px;
+  min-height: 30px;
+  padding: 4px 10px 4px 26px;
   border-radius: var(--radius-sm);
   color: var(--fg);
   text-align: left;
   position: relative;
 }
-.track-option:hover {
-  background: rgb(255 255 255 / 7%);
+.track-option:hover,
+.track-option:focus-visible {
+  background: rgb(255 255 255 / 8%);
+  outline: none;
 }
 .track-option[aria-checked="true"] {
-  color: var(--accent);
+  font-weight: 600;
 }
 .track-option[aria-checked="true"]::before {
   content: "";
   position: absolute;
-  left: 10px;
+  left: 11px;
   top: 50%;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--accent);
   transform: translateY(-50%);
 }
 .track-option small {
@@ -2823,9 +2864,6 @@ kbd {
   min-width: 56px;
   font-variant-numeric: tabular-nums;
   text-align: center;
-}
-.track-close {
-  justify-self: end;
 }
 @media (max-width: 720px) {
   .player-next {
@@ -2994,39 +3032,26 @@ kbd {
   transition: width 0.2s;
 }
 
-/* Sources already opened: dimmed, with a quiet tag; hover restores them. */
-.source-item.marked.opened .source-row {
-  opacity: 0.72;
+/* Sources already opened: their state replaces the addon line; tried ones are dimmed. */
+.source-item.marked.opened .source-heading,
+.source-item.marked.opened .source-detail {
+  color: var(--fg-2);
 }
 .source-item.marked.failed .source-row {
-  opacity: 0.5;
+  opacity: 0.55;
 }
 .source-item.marked .source-row:hover,
 .source-item.marked .source-row:focus-visible {
   opacity: 1;
 }
-.source-item.last .source-row {
-  box-shadow: inset 2px 0 0 var(--accent);
-  background: rgb(214 239 145 / 5%);
+.source-mark {
+  font-variant-numeric: tabular-nums;
 }
-.tag.mark-played,
-.tag.mark-opened {
-  background: rgb(255 255 255 / 6%);
-  color: var(--fg-2);
-}
-.tag.mark-last {
-  background: var(--accent-soft);
+.source-mark.last {
   color: var(--accent);
 }
-.tag.mark-failed {
-  background: rgb(255 120 100 / 12%);
-  color: #ff9d8a;
-}
-.tag.mark-played svg,
-.tag.mark-opened svg,
-.tag.mark-failed svg,
-.tag.mark-last svg {
-  vertical-align: -1px;
+.source-mark.failed {
+  color: #e59a8a;
 }
 .opening-status {
   position: fixed;

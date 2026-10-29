@@ -40,7 +40,7 @@ import { streamQuality } from "../lib/streams";
 import { activeCues, decodeSubtitle, dedupeSubtitles, parseSubtitle, type Cue } from "../lib/subtitles";
 import { requestBytes, requestText } from "../lib/transport";
 import { clock, errorMessage } from "../lib/utils";
-import { anchorFrom, Dialog, useMenu } from "./Primitives";
+import { Dialog } from "./Primitives";
 import { native, setFullscreen, useWindowState, WindowControls } from "./WindowControls";
 
 export type Playing = {
@@ -179,7 +179,6 @@ export function Player({
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pending = useRef<{ audio?: number }>({});
   const autoChosen = useRef({ audio: false, subtitle: false });
-  const menu = useMenu();
   const windowState = useWindowState();
   const [browserFullscreen, setBrowserFullscreen] = useState(false);
   const fullscreen = native ? windowState.fullscreen : browserFullscreen;
@@ -210,7 +209,15 @@ export function Player({
   const [assActive, setAssActive] = useState(false);
   const [subtitleBusy, setSubtitleBusy] = useState(false);
   const [externalBusy, setExternalBusy] = useState(false);
-  const [panel, setPanel] = useState(false);
+  /** The open popover (audio and subtitles, or speed), aligned with the button that opened it. */
+  const [popover, setPopover] = useState<{ kind: "tracks" | "speed"; right: number } | null>(null);
+  const openPopover = (kind: "tracks" | "speed", button: HTMLElement) =>
+    setPopover((current) => {
+      if (current?.kind === kind) return null;
+      const box = surface.current?.getBoundingClientRect();
+      const right = box ? Math.max(12, box.right - button.getBoundingClientRect().right) : 12;
+      return { kind, right };
+    });
   const [idle, setIdle] = useState(false);
   const [hover, setHover] = useState<{ x: number; time: number } | null>(null);
   const [flash, setFlash] = useState("");
@@ -798,29 +805,19 @@ export function Player({
     void chooseSubtitle(nextTrack);
     showFlash(nextTrack ? `Subtítulos: ${nextTrack.label}` : "Subtítulos desactivados");
   };
-  const speedMenu = (button: HTMLElement) =>
-    menu.open(
-      anchorFrom(button, "end", true),
-      [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((value) => ({
-        label: value === 1 ? "Normal" : `${value}×`,
-        checked: rate === value,
-        onSelect: () => {
-          setRate(value);
-          if (video.current) video.current.playbackRate = value;
-        },
-      })),
-      "Velocidad",
-    );
+  const changeRate = (value: number) => {
+    setRate(value);
+    if (video.current) video.current.playbackRate = value;
+  };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
-    if (target.closest(".menu")) return;
     const onRange = target instanceof HTMLInputElement && target.type === "range";
-    const inPanel = Boolean(target.closest(".track-panel"));
+    const inPanel = Boolean(target.closest(".player-popover"));
     const key = event.key.toLowerCase();
     let handled = true;
     if (key === "escape") {
-      if (panel) setPanel(false);
+      if (popover) setPopover(null);
       else if (fullscreen) toggleFullscreen();
       else close();
     } else if (inPanel && (key === " " || key === "enter" || key.startsWith("arrow"))) handled = false;
@@ -872,7 +869,7 @@ export function Player({
     <Dialog title={`Reproduciendo ${playing.meta.name}`} onClose={close} className="player-dialog" hideClose>
       <div
         ref={surface}
-        className={`player ${idle && status === "playing" && !menu.isOpen && !panel ? "idle" : ""}`}
+        className={`player ${idle && status === "playing" && !popover ? "idle" : ""}`}
         data-status={status}
         onMouseMove={wake}
         onKeyDownCapture={() => wake()}
@@ -957,7 +954,7 @@ export function Player({
             finish();
           }}
           onError={(event) => setError(mediaErrorMessage(event.currentTarget.error))}
-          onClick={toggle}
+          onClick={() => (popover ? setPopover(null) : toggle())}
           onDoubleClick={toggleFullscreen}
         />
         {shown.length > 0 && (
@@ -1092,19 +1089,21 @@ export function Player({
             </div>
           </div>
         )}
-        {panel && (
+        {popover?.kind === "tracks" && (
           <TrackPanel
+            right={popover.right}
             audio={audioTracks}
             audioKey={audioKey}
             subtitles={subtitleTracks}
             subtitleKey={subtitleKey}
+            preferred={[settings.subtitleLanguage, settings.subtitleSecondary]}
             delay={delay}
             onAudio={(track) => chooseAudio(track)}
             onSubtitle={(track) => void chooseSubtitle(track)}
             onDelay={changeDelay}
-            onClose={() => setPanel(false)}
           />
         )}
+        {popover?.kind === "speed" && <SpeedPanel right={popover.right} rate={rate} onChange={changeRate} />}
         <div className="player-controls">
           <div
             className="seek"
@@ -1203,9 +1202,9 @@ export function Player({
             </span>
             <span className="player-spacer" />
             <button
-              className={`player-icon ${subtitleKey || audioTracks.length > 1 ? "active" : ""} ${panel ? "pressed" : ""}`}
+              className={`player-icon ${subtitleKey || audioTracks.length > 1 ? "active" : ""} ${popover?.kind === "tracks" ? "pressed" : ""}`}
               aria-label="Audio y subtítulos"
-              aria-expanded={panel}
+              aria-expanded={popover?.kind === "tracks"}
               aria-haspopup="dialog"
               title={
                 activeSubtitle
@@ -1214,16 +1213,17 @@ export function Player({
                     ? "Audio y subtítulos (C)"
                     : "No hay pistas adicionales"
               }
-              onClick={() => setPanel((value) => !value)}
+              onClick={(event) => openPopover("tracks", event.currentTarget)}
             >
               {subtitleBusy ? <LoaderCircle className="spin" size={18} /> : <Captions size={19} />}
             </button>
             <button
-              className={`player-icon ${rate !== 1 ? "active" : ""}`}
+              className={`player-icon ${rate !== 1 ? "active" : ""} ${popover?.kind === "speed" ? "pressed" : ""}`}
               aria-label="Velocidad de reproducción"
-              aria-haspopup="menu"
+              aria-haspopup="dialog"
+              aria-expanded={popover?.kind === "speed"}
               title="Velocidad"
-              onClick={(event) => speedMenu(event.currentTarget)}
+              onClick={(event) => openPopover("speed", event.currentTarget)}
             >
               {rate !== 1 ? <span className="rate">{rate}×</span> : <Gauge size={19} />}
             </button>
@@ -1248,131 +1248,170 @@ export function Player({
             </button>
           </div>
         </div>
-        {menu.element}
       </div>
     </Dialog>
   );
 }
 
-/** Audio and subtitle choices, grouped by language; choosing a language selects its first subtitle. */
+function Option({
+  checked,
+  label,
+  detail,
+  title,
+  onSelect,
+}: {
+  checked: boolean;
+  label: string;
+  detail?: string;
+  title?: string;
+  onSelect: () => void;
+}) {
+  return (
+    <button role="radio" aria-checked={checked} className="track-option" title={title} onClick={onSelect}>
+      <span>{label}</span>
+      {detail && <small>{detail}</small>}
+    </button>
+  );
+}
+
+/** Speed choices, in the same popover as audio and subtitles. */
+function SpeedPanel({ right, rate, onChange }: { right: number; rate: number; onChange: (value: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>("[aria-checked=true]")?.focus();
+  }, []);
+  return (
+    <div className="player-popover speed-panel" role="dialog" aria-label="Velocidad" ref={ref} style={{ right }}>
+      <section>
+        <h3>Velocidad</h3>
+        <div role="radiogroup" aria-label="Velocidad de reproducción">
+          {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((value) => (
+            <Option key={value} checked={rate === value} label={value === 1 ? "Normal" : `${value}×`} onSelect={() => onChange(value)} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Audio and subtitle choices. Subtitles are grouped by language, with the preferred languages
+ * first; choosing a language selects its first subtitle and «Versión» lists the others.
+ */
 function TrackPanel({
+  right,
   audio,
   audioKey,
   subtitles,
   subtitleKey,
+  preferred,
   delay,
   onAudio,
   onSubtitle,
   onDelay,
-  onClose,
 }: {
+  right: number;
   audio: Track[];
   audioKey: string;
   subtitles: Track[];
   subtitleKey: string;
+  preferred: string[];
   delay: number;
   onAudio: (track: Track) => void;
   onSubtitle: (track: Track | null) => void;
   onDelay: (value: number) => void;
-  onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const selected = subtitles.find((track) => track.key === subtitleKey);
-  const languages = [...new Set(subtitles.map((track) => track.lang || "und"))];
-  const variants = selected ? subtitles.filter((track) => (track.lang || "und") === (selected.lang || "und")) : [];
+  const langOf = (track: Track) => track.lang || "und";
+  const selectedLang = selected ? langOf(selected) : undefined;
+  const all = [...new Set(subtitles.map(langOf))];
+  const wanted = preferred.map((code) => normalizeLanguage(code)).filter(Boolean);
+  const label = (lang: string) => (lang === "und" ? "Idioma no indicado" : languageLabel(lang));
+  const top = all.filter((lang) => wanted.includes(lang) || lang === selectedLang)
+    .sort((a, b) => (wanted.indexOf(a) + 1 || 99) - (wanted.indexOf(b) + 1 || 99));
+  const others = all.filter((lang) => !top.includes(lang)).sort((a, b) => label(a).localeCompare(label(b), "es"));
+  const variants = selected ? subtitles.filter((track) => langOf(track) === selectedLang) : [];
   useEffect(() => {
-    ref.current?.querySelector<HTMLElement>("[aria-checked=true], button")?.focus();
+    ref.current?.querySelector<HTMLElement>(".track-languages [aria-checked=true]")?.focus();
   }, []);
   const conversionHint = (track: Track) =>
-    track.origin === "embedded" && !track.subtitle && track.key.startsWith("file-audio")
-      ? "Cambia a la conversión de Stremio Service"
-      : undefined;
+    track.origin === "embedded" && track.key.startsWith("file-audio") ? "Cambia a la conversión de Stremio Service" : undefined;
+  const language = (lang: string) => {
+    const first = subtitles.find((track) => langOf(track) === lang)!;
+    const count = subtitles.filter((track) => langOf(track) === lang).length;
+    return (
+      <Option
+        key={lang}
+        checked={selectedLang === lang}
+        label={label(lang)}
+        detail={count > 1 ? String(count) : undefined}
+        onSelect={() => onSubtitle(selected && selectedLang === lang ? selected : first)}
+      />
+    );
+  };
   return (
-    <div className="track-panel" role="dialog" aria-label="Audio y subtítulos" ref={ref}>
-      {audio.length > 1 && (
-        <section>
-          <h3>Audio</h3>
-          <div role="radiogroup" aria-label="Pista de audio">
-            {audio.map((track) => (
-              <button
-                key={track.key}
-                role="radio"
-                aria-checked={track.key === audioKey}
-                className="track-option"
-                title={conversionHint(track)}
-                onClick={() => onAudio(track)}
-              >
-                <span>{track.label}</span>
-                {track.detail && <small>{track.detail}</small>}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-      <section>
+    <div className="player-popover track-panel" role="dialog" aria-label="Audio y subtítulos" ref={ref} style={{ right }}>
+      <section className="track-languages">
         <h3>Subtítulos</h3>
-        <div role="radiogroup" aria-label="Idioma de los subtítulos">
-          <button role="radio" aria-checked={!selected} className="track-option" onClick={() => onSubtitle(null)}>
-            <span>Desactivados</span>
-          </button>
-          {languages.map((lang) => {
-            const first = subtitles.find((track) => (track.lang || "und") === lang)!;
-            const count = subtitles.filter((track) => (track.lang || "und") === lang).length;
-            return (
-              <button
-                key={lang}
-                role="radio"
-                aria-checked={(selected?.lang || "und") === lang && Boolean(selected)}
-                className="track-option"
-                title={conversionHint(first)}
-                onClick={() => onSubtitle(selected && (selected.lang || "und") === lang ? selected : first)}
-              >
-                <span>{lang === "und" ? "Idioma no indicado" : languageLabel(lang)}</span>
-                {count > 1 && <small>{count}</small>}
-              </button>
-            );
-          })}
+        <div role="radiogroup" aria-label="Idioma de los subtítulos" className="track-scroll">
+          <Option checked={!selected} label="Desactivados" onSelect={() => onSubtitle(null)} />
+          {top.map(language)}
+          {others.length > 0 && top.length > 0 && <hr className="track-divider" aria-hidden="true" />}
+          {others.map(language)}
           {!subtitles.length && <p className="track-empty">No hay subtítulos para este vídeo.</p>}
         </div>
       </section>
-      {variants.length > 1 && (
-        <section>
-          <h3>Versión</h3>
-          <div role="radiogroup" aria-label="Versión de los subtítulos">
-            {variants.map((track) => (
-              <button
-                key={track.key}
-                role="radio"
-                aria-checked={track.key === subtitleKey}
-                className="track-option"
-                title={conversionHint(track)}
-                onClick={() => onSubtitle(track)}
-              >
-                <span>{track.label}</span>
-                <small>{[track.origin === "file" ? "Externo" : "Del archivo", track.detail].filter(Boolean).join(" · ")}</small>
-              </button>
-            ))}
+      <div className="track-side">
+        {audio.length > 1 && (
+          <section>
+            <h3>Audio</h3>
+            <div role="radiogroup" aria-label="Pista de audio">
+              {audio.map((track) => (
+                <Option
+                  key={track.key}
+                  checked={track.key === audioKey}
+                  label={track.label}
+                  detail={track.detail}
+                  title={conversionHint(track)}
+                  onSelect={() => onAudio(track)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+        {variants.length > 1 && (
+          <section>
+            <h3>Versión</h3>
+            <div role="radiogroup" aria-label="Versión de los subtítulos" className="track-scroll">
+              {variants.map((track) => (
+                <Option
+                  key={track.key}
+                  checked={track.key === subtitleKey}
+                  label={track.label}
+                  detail={[track.origin === "file" ? "Externo" : "Del archivo", track.detail].filter(Boolean).join(" · ")}
+                  onSelect={() => onSubtitle(track)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+        <section className="track-delay">
+          <h3 id="subtitle-delay">Desfase</h3>
+          <div className="stepper" role="group" aria-labelledby="subtitle-delay">
+            <button className="button small subtle" aria-label="Adelantar subtítulos 0,1 s" title="Adelantar (G)" disabled={!selected} onClick={() => onDelay(delay - 0.1)}>
+              −0,1
+            </button>
+            <output aria-live="polite">{`${delay > 0 ? "+" : ""}${delay.toLocaleString("es", { minimumFractionDigits: 1 })} s`}</output>
+            <button className="button small subtle" aria-label="Retrasar subtítulos 0,1 s" title="Retrasar (H)" disabled={!selected} onClick={() => onDelay(delay + 0.1)}>
+              +0,1
+            </button>
+            <button className="button small subtle" disabled={!delay} onClick={() => onDelay(0)}>
+              Restablecer
+            </button>
           </div>
         </section>
-      )}
-      <section className="track-delay">
-        <h3 id="subtitle-delay">Desfase</h3>
-        <div className="stepper" role="group" aria-labelledby="subtitle-delay">
-          <button className="button small subtle" aria-label="Adelantar subtítulos 0,1 s" title="Adelantar (G)" disabled={!selected} onClick={() => onDelay(delay - 0.1)}>
-            −0,1 s
-          </button>
-          <output aria-live="polite">{`${delay > 0 ? "+" : ""}${delay.toLocaleString("es", { minimumFractionDigits: 1 })} s`}</output>
-          <button className="button small subtle" aria-label="Retrasar subtítulos 0,1 s" title="Retrasar (H)" disabled={!selected} onClick={() => onDelay(delay + 0.1)}>
-            +0,1 s
-          </button>
-          <button className="button small subtle" disabled={!delay} onClick={() => onDelay(0)}>
-            Restablecer
-          </button>
-        </div>
-      </section>
-      <button className="track-close button small subtle" onClick={onClose}>
-        Cerrar
-      </button>
+      </div>
     </div>
   );
 }

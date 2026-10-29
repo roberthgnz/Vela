@@ -9,7 +9,6 @@ import {
   CheckCheck,
   Circle,
   Eraser,
-  Eye,
   Clipboard,
   ExternalLink,
   Globe,
@@ -89,6 +88,10 @@ const upcoming = (episode: Episode) => isUpcoming(episode);
 function markLabel(outcome: "opened" | "played" | "failed", last: boolean): string {
   if (last) return "Viendo";
   return outcome === "played" ? "Vista" : outcome === "failed" ? "Falló" : "Abierta";
+}
+
+function markText(outcome: "opened" | "played" | "failed", last: boolean, at: number): string {
+  return `${markLabel(outcome, last)} ${relativeTime(at)}`;
 }
 
 function relativeTime(at: number): string {
@@ -602,6 +605,7 @@ function SourcesPanel({
   const [languageFilter, setLanguageFilter] = useState("");
   const [active, setActive] = useState<number | null>(null);
   const marks = useSourceMarks(videoId);
+  const position = videoId ? prefs.library[mediaKey(meta.type, meta.id)]?.videos?.[videoId]?.seconds : undefined;
   const lastKey = (() => {
     const last = sourceHistory.last(meta.type, meta.id);
     return last && last.videoId === videoId ? sourceKey(last.stream) : undefined;
@@ -823,15 +827,6 @@ function SourcesPanel({
                       <span className="source-heading">{streamHeading(stream)}</span>
                       {detail.length > 0 && <span className="source-detail">{detail.join(" · ")}</span>}
                       <span className="source-tags">
-                        {mark && (
-                          <span
-                            className={`tag mark-${mark.outcome} ${isLast ? "mark-last" : ""}`}
-                            title={`${markLabel(mark.outcome, isLast)} ${relativeTime(mark.at)}${mark.error ? ` · ${mark.error}` : ""}`}
-                          >
-                            {mark.outcome === "played" ? <Check size={11} /> : mark.outcome === "failed" ? <AlertTriangle size={11} /> : <Eye size={11} />}{" "}
-                            {markLabel(mark.outcome, isLast)}
-                          </span>
-                        )}
                         <span className={`tag kind-${kind}`}>{kindLabel[kind]}</span>
                         {streamLanguageList.length > 0 && (
                           <span
@@ -866,7 +861,16 @@ function SourcesPanel({
                           </span>
                         )}
                         <span className="source-addon">
-                          {[addonLabel(stream), facts.provider].filter(Boolean).join(" · ")}
+                          {mark ? (
+                            <span
+                              className={`source-mark ${isLast ? "last" : mark.outcome}`}
+                              title={mark.error ? `${mark.error} (${relativeTime(mark.at)})` : relativeTime(mark.at)}
+                            >
+                              {isLast && position && position >= 15 ? `Viendo · ${clock(position)}` : isLast ? "Viendo" : markText(mark.outcome, false, mark.at)}
+                            </span>
+                          ) : (
+                            [addonLabel(stream), facts.provider].filter(Boolean).join(" · ")
+                          )}
                         </span>
                       </span>
                     </span>
