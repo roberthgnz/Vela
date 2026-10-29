@@ -26,6 +26,8 @@ export type MediaItem = {
   cast?: string[];
   director?: string[];
   videos?: Episode[];
+  /** YouTube trailers (`trailerStreams` / `trailers` in Cinemeta). */
+  trailers?: { ytId: string; title?: string }[];
 };
 
 export type AddonCatalog = {

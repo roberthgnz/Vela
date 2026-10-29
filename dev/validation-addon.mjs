@@ -78,6 +78,12 @@ const streams = [
   { name: "Directo\nCabeceras", title: "MP4 que exige X-Vela-Token", url: `${base}/protected/h264.mp4`, behaviorHints: { proxyHeaders: { request: { "X-Vela-Token": "ok" } } } },
   { name: "Directo\nHEVC", title: "MKV con vídeo HEVC · requiere conversión o MPV", url: `${base}/media/hevc.mkv`, behaviorHints: { notWebReady: true } },
   { name: "Directo\nH.264", title: "MP4 H.264/AAC compatible", url: `${base}/media/h264.mp4` },
+  // Many audio languages, written as torrent addons do, to check that the language filter folds.
+  {
+    name: "Directo\nIdiomas",
+    title: "MP4 H.264 · prueba del filtro de idiomas\n🇬🇧 / 🇪🇸 / 🇫🇷 / 🇩🇪 / 🇮🇹 / 🇵🇹 / 🇧🇷 / 🇷🇺 / 🇺🇦 / 🇵🇱 / 🇳🇱 / 🇸🇪 / 🇳🇴 / 🇩🇰 / 🇫🇮 / 🇨🇿 / 🇭🇺 / 🇷🇴 / 🇬🇷 / 🇹🇷 / 🇮🇱 / 🇸🇦 / 🇮🇳 / 🇯🇵 / 🇰🇷 / 🇨🇳 / 🇹🇭 / 🇻🇳 / 🇮🇩 / 🇲🇽",
+    url: `${base}/media/h264.mp4`,
+  },
 ];
 
 const trackStreams = [

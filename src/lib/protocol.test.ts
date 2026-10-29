@@ -141,6 +141,15 @@ describe('catalog protocol', () => {
     expect(result.videos?.[0].title).toBe('Pilot');
   });
 
+  it('reads YouTube trailers from trailerStreams and the older trailers list', async () => {
+    request.mockResolvedValueOnce({ meta: {
+      id: 'tt1', type: 'movie', name: 'Film',
+      trailerStreams: [{ title: 'Film', ytId: 'R7uixLkpjPs' }, { ytId: 'not a youtube id' }],
+      trailers: [{ source: 'R7uixLkpjPs', type: 'Trailer' }, { source: '_2Lbqu0MzXo', type: 'Trailer' }, { source: 'abcdefghijk', type: 'Clip' }],
+    } });
+    expect((await getMeta(addon(), 'movie', 'tt1')).trailers).toEqual([{ ytId: 'R7uixLkpjPs', title: 'Film' }, { ytId: '_2Lbqu0MzXo', title: undefined }]);
+  });
+
   it('rejects metadata returned for a different title', async () => {
     request.mockResolvedValueOnce({ meta: { id: 'tt2', type: 'movie', name: 'Wrong title' } });
     await expect(getMeta(addon(), 'movie', 'tt1')).rejects.toThrow('otro título');

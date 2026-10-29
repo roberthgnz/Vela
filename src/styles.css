@@ -349,58 +349,28 @@ kbd {
 .nav-item.active svg {
   color: var(--accent);
 }
-.account-chip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  padding: 7px 6px;
-  border-top: 1px solid var(--line);
-  border-radius: var(--radius);
-  text-align: left;
-  white-space: nowrap;
+.account-item {
+  margin-top: 4px;
 }
-.account-chip:hover {
-  background: var(--hover);
-}
-.account-avatar {
+.account-initial {
   display: grid;
   flex: none;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--raised-2);
-  color: var(--fg-2);
+  color: var(--fg);
+  font-size: 10.5px;
   font-weight: 600;
-  font-size: 12px;
-  overflow: hidden;
 }
-.account-avatar.connected {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.account-text {
-  display: grid;
-  min-width: 0;
-}
-.account-text strong {
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-}
-.account-text small {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
-  text-overflow: ellipsis;
+.account-initial.error {
+  box-shadow: 0 0 0 1.5px var(--danger);
 }
 .sidebar-collapsed .nav-item {
   padding-left: 11px;
 }
-.sidebar-collapsed .nav-item span,
-.sidebar-collapsed .account-text {
+.sidebar-collapsed .nav-item span:not(.account-initial) {
   opacity: 0;
   pointer-events: none;
 }
@@ -3066,4 +3036,55 @@ kbd {
   background: var(--surface);
   box-shadow: var(--shadow-pop);
   transform: translateX(-50%);
+}
+
+/* Trailer */
+.trailer-dialog {
+  width: min(960px, calc(100vw - 48px));
+  padding: 0;
+  overflow: hidden;
+}
+.trailer-frame {
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+.trailer-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.trailer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+}
+.trailer-bar .segmented {
+  margin-right: auto;
+}
+.trailer-dialog .dialog-close {
+  z-index: 2;
+  background: rgb(0 0 0 / 55%);
+}
+.chip-more {
+  color: var(--muted);
+}
+.account-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--raised-2);
+  color: var(--fg-2);
+  font-weight: 600;
+  font-size: 12px;
+  overflow: hidden;
+}
+.account-avatar.connected {
+  background: var(--accent-soft);
+  color: var(--accent);
 }

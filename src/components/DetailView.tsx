@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Children, isValidElement, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -7,6 +7,7 @@ import {
   BookmarkCheck,
   Check,
   CheckCheck,
+  Clapperboard,
   Circle,
   Eraser,
   Clipboard,
@@ -51,6 +52,7 @@ import { typeLabel } from "./MediaCard";
 import {
   anchorFrom,
   Artwork,
+  Dialog,
   EmptyState,
   ErrorState,
   Spinner,
@@ -169,6 +171,7 @@ export function DetailView({
     : undefined;
   const videoId = isSeries ? (showSources ? selectedEpisode?.id : undefined) : meta.id;
   const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const [trailer, setTrailer] = useState<number | null>(null);
   const backdrop = safeImage(meta.background || meta.poster);
   const chooseEpisode = (episode: Episode) => {
     onVideoChange(episode.id);
@@ -324,6 +327,12 @@ export function DetailView({
                   <Play size={14} fill={resume ? "none" : "currentColor"} />
                   Ver fuentes
                 </button>
+                {meta.trailers?.length ? (
+                  <button className="button secondary" onClick={() => setTrailer(0)}>
+                    <Clapperboard size={15} />
+                    Tráiler
+                  </button>
+                ) : null}
                 <button
                   className="button secondary"
                   aria-label={saved ? "Quitar de mi biblioteca" : "Guardar en mi biblioteca"}
@@ -451,7 +460,77 @@ export function DetailView({
         </aside>
       </div>
       {menu.element}
+      {trailer !== null && meta.trailers?.[trailer] && (
+        <TrailerDialog
+          title={meta.name}
+          trailers={meta.trailers}
+          index={trailer}
+          onIndex={setTrailer}
+          onClose={() => setTrailer(null)}
+          notify={notify}
+        />
+      )}
     </section>
+  );
+}
+
+/**
+ * YouTube's privacy-enhanced player in a dialog. (Stremio Service's /yt resolver no longer works
+ * with YouTube: it answers "Could not extract signature deciphering actions".)
+ */
+function TrailerDialog({
+  title,
+  trailers,
+  index,
+  onIndex,
+  onClose,
+  notify,
+}: {
+  title: string;
+  trailers: NonNullable<MediaItem["trailers"]>;
+  index: number;
+  onIndex: (index: number) => void;
+  onClose: () => void;
+  notify: (message: string) => void;
+}) {
+  const current = trailers[index];
+  return (
+    <Dialog title={`Tráiler de ${title}`} onClose={onClose} className="trailer-dialog" hideClose>
+      <div className="trailer-frame">
+        <iframe
+          key={current.ytId}
+          src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(current.ytId)}?autoplay=1&rel=0&modestbranding=1`}
+          title={`Tráiler de ${title}`}
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+      </div>
+      <div className="trailer-bar">
+        {trailers.length > 1 && (
+          <div className="segmented" role="radiogroup" aria-label="Tráileres">
+            {trailers.map((item, position) => (
+              <button key={item.ytId} role="radio" aria-checked={position === index} onClick={() => onIndex(position)}>
+                <span className="segment-text">{position + 1}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          className="button subtle small"
+          onClick={() =>
+            void openExternal(`https://www.youtube.com/watch?v=${encodeURIComponent(current.ytId)}`).catch((error) =>
+              notify(errorMessage(error)),
+            )
+          }
+        >
+          Abrir en YouTube <ExternalLink size={12} />
+        </button>
+        <button className="button secondary small" data-autofocus onClick={onClose}>
+          Cerrar
+        </button>
+      </div>
+    </Dialog>
   );
 }
 
@@ -579,6 +658,63 @@ function EpisodesPanel({
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * A row of filter chips limited to two lines; the rest fold behind «+N» (the selected chip
+ * always stays visible).
+ */
+function CollapsibleChips({ label, selected, children }: { label: string; selected: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [limit, setLimit] = useState<number | null>(null);
+  const items = Children.toArray(children);
+  // Measure with every chip shown, then keep those on the first two lines (minus room for «+N»).
+  const measured = useRef(-1);
+  useLayoutEffect(() => {
+    if (expanded || (limit !== null && measured.current === items.length)) return;
+    const node = ref.current;
+    if (!node) return;
+    measured.current = items.length;
+    const chips = [...node.children] as HTMLElement[];
+    const rows = [...new Set(chips.map((chip) => chip.offsetTop))];
+    if (rows.length <= 2) return setLimit(items.length);
+    const firstHidden = chips.findIndex((chip) => chip.offsetTop >= rows[2]);
+    setLimit(Math.max(1, firstHidden - 1));
+  }, [expanded, items.length, limit]);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    let width = node.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (node.clientWidth !== width) {
+        width = node.clientWidth;
+        measured.current = -1;
+        setLimit(null);
+      }
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const folded = !expanded && limit !== null && limit < items.length;
+  const visible = folded
+    ? items.filter((item, index) => index < limit! || (isValidElement(item) && item.key === `.$${selected}` && selected !== ""))
+    : items;
+  return (
+    <div className="chip-row" role="toolbar" aria-label={label} ref={ref}>
+      {visible}
+      {folded && (
+        <button className="chip chip-more" aria-expanded={false} onClick={() => setExpanded(true)}>
+          +{items.length - visible.length}
+        </button>
+      )}
+      {expanded && (
+        <button className="chip chip-more" aria-expanded onClick={() => (setExpanded(false), setLimit(null))}>
+          Menos
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -732,7 +868,7 @@ function SourcesPanel({
         </div>
       )}
       {languages.size > 0 && (
-        <div className="chip-row" role="toolbar" aria-label="Filtrar por idioma">
+        <CollapsibleChips label="Filtrar por idioma" selected={languageFilter}>
           <button
             className={`chip ${!languageFilter ? "selected" : ""}`}
             aria-pressed={!languageFilter}
@@ -755,7 +891,7 @@ function SourcesPanel({
                 <span>{count}</span>
               </button>
             ))}
-        </div>
+        </CollapsibleChips>
       )}
       {play.isError && (
         <div className="panel-alert">

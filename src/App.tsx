@@ -4,8 +4,8 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleCheck,
+  CircleUserRound,
   Film,
-  HardDrive,
   Home,
   Keyboard,
   Library,
@@ -427,37 +427,30 @@ export default function App() {
         <nav aria-label="Configuración" className="nav-group">
           {secondary.map(navButton)}
         </nav>
-        <button
-          className="account-chip"
-          onClick={() => {
-            section("settings");
-            requestAnimationFrame(() => document.getElementById("settings-account")?.scrollIntoView());
-          }}
-          title={accountState.user ? `Cuenta de Stremio: ${accountState.user.email}` : "Cuenta"}
-          aria-label={accountState.user ? `Cuenta: ${accountState.user.email}` : "Cuenta: modo local"}
-        >
-          {accountState.status === "signed-in" && accountState.user ? (
-            <>
-              <span className="account-avatar connected">
-                {accountState.syncing ? <RefreshCw size={13} className="spin" /> : accountState.user.email.charAt(0).toUpperCase()}
-              </span>
-              <span className="account-text">
-                <strong>{accountState.user.email}</strong>
-                <small>{accountState.syncing ? "Sincronizando…" : accountState.error ? "Error de sincronización" : "Stremio conectado"}</small>
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="account-avatar">
-                <HardDrive size={14} />
-              </span>
-              <span className="account-text">
-                <strong>Modo local</strong>
-                <small>Sin cuenta conectada</small>
-              </span>
-            </>
-          )}
-        </button>
+        {(() => {
+          const user = accountState.status === "signed-in" ? accountState.user : undefined;
+          const state = accountState.syncing ? "Sincronizando…" : accountState.error ? "Error de sincronización" : "Stremio conectado";
+          return (
+            <button
+              className="nav-item account-item"
+              onClick={() => {
+                section("settings");
+                requestAnimationFrame(() => document.getElementById("settings-account")?.scrollIntoView());
+              }}
+              title={user ? `${user.email} · ${state}` : "Conectar la cuenta de Stremio"}
+              aria-label={user ? `Cuenta de Stremio: ${user.email}. ${state}` : "Iniciar sesión en Stremio"}
+            >
+              {user ? (
+                <span className={`account-initial ${accountState.error ? "error" : ""}`} aria-hidden="true">
+                  {accountState.syncing ? <RefreshCw size={11} className="spin" /> : user.email.charAt(0).toUpperCase()}
+                </span>
+              ) : (
+                <CircleUserRound size={17} strokeWidth={1.75} />
+              )}
+              <span>{user ? user.email : "Iniciar sesión"}</span>
+            </button>
+          );
+        })()}
       </aside>
       <RouteStateProvider value={routeState}>
       <main id="main" className="content" ref={content} tabIndex={-1}>

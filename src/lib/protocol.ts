@@ -170,7 +170,23 @@ function media(value: unknown): MediaItem {
     cast: optionalStrings(item.cast, 'Cast'),
     director: optionalStrings(item.director, 'Directors'),
     videos: item.videos?.map(episode),
+    trailers: trailers(item),
   };
+}
+
+/** YouTube trailers, from `trailerStreams` (streams with ytId) or the older `trailers` list. */
+function trailers(item: Record<string, unknown>): MediaItem['trailers'] {
+  const found = new Map<string, { ytId: string; title?: string }>();
+  const add = (ytId: unknown, title?: unknown) => {
+    if (typeof ytId === 'string' && /^[\w-]{11}$/.test(ytId) && !found.has(ytId))
+      found.set(ytId, { ytId, title: typeof title === 'string' && title.trim() ? title : undefined });
+  };
+  if (Array.isArray(item.trailerStreams))
+    for (const value of item.trailerStreams) if (value && typeof value === 'object') add((value as Record<string, unknown>).ytId, (value as Record<string, unknown>).title);
+  if (Array.isArray(item.trailers))
+    for (const value of item.trailers)
+      if (value && typeof value === 'object' && ((value as Record<string, unknown>).type ?? 'Trailer') === 'Trailer') add((value as Record<string, unknown>).source);
+  return found.size ? [...found.values()] : undefined;
 }
 
 function subtitle(value: unknown): Subtitle {
