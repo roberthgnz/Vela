@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900">
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#172e37"/><stop offset="1" stop-color="#8ca691"/></linearGradient><radialGradient id="light"><stop stop-color="#e4c689"/><stop offset="1" stop-color="#e4c689" stop-opacity="0"/></radialGradient></defs>
+  <path fill="url(#sky)" d="M0 0h600v900H0z"/><circle cx="398" cy="250" r="240" fill="url(#light)"/>
+  <path fill="#1b3c36" d="M0 500q170-100 300 50t300-50v400H0z"/><path fill="#102927" d="M0 680q160-120 340 0t260-40v260H0z"/>
+  <g fill="#d6d9bb"><ellipse cx="295" cy="610" rx="102" ry="142"/><ellipse cx="285" cy="469" rx="77" ry="75"/><ellipse cx="240" cy="358" rx="28" ry="101" transform="rotate(-13 240 358)"/><ellipse cx="320" cy="354" rx="27" ry="104" transform="rotate(11 320 354)"/></g>
+  <g fill="#a3ad93"><ellipse cx="241" cy="356" rx="12" ry="74" transform="rotate(-13 241 356)"/><ellipse cx="320" cy="354" rx="12" ry="77" transform="rotate(11 320 354)"/></g>
+  <path d="M271 472q18 8 35 0" fill="none" stroke="#435452" stroke-width="5" stroke-linecap="round"/><circle cx="258" cy="453" r="5" fill="#243a35"/><circle cx="307" cy="453" r="5" fill="#243a35"/>
+  <g fill="#e8bd6f"><path d="m406 376 14-13-1 21-13 9-13-9-1-21z"/><circle cx="120" cy="526" r="3"/><circle cx="462" cy="519" r="3"/></g>
+  <path fill="#091a1b" fill-opacity=".8" d="M0 762h600v138H0z"/>
+  <g fill="#eff0df" text-anchor="middle" font-family="Georgia,serif"><text x="300" y="806" font-size="18" letter-spacing="5">BLENDER FOUNDATION</text><text x="300" y="855" font-size="45">Big Buck Bunny</text><text x="300" y="881" font-size="12" letter-spacing="4">TRÁILER · 2008</text></g>
+</svg>

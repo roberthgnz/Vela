@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-native-transport"
+description = "Allow the main window to request addon data and explicitly launch links or a configured player."
+commands.allow = ["request_json", "request_text", "open_external", "launch_external_player"]

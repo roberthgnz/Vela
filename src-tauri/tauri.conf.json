@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Vela",
+  "version": "0.1.0",
+  "identifier": "com.vela.desktop",
+  "build": {
+    "beforeDevCommand": "node src-tauri/start-ui.mjs",
+    "devUrl": "http://127.0.0.1:1430",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Vela",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 900,
+        "minHeight": 640,
+        "center": true,
+        "decorations": false,
+        "backgroundColor": "#090b0e"
+      }
+    ],
+    "security": {
+      "capabilities": ["main"],
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http: https: data: blob:; connect-src 'self' ipc: http://ipc.localhost http: https: ws://127.0.0.1:1430; media-src 'self' http: https: blob:; worker-src 'self' blob:; font-src 'self' data:; frame-src 'none'; object-src 'none'; base-uri 'self'",
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http: https: data: blob:; connect-src 'self' ipc: http://ipc.localhost http: https:; media-src 'self' http: https: blob:; worker-src 'self' blob:; font-src 'self' data:; frame-src 'none'; object-src 'none'; base-uri 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "category": "Entertainment",
+    "shortDescription": "Your addons. Your library. One beautiful desktop.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": false,
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

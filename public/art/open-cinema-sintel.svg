@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900">
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#22293f"/><stop offset=".65" stop-color="#916953"/><stop offset="1" stop-color="#d8a867"/></linearGradient><radialGradient id="sun"><stop stop-color="#e7c18a"/><stop offset="1" stop-color="#e7c18a" stop-opacity="0"/></radialGradient></defs>
+  <path fill="url(#sky)" d="M0 0h600v900H0z"/><circle cx="425" cy="394" r="195" fill="url(#sun)"/>
+  <path fill="#3b3b4b" d="m0 560 130-235 95 158 131-262 138 225 106-97v551H0z"/><path fill="#c5b9a0" fill-opacity=".8" d="m88 402 42-77 38 65-36-19zM308 316l48-95 64 104-54-31-21 38z"/><path fill="#272e3a" d="m0 691 160-132 135 101 181-106 124 107v239H0z"/>
+  <path fill="#171e2c" d="m268 500 20-31 30 8 15 35-17 27 26 120 47 101H217l39-119 18-105z"/><path fill="#b17855" d="m272 497 14-30 32 10 14 37-23-9-18 27-24-8z"/><path fill="none" stroke="#171e2c" stroke-width="9" d="m340 526 31 208"/>
+  <path fill="#e0aa66" d="m372 430 29-38 41 11 59-28-27 53-45 9-17 37-23-23-29 17z"/><path fill="#ad744e" d="m402 399 24-74 28 78 46-28-26 53-43 9z"/>
+  <path fill="#141b29" fill-opacity=".9" d="M0 761h600v139H0z"/>
+  <g fill="#f2debd" text-anchor="middle" font-family="Georgia,serif"><text x="300" y="804" font-size="17" letter-spacing="5">BLENDER FOUNDATION</text><text x="300" y="859" font-size="60" letter-spacing="12">SINTEL</text><text x="300" y="884" font-size="12" letter-spacing="4">TRÁILER · 2010</text></g>
+</svg>

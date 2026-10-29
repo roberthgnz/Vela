@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-launch-external-player"
+description = "Enables the launch_external_player command without any pre-configured scope."
+commands.allow = ["launch_external_player"]
+
+[[permission]]
+identifier = "deny-launch-external-player"
+description = "Denies the launch_external_player command without any pre-configured scope."
+commands.deny = ["launch_external_player"]
