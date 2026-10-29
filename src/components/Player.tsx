@@ -21,7 +21,7 @@ import type Hls from "hls.js";
 import type JASSUB from "jassub";
 import type { Episode, MediaItem, ResolvedStream, Subtitle } from "../lib/contracts";
 import { episodeCode, nextEpisode } from "../lib/episodes";
-import { playExternally } from "../lib/externalPlayback";
+import { externalPlayerName, playExternally } from "../lib/externalPlayback";
 import { languageLabel, normalizeLanguage, pickByLanguage } from "../lib/languages";
 import { getSubtitles } from "../lib/protocol";
 import { CREDITS_THRESHOLD, preferencesStore, usePreferences, WATCHED_THRESHOLD } from "../lib/store";
@@ -800,7 +800,7 @@ export function Player({
   const external = async () => {
     setExternalBusy(true);
     try {
-      const { ipc } = await playExternally(playing.externalUrl, {
+      const launch = await playExternally(playing.externalUrl, {
         meta: playing.meta,
         addonUrl: playing.addonUrl,
         videoId: playing.videoId,
@@ -810,7 +810,7 @@ export function Player({
         stream: playing.stream,
       });
       video.current?.pause();
-      showFlash(ipc ? "Abierto en MPV · Vela guardará el progreso" : "Abierto en el reproductor externo");
+      showFlash(launch.ipc ? `Abierto en ${externalPlayerName(launch)} · Vela guardará el progreso` : "Abierto en el reproductor externo");
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {

@@ -23,7 +23,7 @@ import {
 import { account, useAccount } from "./lib/account";
 import type { Episode, InstalledAddon, MediaItem, ResolvedStream } from "./lib/contracts";
 import { episodeCode, nextEpisode, pickNextStream } from "./lib/episodes";
-import { onExternalClosed, playExternally } from "./lib/externalPlayback";
+import { externalPlayerName, onExternalClosed, playExternally } from "./lib/externalPlayback";
 import { defaultAddons, getStreams, loadManifest } from "./lib/protocol";
 import { metaAddon, RouteStateProvider, useNavigation, type Route, type Section } from "./lib/navigation";
 import { resolvePlayback } from "./lib/playback";
@@ -174,7 +174,7 @@ export default function App() {
     const saved = entry?.videos?.[videoId] ?? (entry?.progress?.videoId === videoId ? entry.progress : undefined);
     const resume = saved && saved.duration > 0 && saved.seconds < saved.duration * CREDITS_THRESHOLD ? saved.seconds : 0;
     if (mode === "external") {
-      const { ipc } = await playExternally(target.externalUrl, {
+      const launch = await playExternally(target.externalUrl, {
         meta,
         addonUrl,
         videoId,
@@ -185,7 +185,7 @@ export default function App() {
         subtitles: target.subtitles,
       });
       sourceHistory.mark(meta.type, meta.id, videoId, stream, "played");
-      notify(ipc ? "Abierto en MPV. Vela guardará el progreso al cerrarlo." : "Fuente abierta en el reproductor externo.");
+      notify(launch.ipc ? `Abierto en ${externalPlayerName(launch)}. Vela guardará el progreso al cerrarlo.` : "Fuente abierta en el reproductor externo.");
       return;
     }
     setPlaying({

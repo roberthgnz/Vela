@@ -159,6 +159,9 @@ export async function deleteSecret(name: SecretName): Promise<void> {
  * MPV's IPC and emits `player-progress`; every player emits `player-closed` when it exits.
  * Returns whether progress will be reported.
  */
+/** Whether Vela follows the player's progress, and which kind of player it started. */
+export type ExternalLaunch = { ipc: boolean; player?: 'mpv' | 'vlc' | 'other' };
+
 export async function launchExternalPlayer(
   raw: string,
   path: string,
@@ -171,11 +174,11 @@ export async function launchExternalPlayer(
     subtitles?: string[];
     showSubtitles?: boolean;
   } = {},
-): Promise<{ ipc: boolean }> {
+): Promise<ExternalLaunch> {
   const url = externalUrl(raw);
   if (!isTauri()) throw new Error('Open Vela Desktop to launch an external player.');
   try {
-    return await invoke<{ ipc: boolean }>('launch_external_player', {
+    return await invoke<ExternalLaunch>('launch_external_player', {
       url,
       path,
       headers: options.headers ?? null,

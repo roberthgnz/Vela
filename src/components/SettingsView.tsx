@@ -354,9 +354,9 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
               <h2 id="settings-external-title">Reproductor externo</h2>
               <div className="settings-card">
                 <Row
-                  label="Ruta de MPV"
+                  label="Reproductor"
                   htmlFor="player-path"
-                  description="Opcional. Si la dejas vacía, Vela busca mpv.exe en el PATH, en Programas y en Program Files. Con MPV, Vela pasa las cabeceras de la fuente, reanuda donde lo dejaste y guarda el progreso al cerrarlo."
+                  description="Opcional: ruta de mpv.exe o vlc.exe. Si la dejas vacía, Vela usa MPV (PATH, Programas o Program Files) o, si no lo encuentra, VLC. Con los dos, Vela pasa el título, los subtítulos y las cabeceras de la fuente, reanuda donde lo dejaste y guarda el progreso al cerrarlo."
                   stacked
                 >
                   <input

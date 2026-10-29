@@ -2,10 +2,12 @@
 
 mod downloads;
 mod mpv;
+mod proxy;
 mod secrets;
 mod service;
 mod transport;
 mod updater;
+mod vlc;
 mod webview;
 
 use std::collections::BTreeMap;
@@ -96,18 +98,24 @@ fn player_executable(configured: &str) -> Result<PathBuf, String> {
         candidates.push(PathBuf::from(local).join("Programs/mpv/mpv.exe"));
     }
     if let Some(programs) = std::env::var_os("ProgramFiles") {
-        candidates.push(PathBuf::from(programs).join("mpv/mpv.exe"));
+        candidates.push(PathBuf::from(&programs).join("mpv/mpv.exe"));
+        // VLC only when MPV is not installed: MPV remains the preferred external player.
+        candidates.push(PathBuf::from(programs).join("VideoLAN/VLC/vlc.exe"));
+    }
+    if let Some(programs) = std::env::var_os("ProgramFiles(x86)") {
+        candidates.push(PathBuf::from(programs).join("VideoLAN/VLC/vlc.exe"));
     }
     candidates
         .into_iter()
         .find(|path| path.is_file())
         .ok_or_else(|| {
-            "No se encontró MPV. Instálalo o elige su ejecutable en Ajustes › Reproductor externo."
+            "No se encontró MPV ni VLC. Instala uno o elige su ejecutable en Ajustes › Reproductor externo."
                 .to_owned()
         })
 }
 
-/// Builds MPV arguments for request headers and the window title, rejecting unsafe values.
+/// Builds MPV arguments for request headers and the window title, rejecting unsafe values. VLC
+/// gets its headers through a local proxy instead; other players cannot receive them.
 fn mpv_arguments(
     executable: &Path,
     headers: &BTreeMap<String, String>,
@@ -116,9 +124,10 @@ fn mpv_arguments(
     let is_mpv = is_mpv(executable);
     let mut arguments = Vec::new();
     if !headers.is_empty() {
-        if !is_mpv {
+        if !is_mpv && !vlc::is_vlc(executable) {
             return Err(
-                "Esta fuente necesita cabeceras HTTP, que Vela solo puede pasar a MPV.".to_owned(),
+                "Esta fuente necesita cabeceras HTTP, que Vela solo puede pasar a MPV o VLC."
+                    .to_owned(),
             );
         }
         for (name, value) in headers {
@@ -129,7 +138,9 @@ fn mpv_arguments(
             if !valid_name || value.chars().any(|c| c.is_control()) {
                 return Err("La fuente indicó una cabecera HTTP no válida.".to_owned());
             }
-            arguments.push(format!("--http-header-fields-append={name}: {value}"));
+            if is_mpv {
+                arguments.push(format!("--http-header-fields-append={name}: {value}"));
+            }
         }
     }
     if let Some(title) = title.filter(|_| is_mpv) {
@@ -150,8 +161,9 @@ fn is_mpv(executable: &Path) -> bool {
         .is_some_and(|stem| stem.to_ascii_lowercase().starts_with("mpv"))
 }
 
-/// Starts the player. With MPV and a session id, Vela follows playback through IPC and emits
-/// `player-progress` while it runs; for every player it emits `player-closed` when the process exits.
+/// Starts the player. With a session id, Vela follows playback (MPV through IPC, VLC through its
+/// HTTP interface) and emits `player-progress` while it runs; for every player it emits
+/// `player-closed` when the process exits.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 async fn launch_external_player(
@@ -167,23 +179,47 @@ async fn launch_external_player(
 ) -> Result<serde_json::Value, String> {
     let url = checked_url(&url)?;
     let executable = player_executable(&path)?;
-    let mut arguments = mpv_arguments(&executable, &headers.unwrap_or_default(), title.as_deref())?;
+    let headers = headers.unwrap_or_default();
+    let subtitles = subtitles.unwrap_or_default();
+    let show_subtitles = show_subtitles.unwrap_or(false);
+    let mut arguments = mpv_arguments(&executable, &headers, title.as_deref())?;
     let session = session.filter(|value| mpv::valid_session(value));
-    let ipc = session.is_some() && is_mpv(&executable);
-    if let (true, Some(session)) = (ipc, &session) {
-        arguments.extend(mpv::ipc_arguments(session, start));
-    }
-    if is_mpv(&executable) {
-        arguments.extend(mpv::subtitle_arguments(
-            &subtitles.unwrap_or_default(),
-            show_subtitles.unwrap_or(false),
+    let (is_mpv, is_vlc) = (is_mpv(&executable), vlc::is_vlc(&executable));
+    let mut target = url.clone();
+    let mut item_options = Vec::new();
+    let mut proxy = None;
+    // VLC's HTTP interface, protected by the session id, which only this window knows.
+    let mut interface: Option<(u16, String)> = None;
+    if is_mpv {
+        if let Some(session) = &session {
+            arguments.extend(mpv::ipc_arguments(session, start));
+        }
+        arguments.extend(mpv::subtitle_arguments(&subtitles, show_subtitles));
+    } else if is_vlc {
+        if !headers.is_empty() {
+            let served = proxy::serve(url.clone(), headers.clone()).await?;
+            target = served.url.clone();
+            proxy = Some(served);
+        }
+        interface = session
+            .as_ref()
+            .and_then(|session| vlc::free_port().map(|port| (port, session.clone())));
+        arguments.extend(vlc::arguments(
+            interface
+                .as_ref()
+                .map(|(port, password)| (*port, password.as_str())),
+            start,
+            &subtitles,
         ));
+        item_options = vlc::item_options(title.as_deref());
     }
+    let ipc = session.is_some() && (is_mpv || interface.is_some());
     let mut command = Command::new(executable);
     command
         .args(arguments)
         .arg("--")
-        .arg(url.as_str())
+        .arg(target.as_str())
+        .args(item_options)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -193,9 +229,11 @@ async fn launch_external_player(
     let mut child = command
         .spawn()
         .map_err(|_| "No se pudo iniciar el reproductor elegido.".to_owned())?;
-    if let Some(session) = session {
+    // The proxy has to live as long as the player, even when nobody follows the session.
+    if session.is_some() || proxy.is_some() {
         tauri::async_runtime::spawn(async move {
             let exited = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let alive = || !exited.load(std::sync::atomic::Ordering::Relaxed);
             let watcher = {
                 let exited = exited.clone();
                 async move {
@@ -205,29 +243,38 @@ async fn launch_external_player(
                 }
             };
             let follower = async {
+                let session = session.as_deref()?;
+                let report = |value| {
+                    let _ = app.emit("player-progress", value);
+                };
+                if let Some((port, password)) = &interface {
+                    return vlc::follow(*port, password, session, !show_subtitles, alive, report)
+                        .await;
+                }
                 #[cfg(windows)]
                 if ipc {
-                    let app = app.clone();
-                    return mpv::follow(
-                        &mpv::pipe_name(&session),
-                        &session,
-                        || !exited.load(std::sync::atomic::Ordering::Relaxed),
-                        move |value| {
-                            let _ = app.emit("player-progress", value);
-                        },
-                    )
-                    .await;
+                    return mpv::follow(&mpv::pipe_name(session), session, alive, report).await;
                 }
                 None
             };
             let (code, state) = tokio::join!(watcher, follower);
-            let mut payload = state.clone().unwrap_or_default().to_json(&session);
-            payload["ipc"] = serde_json::json!(state.is_some());
-            payload["exitCode"] = serde_json::json!(code);
-            let _ = app.emit("player-closed", payload);
+            drop(proxy);
+            if let Some(session) = &session {
+                let mut payload = state.clone().unwrap_or_default().to_json(session);
+                payload["ipc"] = serde_json::json!(state.is_some());
+                payload["exitCode"] = serde_json::json!(code);
+                let _ = app.emit("player-closed", payload);
+            }
         });
     }
-    Ok(serde_json::json!({ "ipc": ipc }))
+    let player = if is_mpv {
+        "mpv"
+    } else if is_vlc {
+        "vlc"
+    } else {
+        "other"
+    };
+    Ok(serde_json::json!({ "ipc": ipc, "player": player }))
 }
 
 #[cfg(test)]
@@ -244,7 +291,12 @@ mod tests {
                 "--force-media-title=Sintel".to_owned()
             ]
         );
-        assert!(mpv_arguments(Path::new("C:/vlc/vlc.exe"), &headers, None).is_err());
+        assert!(mpv_arguments(Path::new("C:/other/player.exe"), &headers, None).is_err());
+        assert!(
+            mpv_arguments(Path::new("C:/vlc/vlc.exe"), &headers, Some("x"))
+                .unwrap()
+                .is_empty()
+        );
         assert!(
             mpv_arguments(Path::new("C:/vlc/vlc.exe"), &BTreeMap::new(), Some("x"))
                 .unwrap()

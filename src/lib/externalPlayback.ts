@@ -6,7 +6,7 @@ import { normalizeLanguage } from "./languages";
 import { getSubtitles } from "./protocol";
 import { dedupeSubtitles } from "./subtitles";
 import { CREDITS_THRESHOLD, preferencesStore, WATCHED_THRESHOLD } from "./store";
-import { launchExternalPlayer } from "./transport";
+import { type ExternalLaunch, launchExternalPlayer } from "./transport";
 
 /**
  * Follows videos opened in an external player. With MPV, the desktop app reads the position
@@ -127,6 +127,11 @@ async function subtitlesFor(meta: MediaItem, videoId: string, stream: ResolvedSt
   return [...extra, ...fetched];
 }
 
+/** Name shown in notices about the external player. */
+export function externalPlayerName(launch: ExternalLaunch): string {
+  return launch.player === "vlc" ? "VLC" : launch.player === "mpv" ? "MPV" : "el reproductor externo";
+}
+
 /** Opens a video in the configured player and follows it. Returns whether progress is reported. */
 export async function playExternally(
   url: string,
@@ -142,7 +147,7 @@ export async function playExternally(
     /** Subtitles already known (from the torrent or loaded by the integrated player). */
     subtitles?: Subtitle[];
   },
-): Promise<{ ipc: boolean }> {
+): Promise<ExternalLaunch> {
   const settings = preferencesStore.getSnapshot().player;
   const subtitles = externalSubtitles(
     await subtitlesFor(options.meta, options.videoId, options.stream, options.subtitles ?? []),
