@@ -77,5 +77,5 @@ for (const episode of [1, 2, 3]) {
 }
 
 // HEVC copy of the H.264 fixture, for the conversion test.
-ffmpeg("-i", fileURLToPath(new URL("../tests/fixtures/playback.mp4", import.meta.url)), "-c:v", "libx265", "-tag:v", "hvc1", "-c:a", "copy", path("hevc.mkv"));
+ffmpeg("-i", fileURLToPath(new URL("./media/playback.mp4", import.meta.url)), "-c:v", "libx265", "-tag:v", "hvc1", "-c:a", "copy", path("hevc.mkv"));
 console.log(`Media written to ${out}`);

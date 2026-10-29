@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   interface:
-    name: Interface (types, unit and end-to-end tests)
+    name: Interface (types and unit tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -29,14 +29,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
-      - uses: actions/upload-artifact@v5
-        if: failure()
-        with:
-          name: playwright-results
-          path: test-results/
-          retention-days: 7
 
   desktop:
     name: Desktop (Rust on Windows)

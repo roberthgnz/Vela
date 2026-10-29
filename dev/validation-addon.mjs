@@ -3,7 +3,7 @@
 //
 // Torrents are Blender Foundation films distributed under Creative Commons BY 3.0
 // (the WebTorrent sample torrents). The HEVC/MKV and header-protected files are generated
-// locally from tests/fixtures/playback.mp4; the multitrack file, the episodes and the
+// locally from dev/media/playback.mp4; the multitrack file, the episodes and the
 // subtitles are synthetic (FFmpeg test patterns and tones): `node dev/make-validation-media.mjs`.
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
@@ -13,7 +13,7 @@ const port = Number(process.env.PORT || 7010);
 const root = fileURLToPath(new URL("../", import.meta.url));
 const generated = (name) => `${root}.tmp/media/${name}`;
 const media = {
-  "h264.mp4": `${root}tests/fixtures/playback.mp4`,
+  "h264.mp4": `${root}dev/media/playback.mp4`,
   "hevc.mkv": generated("hevc.mkv"),
   "multitrack.mkv": generated("multitrack.mkv"),
   "multiaudio.mp4": generated("multiaudio.mp4"),

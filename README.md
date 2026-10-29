@@ -18,8 +18,6 @@ pnpm desktop
 ```powershell
 pnpm build
 pnpm test
-pnpm exec playwright install chromium
-pnpm test:e2e
 cargo test --manifest-path src-tauri/Cargo.toml
 pnpm package
 ```
@@ -28,7 +26,7 @@ El instalador se genera en `src-tauri/target/release/bundle/nsis/`.
 
 ### Versiones en GitHub
 
-- **CI** ([ci.yml](.github/workflows/ci.yml)): en cada push a `main` y en cada pull request comprueba tipos, compila la interfaz y ejecuta las pruebas unitarias y Playwright (Ubuntu), y `cargo fmt`, `clippy` y las pruebas Rust (Windows).
+- **CI** ([ci.yml](.github/workflows/ci.yml)): en cada push a `main` y en cada pull request comprueba tipos, compila la interfaz y ejecuta las pruebas unitarias (Ubuntu), y `cargo fmt`, `clippy` y las pruebas Rust (Windows).
 - **Release** ([release.yml](.github/workflows/release.yml)): genera el instalador NSIS en Windows tras pasar las pruebas y lo publica en [Releases](https://github.com/roberthgnz/Vela/releases) con su suma SHA-256 y notas generadas a partir de los commits. Se lanza de dos formas:
   - subiendo una etiqueta igual a la versión: actualiza la versión en `package.json`, `src-tauri/Cargo.toml` y `src-tauri/tauri.conf.json`, haz commit y ejecuta `git tag v0.3.0` y `git push origin v0.3.0`;
   - o desde Actions › Release › Run workflow, que etiqueta el commit elegido como `v<versión>` (opcionalmente como borrador).

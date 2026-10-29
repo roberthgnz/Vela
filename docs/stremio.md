@@ -242,7 +242,8 @@ Versión 0.3.0, 29 de octubre de 2026:
 
 - 99 pruebas unitarias (nuevas: subtítulos e idiomas, bitfield con los vectores de stremio-core, episodios, migración v1→v2, historial, sincronización de temporales, puntero y vistos, paginación, actualización de manifiestos), 13 flujos Playwright (nuevos: panel de subtítulos con Windows‑1252, duplicados, archivo dañado y desfase; estilo y selección automática; siguiente episodio por `bingeGroup` y «Seguir viendo»; restauración de catálogo, foco y temporada; marcar vistos desde el menú contextual) y 11 pruebas Rust (nuevas: estado de MPV, argumentos IPC y seguimiento de una tubería con nombre real). `cargo clippy -- -D warnings` y `cargo fmt` sin avisos.
 - En la ventana Tauri, por CDP, con Stremio 4.22.3 y el addon de validación: MKV con dos audios y tres subtítulos (cambio de audio medido por frecuencia, SRT incrustado español, ASS incrustado con estilos por JASSUB, SRT externo Windows‑1252, ASS externo, archivo dañado), desfase, preferencias automáticas, HEVC convertido a HLS nativo, serie de tres episodios con cuenta atrás, cambio por `bingeGroup`, vistos y «Seguir viendo», y libmpv real por IPC.
-- Prueba simulada no es validación real: los flujos Playwright usan addons, subtítulos y vídeo controlados en Chromium; la cuenta de Stremio sigue sin probarse con datos reales.
+- Prueba simulada no es validación real: los flujos Playwright usaban addons, subtítulos y vídeo controlados en Chromium; la cuenta de Stremio sigue sin probarse con datos reales.
+- Después de la 0.3.0 se retiraron las pruebas de interfaz con Playwright por su duración. Quedan las pruebas unitarias (Vitest) y Rust; la interfaz se comprueba a mano en la ventana Tauri (por CDP, con los scripts de `.tmp/`). El vídeo de prueba pasó de `tests/fixtures/` a `dev/media/playback.mp4`, que usa el addon de validación.
 
 ## Orden de trabajo pendiente
 
