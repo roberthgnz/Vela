@@ -155,6 +155,30 @@ export function parseSubtitle(text: string): ParsedSubtitles {
 }
 
 /**
+ * Lines around `time` (already shifted by `delay`) for syncing by ear: the user picks the line
+ * they just heard and the delay becomes `time - cue.start`. Duplicates are listed once.
+ */
+export function syncCandidates(cues: Cue[], time: number, delay: number, span = 60, limit = 40): Cue[] {
+  const at = time - delay;
+  const seen = new Set<string>();
+  const near = cues.filter((cue) => {
+    if (cue.start < at - span || cue.start > at + span) return false;
+    const key = `${cue.start}${cue.text}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  // Keep the lines closest to the current position when the window is crowded.
+  const closest = [...near].sort((a, b) => Math.abs(a.start - at) - Math.abs(b.start - at)).slice(0, limit);
+  return closest.sort((a, b) => a.start - b.start);
+}
+
+/** Delay that shows `cue` at `time`, rounded to the 0.1 s steps of the stepper. */
+export function syncDelay(cue: Cue, time: number): number {
+  return Math.round((time - cue.start) * 10) / 10;
+}
+
+/**
  * Cues visible at `time`. Identical lines that overlap (common in files merged from
  * several sources) are shown once, in start order.
  */

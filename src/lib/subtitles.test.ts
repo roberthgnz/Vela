@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { languageLabel, normalizeLanguage, pickByLanguage, sameLanguage } from './languages';
-import { activeCues, decodeSubtitle, dedupeSubtitles, detectFormat, parseSubtitle, SubtitleError } from './subtitles';
+import { activeCues, decodeSubtitle, dedupeSubtitles, detectFormat, parseSubtitle, SubtitleError, syncCandidates, syncDelay } from './subtitles';
 
 const encode = (text: string) => new TextEncoder().encode(text);
 
@@ -94,6 +94,21 @@ describe('subtitle parsing', () => {
     expect(activeCues(cues, 2.2).map((cue) => cue.text)).toEqual(['Larga', 'Repetida', 'Corta']);
     expect(activeCues(cues, 3).map((cue) => cue.text)).toEqual(['Larga']);
     expect(activeCues(cues, 11)).toEqual([]);
+  });
+
+  it('lists nearby lines for syncing by ear and derives the delay', () => {
+    const cues = [
+      { start: 1, end: 2, text: 'Lejos' },
+      { start: 100, end: 102, text: 'Antes' },
+      { start: 100, end: 102, text: 'Antes' },
+      { start: 110, end: 112, text: 'Ahora' },
+      { start: 125, end: 127, text: 'Después' },
+      { start: 400, end: 401, text: 'Final' },
+    ];
+    expect(syncCandidates(cues, 112, 2).map((cue) => cue.text)).toEqual(['Antes', 'Ahora', 'Después']);
+    expect(syncCandidates(cues, 112, 0, 60, 2).map((cue) => cue.text)).toEqual(['Antes', 'Ahora']);
+    expect(syncDelay(cues[3], 113.04)).toBe(3);
+    expect(syncDelay(cues[4], 120)).toBe(-5);
   });
 
   it('removes duplicate subtitle entries by URL', () => {

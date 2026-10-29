@@ -37,7 +37,7 @@ import {
   type TorrentStats,
 } from "../lib/streamingServer";
 import { streamQuality } from "../lib/streams";
-import { activeCues, decodeSubtitle, dedupeSubtitles, parseSubtitle, type Cue } from "../lib/subtitles";
+import { activeCues, decodeSubtitle, dedupeSubtitles, parseSubtitle, syncCandidates, syncDelay, type Cue } from "../lib/subtitles";
 import { requestBytes, requestText } from "../lib/transport";
 import { clock, errorMessage } from "../lib/utils";
 import { Dialog } from "./Primitives";
@@ -1105,6 +1105,8 @@ export function Player({
             subtitleKey={subtitleKey}
             preferred={[settings.subtitleLanguage, settings.subtitleSecondary]}
             delay={delay}
+            cues={cues}
+            time={time}
             onAudio={(track) => chooseAudio(track)}
             onSubtitle={(track) => void chooseSubtitle(track)}
             onDelay={changeDelay}
@@ -1313,6 +1315,8 @@ function TrackPanel({
   subtitleKey,
   preferred,
   delay,
+  cues,
+  time,
   onAudio,
   onSubtitle,
   onDelay,
@@ -1324,6 +1328,8 @@ function TrackPanel({
   subtitleKey: string;
   preferred: string[];
   delay: number;
+  cues: Cue[];
+  time: number;
   onAudio: (track: Track) => void;
   onSubtitle: (track: Track | null) => void;
   onDelay: (value: number) => void;
@@ -1339,6 +1345,17 @@ function TrackPanel({
     .sort((a, b) => (wanted.indexOf(a) + 1 || 99) - (wanted.indexOf(b) + 1 || 99));
   const others = all.filter((lang) => !top.includes(lang)).sort((a, b) => label(a).localeCompare(label(b), "es"));
   const variants = selected ? subtitles.filter((track) => langOf(track) === selectedLang) : [];
+  // Syncing by ear: the position is frozen when the list opens, so the lines do not move under
+  // the pointer, and the chosen line is shown at that position.
+  const [syncAt, setSyncAt] = useState<number | null>(null);
+  const candidates = useMemo(() => (syncAt === null ? [] : syncCandidates(cues, syncAt, delay)), [cues, delay, syncAt]);
+  const showing = syncAt === null ? [] : activeCues(cues, syncAt - delay);
+  useEffect(() => {
+    if (syncAt === null) return;
+    const list = ref.current?.querySelector<HTMLElement>(".track-sync-list");
+    (list?.querySelector<HTMLElement>("[data-current]") ?? list?.querySelector<HTMLElement>("button"))?.scrollIntoView({ block: "center" });
+  }, [syncAt]);
+  useEffect(() => setSyncAt(null), [subtitleKey]);
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>(".track-languages [aria-checked=true]")?.focus();
   }, []);
@@ -1417,6 +1434,37 @@ function TrackPanel({
               Restablecer
             </button>
           </div>
+          <button
+            className="button small subtle track-sync-toggle"
+            aria-expanded={syncAt !== null}
+            disabled={!selected || !cues.length}
+            onClick={() => setSyncAt(syncAt === null ? time : null)}
+          >
+            {syncAt === null ? "Sincronizar con una frase" : "Cancelar sincronización"}
+          </button>
+          {syncAt !== null && (
+            <div className="track-sync">
+              <p>Elige la frase que acabas de oír.</p>
+              <div className="track-sync-list track-scroll" role="list">
+                {candidates.map((cue) => (
+                  <button
+                    key={`${cue.start}-${cue.text}`}
+                    role="listitem"
+                    className="track-sync-line"
+                    data-current={showing.includes(cue) || undefined}
+                    onClick={() => {
+                      onDelay(syncDelay(cue, syncAt));
+                      setSyncAt(null);
+                    }}
+                  >
+                    <small>{clock(cue.start)}</small>
+                    <span>{cue.text}</span>
+                  </button>
+                ))}
+                {!candidates.length && <p className="track-empty">No hay frases cerca de este momento.</p>}
+              </div>
+            </div>
+          )}
         </section>
       </div>
     </div>
