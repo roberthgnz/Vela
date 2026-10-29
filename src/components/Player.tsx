@@ -155,11 +155,16 @@ export function Player({
   playing,
   onClose,
   onNext,
+  onStarted,
+  onFailed,
 }: {
   playing: Playing;
   onClose: () => void;
   /** Starts the next episode; resolves when it is playing or rejects with a reason. */
   onNext?: (episode: Episode) => void;
+  /** The source played for the first time / could not be played. */
+  onStarted?: () => void;
+  onFailed?: (message: string) => void;
 }) {
   const prefs = usePreferences();
   const settings = prefs.player;
@@ -170,6 +175,7 @@ export function Player({
   const lastSave = useRef(0);
   const watchedTime = useRef({ last: -1, total: 0, marked: false });
   const finished = useRef(false);
+  const started = useRef(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pending = useRef<{ audio?: number }>({});
   const autoChosen = useRef({ audio: false, subtitle: false });
@@ -664,6 +670,10 @@ export function Player({
     };
   }, []);
 
+  useEffect(() => {
+    if (error && !started.current) onFailed?.(error);
+  }, [error, onFailed]);
+
   // Long waits get an explanation and alternatives instead of an endless spinner.
   useEffect(() => {
     setSlow(false);
@@ -915,6 +925,10 @@ export function Player({
           }}
           onPlay={() => wake()}
           onPlaying={() => {
+            if (!started.current) {
+              started.current = true;
+              onStarted?.();
+            }
             setStatus("playing");
             setNotice((value) => (value === "Pulsa reproducir para iniciar el vídeo." ? "" : value));
           }}

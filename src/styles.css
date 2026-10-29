@@ -2993,3 +2993,52 @@ kbd {
   background: var(--accent);
   transition: width 0.2s;
 }
+
+/* Sources already opened: dimmed, with a quiet tag; hover restores them. */
+.source-item.marked.opened .source-row {
+  opacity: 0.72;
+}
+.source-item.marked.failed .source-row {
+  opacity: 0.5;
+}
+.source-item.marked .source-row:hover,
+.source-item.marked .source-row:focus-visible {
+  opacity: 1;
+}
+.source-item.last .source-row {
+  box-shadow: inset 2px 0 0 var(--accent);
+  background: rgb(214 239 145 / 5%);
+}
+.tag.mark-played,
+.tag.mark-opened {
+  background: rgb(255 255 255 / 6%);
+  color: var(--fg-2);
+}
+.tag.mark-last {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tag.mark-failed {
+  background: rgb(255 120 100 / 12%);
+  color: #ff9d8a;
+}
+.tag.mark-played svg,
+.tag.mark-opened svg,
+.tag.mark-failed svg,
+.tag.mark-last svg {
+  vertical-align: -1px;
+}
+.opening-status {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  transform: translateX(-50%);
+}

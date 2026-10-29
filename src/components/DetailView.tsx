@@ -8,6 +8,8 @@ import {
   Check,
   CheckCheck,
   Circle,
+  Eraser,
+  Eye,
   Clipboard,
   ExternalLink,
   Globe,
@@ -29,6 +31,7 @@ import type {
 } from "../lib/contracts";
 import { episodeCode, isUpcoming, orderedEpisodes, videoProgress, watchedEpisodes } from "../lib/episodes";
 import { getMeta, getStreams } from "../lib/protocol";
+import { sourceHistory, sourceKey, useSourceMarks } from "../lib/sourceHistory";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import {
   kindLabel,
@@ -83,6 +86,20 @@ function formatDate(value?: string): string {
 
 const upcoming = (episode: Episode) => isUpcoming(episode);
 
+function markLabel(outcome: "opened" | "played" | "failed", last: boolean): string {
+  if (last) return "Viendo";
+  return outcome === "played" ? "Vista" : outcome === "failed" ? "Falló" : "Abierta";
+}
+
+function relativeTime(at: number): string {
+  const minutes = Math.round((Date.now() - at) / 60_000);
+  if (minutes < 1) return "hace un momento";
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  return `el ${new Date(at).toLocaleDateString("es", { day: "numeric", month: "short" })}`;
+}
+
 export function DetailView({
   meta: initial,
   addon,
@@ -93,11 +110,13 @@ export function DetailView({
   onSeasonChange,
   onSourcesChange,
   onPlay,
+  onResume,
   onAddons,
   notify,
 }: {
   meta: MediaItem;
   addon: InstalledAddon;
+  onResume: () => void;
   videoId?: string;
   /** Season chosen in the episode list, kept in the history entry. */
   season?: number;
@@ -230,6 +249,7 @@ export function DetailView({
       : undefined;
   const resumeEpisode = resume && episodes.find((item) => item.id === resume.videoId);
   const upNext = Boolean(resume && resume.seconds === 0);
+  const lastSource = sourceHistory.last(meta.type, meta.id);
   const facts = [
     typeLabel(meta.type),
     yearOf(meta),
@@ -276,7 +296,10 @@ export function DetailView({
                 {resume && (
                   <button
                     className="button primary"
+                    title={lastSource ? `Continuar con ${streamHeading(lastSource.stream)}` : undefined}
                     onClick={() => {
+                      // With a source already watched, play it directly; otherwise show the sources.
+                      if (lastSource) return onResume();
                       if (resumeEpisode) chooseEpisode(resumeEpisode);
                       else setShowSources(true);
                       focusSources();
@@ -578,6 +601,11 @@ function SourcesPanel({
   const [addonFilter, setAddonFilter] = useState("");
   const [languageFilter, setLanguageFilter] = useState("");
   const [active, setActive] = useState<number | null>(null);
+  const marks = useSourceMarks(videoId);
+  const lastKey = (() => {
+    const last = sourceHistory.last(meta.type, meta.id);
+    return last && last.videoId === videoId ? sourceKey(last.stream) : undefined;
+  })();
   const enabled = prefs.addons.filter((item) => item.enabled).map((item) => item.manifestUrl);
   const sources = useQuery({
     queryKey: ["streams", enabled, meta.type, videoId],
@@ -634,6 +662,9 @@ function SourcesPanel({
           onSelect: () => start(stream, "external", index),
         },
         "separator",
+        ...(marks[sourceKey(stream)]
+          ? [{ label: "Quitar marca", icon: <Eraser size={15} />, onSelect: () => videoId && sourceHistory.clear(videoId, stream) }]
+          : []),
         {
           label: stream.infoHash && !stream.url ? "Copiar enlace magnet" : "Copiar enlace",
           icon: <Clipboard size={15} />,
@@ -756,10 +787,13 @@ function SourcesPanel({
               const detail = streamDetail(stream);
               const streamLanguageList = streamLanguages(stream);
               const facts = streamFacts(stream);
+              const key = sourceKey(stream);
+              const mark = marks[key];
+              const isLast = key === lastKey;
               return (
                 <li
                   key={`${stream.addonUrl}-${index}`}
-                  className="source-item"
+                  className={`source-item ${mark ? `marked ${mark.outcome}` : ""} ${isLast ? "last" : ""}`}
                   onContextMenu={(event) => {
                     event.preventDefault();
                     rowMenu({ x: event.clientX, y: event.clientY }, stream, index);
@@ -767,7 +801,7 @@ function SourcesPanel({
                 >
                   <button
                     className="source-row"
-                    aria-label={`Reproducir ${stream.name || stream.addonName} ${index + 1}`}
+                    aria-label={`Reproducir ${stream.name || stream.addonName} ${index + 1}${mark ? `, ${markLabel(mark.outcome, isLast).toLowerCase()}` : ""}`}
                     disabled={play.isPending}
                     onClick={() => start(stream, "internal", index)}
                     onKeyDown={(event) => {
@@ -789,6 +823,15 @@ function SourcesPanel({
                       <span className="source-heading">{streamHeading(stream)}</span>
                       {detail.length > 0 && <span className="source-detail">{detail.join(" · ")}</span>}
                       <span className="source-tags">
+                        {mark && (
+                          <span
+                            className={`tag mark-${mark.outcome} ${isLast ? "mark-last" : ""}`}
+                            title={`${markLabel(mark.outcome, isLast)} ${relativeTime(mark.at)}${mark.error ? ` · ${mark.error}` : ""}`}
+                          >
+                            {mark.outcome === "played" ? <Check size={11} /> : mark.outcome === "failed" ? <AlertTriangle size={11} /> : <Eye size={11} />}{" "}
+                            {markLabel(mark.outcome, isLast)}
+                          </span>
+                        )}
                         <span className={`tag kind-${kind}`}>{kindLabel[kind]}</span>
                         {streamLanguageList.length > 0 && (
                           <span

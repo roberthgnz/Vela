@@ -41,6 +41,7 @@ import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
 import { UpdateNotice } from "./components/UpdateNotice";
 import { native, WindowControls } from "./components/WindowControls";
+import { sourceHistory } from "./lib/sourceHistory";
 import { updates } from "./lib/updates";
 
 const primary = [
@@ -151,10 +152,17 @@ export default function App() {
       notify("Fuente abierta en el navegador.");
       return;
     }
-    const target = await resolvePlayback(meta, stream, prefs.serviceUrl, {
-      episode,
-      external: mode === "external",
-    });
+    sourceHistory.mark(meta.type, meta.id, videoId, stream, "opened");
+    let target: Awaited<ReturnType<typeof resolvePlayback>>;
+    try {
+      target = await resolvePlayback(meta, stream, prefs.serviceUrl, {
+        episode,
+        external: mode === "external",
+      });
+    } catch (error) {
+      sourceHistory.mark(meta.type, meta.id, videoId, stream, "failed", errorMessage(error));
+      throw error;
+    }
     const entry = preferencesStore.getSnapshot().library[mediaKey(meta.type, meta.id)];
     const saved = entry?.videos?.[videoId] ?? (entry?.progress?.videoId === videoId ? entry.progress : undefined);
     const resume = saved && saved.duration > 0 && saved.seconds < saved.duration * CREDITS_THRESHOLD ? saved.seconds : 0;
@@ -167,6 +175,7 @@ export default function App() {
         title: episode ? `${meta.name} · ${episodeCode(episode)}` : meta.name,
         start: resume,
       });
+      sourceHistory.mark(meta.type, meta.id, videoId, stream, "played");
       notify(ipc ? "Abierto en MPV. Vela guardará el progreso al cerrarlo." : "Fuente abierta en el reproductor externo.");
       return;
     }
@@ -192,6 +201,34 @@ export default function App() {
 
   const onPlay: PlayHandler = (meta, addon, videoId, stream, mode, episode) =>
     startPlayback(meta, addon.manifestUrl, videoId, stream, mode, episode);
+
+  /**
+   * «Continuar»: plays the source last watched for this title at the saved position. For the next
+   * episode it looks for the same release (`bingeGroup`). Without a usable source it opens the
+   * sources of the episode instead.
+   */
+  const [opening, setOpening] = useState<string | null>(null);
+  const resumeTitle = async (meta: MediaItem, addonUrl: string) => {
+    const entry = preferencesStore.getSnapshot().library[mediaKey(meta.type, meta.id)];
+    const full = entry?.meta.videos?.length ? { ...meta, videos: meta.videos ?? entry.meta.videos } : meta;
+    const videoId = entry?.progress?.videoId ?? (meta.type === "series" ? undefined : meta.id);
+    const last = sourceHistory.last(meta.type, meta.id);
+    const showSources = () => go({ name: "detail", meta: full, addonUrl, videoId, sources: true });
+    if (!videoId || !last) return showSources();
+    const episode = full.videos?.find((video) => video.id === videoId);
+    setOpening(meta.name);
+    try {
+      let stream = last.videoId === videoId ? last.stream : undefined;
+      if (!stream) stream = pickNextStream(await getStreams(preferencesStore.getSnapshot().addons, meta.type, videoId), last.stream);
+      if (!stream) return showSources();
+      await startPlayback(full, addonUrl, videoId, stream, "internal", episode);
+    } catch (error) {
+      notify(errorMessage(error), "error");
+      showSources();
+    } finally {
+      setOpening(null);
+    }
+  };
 
   /**
    * Plays the next episode with a stream of the same `bingeGroup` (or, failing that, the same
@@ -432,6 +469,7 @@ export default function App() {
         {route.name === "home" && (
           <HomeView
             onOpen={openMedia}
+            onResume={(meta, addonUrl) => void resumeTitle(meta, addonUrl)}
             onBrowse={(type) => section(type === "movie" ? "movies" : "series")}
             onAddons={() => section("addons")}
             onMenu={onCardMenu}
@@ -463,6 +501,7 @@ export default function App() {
             onSeasonChange={(season) => nav.update((current) => ({ ...current, season }))}
             onSourcesChange={(sources) => nav.update((current) => ({ ...current, sources }))}
             onPlay={onPlay}
+            onResume={() => void resumeTitle(route.meta, route.addonUrl)}
             onAddons={() => section("addons")}
             notify={notify}
           />
@@ -487,6 +526,10 @@ export default function App() {
           key={`${playing.videoId}|${playing.url}`}
           playing={playing}
           onNext={(episode) => void playNext(playing, episode)}
+          onStarted={() => sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "played")}
+          onFailed={(message) =>
+            sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "failed", message)
+          }
           onClose={() => {
             setPlaying(null);
             void account.sync();
@@ -495,6 +538,11 @@ export default function App() {
       )}
       {menu.element}
       <UpdateNotice />
+      {opening && (
+        <div className="opening-status" role="status">
+          <RefreshCw size={14} className="spin" /> Abriendo {opening}…
+        </div>
+      )}
       <div className="toasts" aria-live="polite">
         {toasts.map((toast) => (
           <div className={`toast ${toast.tone}`} key={toast.id} role="status">

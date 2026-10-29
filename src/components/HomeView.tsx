@@ -156,9 +156,11 @@ function episodeLabel(entry: LibraryEntry): string {
 function ContinueCard({
   entry,
   onOpen,
+  onResume,
 }: {
   entry: LibraryEntry;
   onOpen: OpenMedia;
+  onResume: (meta: MediaItem, addonUrl: string) => void;
 }) {
   const progress = entry.progress!;
   const upNext = progress.duration === 0;
@@ -171,7 +173,12 @@ function ContinueCard({
         className="continue-button"
         data-card-focus
         aria-label={`Continuar ${entry.meta.name}`}
-        onClick={() => onOpen(entry.meta, entry.addonUrl, true)}
+        title="Continuar con la misma fuente"
+        onClick={() => onResume(entry.meta, entry.addonUrl)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onOpen(entry.meta, entry.addonUrl, true);
+        }}
         onKeyDown={cardKeys}
       >
         <span className="continue-art">
@@ -212,11 +219,13 @@ export function inProgress(entry: LibraryEntry): boolean {
 
 export function HomeView({
   onOpen,
+  onResume,
   onBrowse,
   onAddons,
   onMenu,
 }: {
   onOpen: OpenMedia;
+  onResume: (meta: MediaItem, addonUrl: string) => void;
   onBrowse: (type: "movie" | "series") => void;
   onAddons: () => void;
   onMenu: CardMenu;
@@ -251,6 +260,7 @@ export function HomeView({
               key={mediaKey(entry.meta.type, entry.meta.id)}
               entry={entry}
               onOpen={onOpen}
+              onResume={onResume}
             />
           ))}
         </Shelf>
