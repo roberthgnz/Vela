@@ -7,3 +7,8 @@ commands.allow = ["request_json", "post_json", "request_text", "request_bytes", 
 identifier = "allow-downloads"
 description = "Allow the main window to download video files to the Vela folder in Downloads, pause and resume them, delete them and show them in Explorer (only inside that folder)."
 commands.allow = ["download_folder", "download_start", "download_cancel", "download_remove", "download_reveal"]
+
+[[permission]]
+identifier = "allow-desktop-services"
+description = "Allow the main window to start the streaming server Stremio installs (stopped again when Vela exits) and to read and save the hardware video decoding choice, applied at the next start."
+commands.allow = ["service_installed", "service_start", "hardware_decoding_get", "hardware_decoding_set"]

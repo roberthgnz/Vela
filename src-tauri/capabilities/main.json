@@ -17,6 +17,7 @@
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-native-transport",
-    "allow-downloads"
+    "allow-downloads",
+    "allow-desktop-services"
   ]
 }

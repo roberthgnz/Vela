@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hardware-decoding-set"
+description = "Enables the hardware_decoding_set command without any pre-configured scope."
+commands.allow = ["hardware_decoding_set"]
+
+[[permission]]
+identifier = "deny-hardware-decoding-set"
+description = "Denies the hardware_decoding_set command without any pre-configured scope."
+commands.deny = ["hardware_decoding_set"]

@@ -6,6 +6,7 @@ mod secrets;
 mod service;
 mod transport;
 mod updater;
+mod webview;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -268,6 +269,7 @@ fn main() {
         .manage(client)
         .manage(downloads::Downloads::new().expect("could not initialize downloads"))
         .manage(service::Service::default())
+        .setup(|app| Ok(webview::create_main_window(app.handle())?))
         .invoke_handler(tauri::generate_handler![
             request_json,
             post_json,
@@ -283,6 +285,8 @@ fn main() {
             launch_external_player,
             service::service_installed,
             service::service_start,
+            webview::hardware_decoding_get,
+            webview::hardware_decoding_set,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_delete,

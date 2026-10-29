@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
 import {
   CheckCircle2,
   Download,
@@ -297,6 +298,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
                 label="Reproductor integrado"
                 description="Reproduce MP4, WebM y MKV con H.264, VP9 o AV1 y listas HLS, con varias pistas de audio. HEVC, DTS o TrueHD necesitan la conversión de Stremio Service o un reproductor externo."
               />
+              {native && <HardwareDecodingRow notify={notify} />}
               <Row label="Salto corto" description="Flechas izquierda y derecha.">
                 <Segmented
                   label="Salto corto"
@@ -531,6 +533,38 @@ export function ShortcutTable({ seekShort, seekLong }: { seekShort?: number; see
 }
 
 /** Keyword filter for sources, stored on this device only. */
+/** Stored by the desktop app, which needs it before the window exists. */
+function HardwareDecodingRow({ notify }: { notify: (message: string) => void }) {
+  const [enabled, setEnabled] = useState<boolean>();
+  const [changed, setChanged] = useState(false);
+  useEffect(() => {
+    void invoke<boolean>("hardware_decoding_get").then(setEnabled, () => setEnabled(true));
+  }, []);
+  const toggle = async () => {
+    const next = !enabled;
+    try {
+      await invoke("hardware_decoding_set", { enabled: next });
+      setEnabled(next);
+      setChanged(true);
+      notify("Se aplicará al reiniciar Vela.");
+    } catch (error) {
+      notify(errorMessage(error));
+    }
+  };
+  return (
+    <Row
+      label="Decodificación por hardware"
+      description={
+        changed
+          ? "Cierra y vuelve a abrir Vela para aplicar el cambio."
+          : "Usa la tarjeta gráfica para decodificar vídeo. Desactívala si ves la imagen negra, verde o morada, o si el vídeo se corta; consume más procesador. Se aplica al reiniciar Vela."
+      }
+    >
+      <Switch checked={enabled ?? true} label="Decodificación por hardware" onChange={() => enabled !== undefined && void toggle()} />
+    </Row>
+  );
+}
+
 function KeywordRows() {
   const keywords = useSourceKeywords();
   const field = (kind: "include" | "exclude", label: string, description: string, placeholder: string) => (
