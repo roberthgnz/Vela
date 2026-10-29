@@ -146,6 +146,11 @@ function file(req, res, path) {
   if (range) {
     const start = Number(range[1]);
     const end = range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+    // VLC probes the end of the file (`bytes=<size>-`); answer as HTTP says instead of crashing.
+    if (start > end) {
+      res.writeHead(416, { "content-range": `bytes */${size}`, "access-control-allow-origin": "*" }).end();
+      return;
+    }
     res.writeHead(206, {
       "content-type": type,
       "accept-ranges": "bytes",
