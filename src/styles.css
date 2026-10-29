@@ -1121,7 +1121,6 @@ kbd {
   height: 26px;
   border-radius: 50%;
   background: rgb(10 11 13 / 72%);
-  backdrop-filter: blur(8px);
   color: var(--fg);
   opacity: 0;
   transition: opacity 0.12s, background 0.12s;
@@ -1130,6 +1129,13 @@ kbd {
 .media-card:focus-within .card-save,
 .card-save.saved {
   opacity: 1;
+}
+/* Blurred only while shown: every backdrop-filter is a composited layer, even at opacity 0, and a
+   page of posters made dozens of them for the GPU to redraw on each scroll frame. The saved state
+   has a solid background and does not need it. */
+.media-card:hover .card-save,
+.media-card:focus-within .card-save {
+  backdrop-filter: blur(8px);
 }
 .card-save:hover {
   background: rgb(10 11 13 / 92%);
