@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const transport = vi.hoisted(() => ({ postJson: vi.fn(), requestJson: vi.fn() }));
 vi.mock('./transport', () => transport);
 
-import { peerSources, prepareTorrent, probeProblems, proxyUrl, torrentUrl, transcodeUrl } from './streamingServer';
+import { describeTorrent, peerSources, prepareTorrent, probeProblems, proxyUrl, torrentStats, torrentUrl, transcodeUrl } from './streamingServer';
 
 const hash = '08ada5a7a6183aae1e09d831df6748d566095a10';
 const files = ['Sintel.de.srt', 'Sintel.en.srt', 'Sintel.es.srt', 'Sintel.fr.srt', 'Sintel.it.srt', 'Sintel.mp4', 'poster.jpg']
@@ -77,5 +77,16 @@ describe('streaming server client', () => {
     expect(url.searchParams.get('mediaURL')).toBe('http://127.0.0.1:11470/x/1');
     expect(url.searchParams.getAll('videoCodecs')).toEqual(['h264', 'vp9']);
     expect(url.searchParams.get('maxAudioChannels')).toBe('2');
+  });
+});
+
+describe('torrent swarm', () => {
+  it('reads the server stats and summarizes them', async () => {
+    transport.requestJson.mockResolvedValueOnce({ peers: 3, unchoked: 1, downloadSpeed: 0, downloaded: 0, peerSearchRunning: true, swarmSize: 55 });
+    const stats = await torrentStats('http://127.0.0.1:11470/', 'A2D9D5DE');
+    expect(transport.requestJson).toHaveBeenLastCalledWith('http://127.0.0.1:11470/a2d9d5de/stats.json');
+    expect(stats).toEqual({ peers: 3, unchoked: 1, speed: 0, downloaded: 0, searching: true });
+    expect(describeTorrent(stats)).toBe('3 pares · 0 KB/s · 0 MB descargados');
+    expect(describeTorrent({ ...stats, peers: 1, speed: 2_540_000, downloaded: 290_000_000 })).toBe('1 par · 2.4 MB/s · 277 MB descargados');
   });
 });

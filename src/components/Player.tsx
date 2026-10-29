@@ -31,7 +31,10 @@ import {
   probe as probeMedia,
   readSubtitleRendition,
   subtitleUrl as serviceSubtitleUrl,
+  describeTorrent,
+  torrentStats,
   type Probe,
+  type TorrentStats,
 } from "../lib/streamingServer";
 import { streamQuality } from "../lib/streams";
 import { activeCues, decodeSubtitle, dedupeSubtitles, parseSubtitle, type Cue } from "../lib/subtitles";
@@ -177,6 +180,7 @@ export function Player({
   const [status, setStatus] = useState<Status>("loading");
   const [waitingSince, setWaitingSince] = useState(Date.now());
   const [slow, setSlow] = useState(false);
+  const [swarm, setSwarm] = useState<{ stats: TorrentStats; stalledSince?: number } | null>(null);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
@@ -668,6 +672,30 @@ export function Player({
     return () => clearTimeout(timer);
   }, [status, waitingSince]);
 
+  // Torrents: show the swarm while loading, and say so when no data arrives.
+  const infoHash = playing.stream.infoHash && !playing.stream.url ? playing.stream.infoHash : undefined;
+  useEffect(() => {
+    if (!infoHash || (status !== "loading" && status !== "buffering")) return;
+    let active = true;
+    const read = () =>
+      void torrentStats(playing.serviceUrl, infoHash)
+        .then((stats) => {
+          if (!active) return;
+          setSwarm((previous) => {
+            const moving = stats.speed > 0 || stats.downloaded > (previous?.stats.downloaded ?? 0);
+            return { stats, stalledSince: moving ? undefined : (previous?.stalledSince ?? Date.now()) };
+          });
+        })
+        .catch(() => {});
+    read();
+    const timer = setInterval(read, 2000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [infoHash, playing.serviceUrl, status]);
+  const starved = Boolean(swarm?.stalledSince && Date.now() - swarm.stalledSince > 20_000);
+
   // Countdown to the next episode once the current one has ended.
   useEffect(() => {
     if (status !== "ended" || !next || !onNext || nextDismissed || !settings.autoNext || settings.nextCountdown <= 0) {
@@ -956,11 +984,21 @@ export function Player({
                   ? "Convirtiendo con Stremio Service"
                   : playing.note || "Cargando"}
             </span>
-            {slow && (
+            {swarm && <span className="player-swarm">{describeTorrent(swarm.stats)}</span>}
+            {(slow || starved) && (
               <div className="player-slow">
-                <p>La fuente está tardando en responder.</p>
+                <p>
+                  {starved
+                    ? `El torrent no está recibiendo datos (${swarm!.stats.unchoked} de ${swarm!.stats.peers} pares envían). Puede que no tenga fuentes suficientes; prueba otra.`
+                    : "La fuente está tardando en responder."}
+                </p>
                 <div>
-                  {playing.transcodeUrl && !converting && (
+                  {infoHash && (
+                    <button className="button small subtle" onClick={onClose}>
+                      Elegir otra fuente
+                    </button>
+                  )}
+                  {playing.transcodeUrl && !converting && !infoHash && (
                     <button className="button small subtle" onClick={() => switchToConversion({})}>
                       Probar con Stremio Service
                     </button>

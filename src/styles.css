@@ -2941,3 +2941,9 @@ kbd {
   right: 4px;
   transform: translateY(-50%);
 }
+
+.player-swarm {
+  color: rgb(255 255 255 / 62%);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
