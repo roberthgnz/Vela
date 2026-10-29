@@ -39,9 +39,10 @@ export async function serviceVersion(serviceUrl: string): Promise<string | undef
   return typeof values?.serverVersion === "string" ? values.serverVersion : undefined;
 }
 
+/** The server answers /settings at once when it runs; a hung or unrelated host should not hold playback back. */
 export async function serviceAvailable(serviceUrl: string): Promise<boolean> {
   try {
-    await requestJson(`${base(serviceUrl)}/settings`);
+    await requestJson(`${base(serviceUrl)}/settings`, AbortSignal.timeout(4000));
     return true;
   } catch {
     return false;
@@ -231,9 +232,10 @@ export function mediaCapabilities(): Capabilities {
   return { formats: ["mp4", "matroska,webm"], videoCodecs, audioCodecs, maxAudioChannels: 8 };
 }
 
-export async function probe(serviceUrl: string, mediaUrl: string): Promise<Probe> {
+export async function probe(serviceUrl: string, mediaUrl: string, signal?: AbortSignal): Promise<Probe> {
   const result = (await requestJson(
     `${base(serviceUrl)}/hlsv2/probe?${new URLSearchParams({ mediaURL: mediaUrl })}`,
+    signal,
   )) as Probe;
   if (!result?.format || !Array.isArray(result.streams)) throw new Error("Respuesta de sondeo no válida.");
   return result;

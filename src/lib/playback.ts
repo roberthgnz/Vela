@@ -94,7 +94,9 @@ export async function resolvePlayback(
     streamTags(stream).some((tag) => tag === "HEVC" || tag === "MKV");
   if (!suspicious) return target;
   try {
-    target.probe = await probe(serviceUrl, playable);
+    // The server reads the file's header before answering, which waits for peers on a torrent.
+    // The player shows the swarm and offers the conversion later, so the wait is kept short.
+    target.probe = await probe(serviceUrl, playable, AbortSignal.timeout(torrent ? 10_000 : 20_000));
     const problems = probeProblems(target.probe, capabilities);
     if (problems.length) {
       target.url = target.transcodeUrl;

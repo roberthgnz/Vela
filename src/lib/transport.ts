@@ -4,6 +4,21 @@ function checkSignal(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('The request was cancelled.', 'AbortError');
 }
 
+/**
+ * Waits for a desktop request but gives up as soon as the signal aborts. Rust still finishes (or
+ * times out) on its own; its answer is dropped. Without this, timeouts set by callers were ignored
+ * in the desktop app and every request could take the full 20 seconds.
+ */
+function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new DOMException('The request was cancelled.', 'AbortError'));
+    if (signal.aborted) return abort();
+    signal.addEventListener('abort', abort, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+  });
+}
+
 function message(error: unknown): Error {
   return error instanceof Error ? error : new Error(typeof error === 'string' ? error : 'The addon request failed.');
 }
@@ -12,7 +27,7 @@ async function request(url: string, format: 'json' | 'text', signal?: AbortSigna
   checkSignal(signal);
   if (isTauri()) {
     try {
-      const result = await invoke(format === 'json' ? 'request_json' : 'request_text', { url });
+      const result = await abortable(invoke(format === 'json' ? 'request_json' : 'request_text', { url }), signal);
       checkSignal(signal);
       return result;
     } catch (error) {
@@ -49,7 +64,7 @@ export async function requestBytes(url: string, signal?: AbortSignal): Promise<U
   checkSignal(signal);
   if (isTauri()) {
     try {
-      const result = await invoke<ArrayBuffer | number[]>('request_bytes', { url });
+      const result = await abortable(invoke<ArrayBuffer | number[]>('request_bytes', { url }), signal);
       checkSignal(signal);
       return result instanceof ArrayBuffer ? new Uint8Array(result) : Uint8Array.from(result);
     } catch (error) {
@@ -69,7 +84,7 @@ export async function requestRange(url: string, start: number, length: number, s
   checkSignal(signal);
   if (!isTauri()) throw new Error('Partial reads need the desktop app.');
   try {
-    const result = await invoke<ArrayBuffer | number[]>('request_range', { url, start, length });
+    const result = await abortable(invoke<ArrayBuffer | number[]>('request_range', { url, start, length }), signal);
     checkSignal(signal);
     return result instanceof ArrayBuffer ? new Uint8Array(result) : Uint8Array.from(result);
   } catch (error) {
@@ -83,7 +98,7 @@ export async function postJson(url: string, body: unknown, signal?: AbortSignal)
   checkSignal(signal);
   if (isTauri()) {
     try {
-      const result = await invoke('post_json', { url, body });
+      const result = await abortable(invoke('post_json', { url, body }), signal);
       checkSignal(signal);
       return result;
     } catch (error) {
