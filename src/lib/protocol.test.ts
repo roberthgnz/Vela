@@ -44,12 +44,20 @@ describe('manifest installation', () => {
   });
 
   it.each([
-    { description: undefined }, { id: '' }, { version: 'latest' }, { resources: [] },
-    { types: 'movie' }, { catalogs: [{ type: 'movie', id: 'top' }] },
-    { logo: 'data:image/svg+xml,unsafe' }, { resources: [{ name: 'stream', types: 2 }] },
-  ])('rejects malformed required fields and unsafe assets: %j', async (changes) => {
+    { id: '' }, { name: '' }, { version: 'latest' }, { resources: 'stream' },
+    { catalogs: {} }, { catalogs: [{ type: 'movie' }] }, { resources: [{ name: 'stream', types: 2 }] },
+  ])('rejects malformed required fields: %j', async (changes) => {
     request.mockResolvedValueOnce({ ...addon().manifest, ...changes });
     await expect(loadManifest('https://addon.example')).rejects.toThrow();
+  });
+
+  it('accepts what stremio-core accepts: no description, types or catalogs, unnamed catalogs, odd logos', async () => {
+    const { description: _description, catalogs: _catalogs, ...bare } = addon().manifest;
+    request.mockResolvedValueOnce({ ...bare, id: 'community-addon', types: 'movie', logo: 'data:image/svg+xml,unsafe', resources: [{ name: 'stream' }] });
+    const result = await loadManifest('https://addon.example');
+    expect(result.manifest).toMatchObject({ id: 'community-addon', description: undefined, logo: undefined, types: [], catalogs: [], resources: [{ name: 'stream', types: undefined }] });
+    request.mockResolvedValueOnce({ ...addon().manifest, description: '', catalogs: [{ type: 'movie', id: 'top' }] });
+    expect((await loadManifest('https://addon.example')).manifest.catalogs[0].name).toBe('top');
   });
 
   it('does not disclose configured URLs in transport errors', async () => {

@@ -103,39 +103,46 @@ function catalog(value: unknown): AddonCatalog {
   return {
     id: text(item.id, 'Catalog ID'),
     type: text(item.type, 'Catalog type'),
-    name: text(item.name, 'Catalog name'),
+    // stremio-core treats the name as optional; such catalogs are shown by their ID.
+    name: typeof item.name === 'string' && item.name.trim() ? item.name : text(item.id, 'Catalog ID'),
     extra,
     extraSupported: optionalStrings(item.extraSupported, 'Supported extras'),
     extraRequired: optionalStrings(item.extraRequired, 'Required extras'),
   };
 }
 
+/**
+ * Validates a manifest as leniently as stremio-core, so that every addon the official apps install
+ * installs here too: ID, name, semantic version and a resource list are required; description,
+ * logo, types, catalogs and per-resource types are optional, and a bad logo is dropped.
+ */
 function manifest(value: unknown): AddonManifest {
   const item = record(value, 'Manifest');
   const id = text(item.id, 'Manifest ID');
-  if (!/^[a-z\d_-]+(?:\.[a-z\d_-]+)+$/i.test(id)) throw new Error('Manifest ID must be a dot-separated identifier.');
   const version = text(item.version, 'Manifest version');
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[\da-z.-]+)?(?:\+[\da-z.-]+)?$/i.test(version)) throw new Error('Manifest version must use semantic versioning.');
-  if (!Array.isArray(item.resources) || !item.resources.length) throw new Error('Manifest must declare at least one resource.');
-  if (!Array.isArray(item.catalogs)) throw new Error('Manifest catalogs must be an array.');
+  if (!Array.isArray(item.resources)) throw new Error('Manifest resources must be an array.');
+  if (item.catalogs != null && !Array.isArray(item.catalogs)) throw new Error('Manifest catalogs must be an array.');
+  let logo: string | undefined;
+  try { logo = optionalUrl(item.logo, 'Manifest logo'); } catch { logo = undefined; }
   return {
     id,
     version,
     name: text(item.name, 'Manifest name'),
-    description: text(item.description, 'Manifest description'),
-    logo: optionalUrl(item.logo, 'Manifest logo'),
-    types: strings(item.types, 'Manifest types'),
+    description: typeof item.description === 'string' && item.description.trim() ? item.description : undefined,
+    logo,
+    types: Array.isArray(item.types) ? item.types.filter((type): type is string => typeof type === 'string' && Boolean(type.trim())) : [],
     idPrefixes: optionalStrings(item.idPrefixes, 'Manifest ID prefixes'),
     resources: item.resources.map((value) => {
       if (typeof value === 'string') return text(value, 'Resource name');
       const entry = record(value, 'Resource');
       return {
         name: text(entry.name, 'Resource name'),
-        types: strings(entry.types, 'Resource types'),
+        types: optionalStrings(entry.types, 'Resource types'),
         idPrefixes: optionalStrings(entry.idPrefixes, 'Resource ID prefixes'),
       };
     }),
-    catalogs: item.catalogs.map(catalog),
+    catalogs: Array.isArray(item.catalogs) ? item.catalogs.map(catalog) : [],
   };
 }
 
