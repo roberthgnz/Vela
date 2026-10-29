@@ -1,3 +1,4 @@
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { Episode, ResolvedStream, Subtitle } from "./contracts";
 import { postJson, requestJson } from "./transport";
 
@@ -45,6 +46,44 @@ export async function serviceAvailable(serviceUrl: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** The server Stremio installs listens here; only this address can be started by Vela. */
+export function isLocalService(serviceUrl: string): boolean {
+  try {
+    const url = new URL(serviceUrl);
+    return url.protocol === "http:" && ["127.0.0.1", "localhost"].includes(url.hostname) && url.port === "11470";
+  } catch {
+    return false;
+  }
+}
+
+/** Whether Stremio is installed, so Vela can start its server (desktop only). */
+export async function serviceInstalled(): Promise<boolean> {
+  return isTauri() ? invoke<boolean>("service_installed").catch(() => false) : false;
+}
+
+let starting: Promise<boolean> | undefined;
+
+/**
+ * Answers whether the server is reachable, starting the one Stremio installs when nothing answers
+ * on the default address. Startup takes a few seconds; concurrent callers share the same wait.
+ */
+export function ensureService(serviceUrl: string, wait = 20_000): Promise<boolean> {
+  starting ??= (async () => {
+    if (await serviceAvailable(serviceUrl)) return true;
+    if (!isLocalService(serviceUrl) || !(await serviceInstalled())) return false;
+    await invoke("service_start");
+    const deadline = Date.now() + wait;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (await serviceAvailable(serviceUrl)) return true;
+    }
+    return false;
+  })().finally(() => {
+    starting = undefined;
+  });
+  return starting;
 }
 
 /** Normalizes addon `sources` into the server's peer-search notation. */

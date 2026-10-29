@@ -23,7 +23,8 @@ import {
 import type { PlayerPreferences } from "../lib/contracts";
 import { languageLabel, preferredLanguageOptions } from "../lib/languages";
 import { preferencesStore, usePreferences } from "../lib/store";
-import { openExternal, requestJson } from "../lib/transport";
+import { ensureService, isLocalService, serviceInstalled, serviceVersion } from "../lib/streamingServer";
+import { openExternal } from "../lib/transport";
 import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
 import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
@@ -109,12 +110,15 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
   const probe = useMutation({
     mutationFn: async () => {
       const url = validServiceUrl(service);
-      const settings = await requestJson(`${url}/settings`);
-      const values = (settings as { values?: Record<string, unknown> })?.values;
-      return {
-        url,
-        version: typeof values?.serverVersion === "string" ? values.serverVersion : undefined,
-      };
+      if (!(await ensureService(url)))
+        throw new Error(
+          !isLocalService(url)
+            ? "Sin respuesta. Comprueba la dirección y que el servidor esté abierto."
+            : (await serviceInstalled())
+              ? "Vela inició el servidor de Stremio, pero no respondió. Prueba a abrir Stremio."
+              : "Sin respuesta y Stremio no está instalado. Instala Stremio o abre Stremio Service.",
+        );
+      return { url, version: await serviceVersion(url).catch(() => undefined) };
     },
     onSuccess: ({ url }) => {
       preferencesStore.setServiceUrl(url);
@@ -364,7 +368,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
               <Row
                 label="Stremio Service"
                 htmlFor="service-url"
-                description="Servidor local necesario para reproducir fuentes torrent. No se incluye con Vela."
+                description="Servidor local necesario para reproducir fuentes torrent. No se incluye con Vela: si Stremio está instalado, Vela inicia su servidor cuando hace falta."
                 stacked
               >
                 <div className="input-group">
@@ -400,7 +404,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
                     </span>
                   ) : probe.isError ? (
                     <span className="status error">
-                      <XCircle size={14} /> Sin respuesta. Abre Stremio o Stremio Service y comprueba la dirección.
+                      <XCircle size={14} /> {errorMessage(probe.error)}
                     </span>
                   ) : (
                     <span className="status">Sin comprobar</span>

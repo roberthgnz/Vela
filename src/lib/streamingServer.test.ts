@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const transport = vi.hoisted(() => ({ postJson: vi.fn(), requestJson: vi.fn() }));
 vi.mock('./transport', () => transport);
 
-import { describeTorrent, peerSources, prepareTorrent, probeProblems, proxyUrl, torrentStats, torrentUrl, transcodeUrl } from './streamingServer';
+import { describeTorrent, ensureService, isLocalService, peerSources, prepareTorrent, probeProblems, proxyUrl, torrentStats, torrentUrl, transcodeUrl } from './streamingServer';
 
 const hash = '08ada5a7a6183aae1e09d831df6748d566095a10';
 const files = ['Sintel.de.srt', 'Sintel.en.srt', 'Sintel.es.srt', 'Sintel.fr.srt', 'Sintel.it.srt', 'Sintel.mp4', 'poster.jpg']
@@ -90,5 +90,22 @@ describe('torrent swarm', () => {
     expect(describeTorrent(stats)).toBe('3 de 145 pares conectados · 0 KB/s · 0 MB descargados');
     expect(describeTorrent({ ...stats, peers: 1, found: 1, speed: 2_540_000, downloaded: 290_000_000 })).toBe('1 par conectado · 2.4 MB/s · 277 MB descargados');
     expect(describeTorrent({ ...stats, peers: 4, found: 0 })).toBe('4 pares conectados · 0 KB/s · 0 MB descargados');
+  });
+});
+
+describe('ensureService', () => {
+  it('only treats the default local address as one Vela can start', () => {
+    expect(isLocalService('http://127.0.0.1:11470')).toBe(true);
+    expect(isLocalService('http://localhost:11470/')).toBe(true);
+    expect(isLocalService('http://192.168.1.10:11470')).toBe(false);
+    expect(isLocalService('https://127.0.0.1:12470')).toBe(false);
+    expect(isLocalService('not a url')).toBe(false);
+  });
+
+  it('answers at once when the server responds, and gives up on remote servers without starting one', async () => {
+    transport.requestJson.mockResolvedValueOnce({ values: {} });
+    expect(await ensureService('http://127.0.0.1:11470')).toBe(true);
+    transport.requestJson.mockRejectedValueOnce(new Error('refused'));
+    expect(await ensureService('http://192.168.1.10:11470')).toBe(false);
   });
 });

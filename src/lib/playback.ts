@@ -1,6 +1,7 @@
 import type { Episode, MediaItem, ResolvedStream, Subtitle } from "./contracts";
 import {
   type Probe,
+  ensureService,
   mediaCapabilities,
   prepareTorrent,
   probe,
@@ -30,7 +31,7 @@ export type PlaybackTarget = {
 };
 
 const serviceHint =
-  "Abre Stremio o Stremio Service y comprueba su dirección en Ajustes › Streaming.";
+  "Vela inicia el servidor de Stremio si Stremio está instalado; si no, instala Stremio o abre Stremio Service y comprueba su dirección en Ajustes › Streaming.";
 
 /** Turns an addon stream into URLs the integrated or external player can open. */
 export async function resolvePlayback(
@@ -42,7 +43,12 @@ export async function resolvePlayback(
   const headers = stream.behaviorHints?.proxyHeaders?.request || {};
   const needsHeaders = Object.keys(headers).length > 0;
   const torrent = Boolean(stream.infoHash && !stream.url);
-  const service = torrent || needsHeaders || !options.external ? await serviceAvailable(serviceUrl) : false;
+  // Torrents and header proxies cannot work without the server, so Vela starts it if it can;
+  // plain links only use it for optional probing and conversion.
+  const service =
+    torrent || needsHeaders
+      ? await ensureService(serviceUrl)
+      : !options.external && (await serviceAvailable(serviceUrl));
   let url = stream.url;
   let note: string | undefined;
   let subtitles: Subtitle[] = [];

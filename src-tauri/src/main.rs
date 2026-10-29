@@ -3,13 +3,14 @@
 mod downloads;
 mod mpv;
 mod secrets;
+mod service;
 mod transport;
 mod updater;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
 use tokio::process::Command;
 use transport::{HttpClient, checked_url};
 
@@ -266,6 +267,7 @@ fn main() {
         .manage(updater::PendingUpdate::default())
         .manage(client)
         .manage(downloads::Downloads::new().expect("could not initialize downloads"))
+        .manage(service::Service::default())
         .invoke_handler(tauri::generate_handler![
             request_json,
             post_json,
@@ -279,12 +281,19 @@ fn main() {
             downloads::download_reveal,
             open_external,
             launch_external_player,
+            service::service_installed,
+            service::service_start,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_delete,
             updater::update_check,
             updater::update_install
         ])
-        .run(tauri::generate_context!())
-        .expect("could not start Vela");
+        .build(tauri::generate_context!())
+        .expect("could not start Vela")
+        .run(|app, event| {
+            if let RunEvent::Exit = event {
+                app.state::<service::Service>().stop();
+            }
+        });
 }
