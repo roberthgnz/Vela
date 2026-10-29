@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import type { InstalledAddon, MediaItem } from "./contracts";
 import { supportsResource } from "./protocol";
 
@@ -10,9 +10,20 @@ export type Section =
   | "addons"
   | "settings";
 
+/** Filters and choices of a view, kept in its history entry so going back restores them. */
+export type ViewState = Record<string, string | number | boolean | undefined>;
+
 export type Route =
-  | { name: Section }
-  | { name: "detail"; meta: MediaItem; addonUrl: string; videoId?: string; sources?: boolean };
+  | { name: Section; state?: ViewState }
+  | {
+      name: "detail";
+      meta: MediaItem;
+      addonUrl: string;
+      videoId?: string;
+      season?: number;
+      sources?: boolean;
+      state?: ViewState;
+    };
 
 type History = { entries: Route[]; index: number };
 
@@ -29,12 +40,18 @@ export function useNavigation(initial: Route = { name: "home" }) {
       return { entries: [...entries.slice(0, index + 1), route], index: index + 1 };
     });
   }, []);
-  const replace = useCallback((route: Route) => {
+  /** Changes the current entry without adding one (the latest value is passed to `change`). */
+  const update = useCallback((change: (route: Route) => Route) => {
     setHistory(({ entries, index }) => ({
-      entries: entries.map((entry, i) => (i === index ? route : entry)),
+      entries: entries.map((entry, i) => (i === index ? change(entry) : entry)),
       index,
     }));
   }, []);
+  const replace = useCallback((route: Route) => update(() => route), [update]);
+  const patchState = useCallback(
+    (patch: ViewState) => update((route) => ({ ...route, state: { ...route.state, ...patch } })),
+    [update],
+  );
   const back = useCallback(
     () =>
       setHistory((value) =>
@@ -58,9 +75,30 @@ export function useNavigation(initial: Route = { name: "home" }) {
     canForward: history.index < history.entries.length - 1,
     navigate,
     replace,
+    update,
+    patchState,
     back,
     forward,
   };
+}
+
+const RouteStateContext = createContext<{ state: ViewState; patch: (patch: ViewState) => void }>({
+  state: {},
+  patch: () => {},
+});
+
+export const RouteStateProvider = RouteStateContext.Provider;
+
+/** A view setting stored in the current history entry (like `useState`, but restored on «Atrás»). */
+export function useRouteState<T extends string | number | boolean>(
+  key: string,
+  fallback: T,
+): [T, (value: T) => void] {
+  const { state, patch } = useContext(RouteStateContext);
+  const saved = state[key];
+  const value = (typeof saved === typeof fallback ? saved : fallback) as T;
+  const set = useCallback((next: T) => patch({ [key]: next }), [key, patch]);
+  return [value, set];
 }
 
 /** Finds the addon that should describe a title, falling back to a read-only placeholder. */

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, KeyRound, Link2, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ExternalLink, Eye, EyeOff, KeyRound, Link2, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
 import { account, useAccount } from "../lib/account";
 import { createLink, readLink, type LinkCode } from "../lib/stremioApi";
 import { openExternal } from "../lib/transport";
@@ -18,6 +18,15 @@ function LinkSignIn({ notify }: { notify: (message: string) => void }) {
   const [code, setCode] = useState<LinkCode | null>(null);
   const [status, setStatus] = useState<"idle" | "waiting" | "expired" | "error">("idle");
   const [error, setError] = useState("");
+  const startButton = useRef<HTMLButtonElement>(null);
+  const cancelled = useRef(false);
+  // After cancelling, focus returns to the button that starts the link.
+  useEffect(() => {
+    if (!code && cancelled.current) {
+      cancelled.current = false;
+      startButton.current?.focus();
+    }
+  }, [code]);
   useEffect(() => {
     if (!code) return;
     let stopped = false;
@@ -77,7 +86,14 @@ function LinkSignIn({ notify }: { notify: (message: string) => void }) {
               <button className="button subtle small" onClick={() => void openExternal(code.link)}>
                 Abrir de nuevo <ExternalLink size={12} />
               </button>
-              <button className="button subtle small" onClick={() => { setCode(null); setStatus("idle"); }}>
+              <button
+                className="button subtle small"
+                onClick={() => {
+                  cancelled.current = true;
+                  setCode(null);
+                  setStatus("idle");
+                }}
+              >
                 Cancelar
               </button>
             </div>
@@ -88,7 +104,7 @@ function LinkSignIn({ notify }: { notify: (message: string) => void }) {
           <p>
             Recomendado. Abre la página oficial de Stremio en tu navegador; tu contraseña no pasa por Vela.
           </p>
-          <button className="button primary" onClick={() => void start()}>
+          <button className="button primary" ref={startButton} onClick={() => void start()}>
             <Link2 size={15} /> Vincular con el navegador
           </button>
           {status === "expired" && <span className="status error">El código caducó. Genera uno nuevo.</span>}
@@ -102,6 +118,7 @@ function LinkSignIn({ notify }: { notify: (message: string) => void }) {
 function PasswordSignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [visible, setVisible] = useState(false);
   const submit = useMutation({ mutationFn: () => account.signInWithPassword(email, password) });
   return (
     <form
@@ -122,15 +139,27 @@ function PasswordSignIn() {
         onChange={(event) => setEmail(event.target.value)}
       />
       <label className="field-label" htmlFor="stremio-password">Contraseña</label>
-      <input
-        id="stremio-password"
-        className="input"
-        type="password"
-        autoComplete="current-password"
-        required
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-      />
+      <div className="input-with-action">
+        <input
+          id="stremio-password"
+          className="input"
+          type={visible ? "text" : "password"}
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+          aria-pressed={visible}
+          title={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+          onClick={() => setVisible(!visible)}
+        >
+          {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+        </button>
+      </div>
       {submit.isError && <p className="form-error" role="alert">{errorMessage(submit.error)}</p>}
       <div>
         <button className="button primary" type="submit" disabled={submit.isPending || !email || !password}>

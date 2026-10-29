@@ -3,16 +3,27 @@
 //
 // Torrents are Blender Foundation films distributed under Creative Commons BY 3.0
 // (the WebTorrent sample torrents). The HEVC/MKV and header-protected files are generated
-// locally from tests/fixtures/playback.mp4; see `media` below.
+// locally from tests/fixtures/playback.mp4; the multitrack file, the episodes and the
+// subtitles are synthetic (FFmpeg test patterns and tones): `node dev/make-validation-media.mjs`.
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 
 const port = Number(process.env.PORT || 7010);
 const root = fileURLToPath(new URL("../", import.meta.url));
+const generated = (name) => `${root}.tmp/media/${name}`;
 const media = {
   "h264.mp4": `${root}tests/fixtures/playback.mp4`,
-  "hevc.mkv": `${root}.tmp/media/hevc.mkv`,
+  "hevc.mkv": generated("hevc.mkv"),
+  "multitrack.mkv": generated("multitrack.mkv"),
+  "multiaudio.mp4": generated("multiaudio.mp4"),
+  "ep1.mp4": generated("ep1.mp4"),
+  "ep2.mp4": generated("ep2.mp4"),
+  "ep3.mp4": generated("ep3.mp4"),
+  "styled.ass": generated("styled.ass"),
+  "subs-en.srt": generated("subs-en.srt"),
+  "subs-es-1252.srt": generated("subs-es-1252.srt"),
+  "broken.srt": generated("broken.srt"),
 };
 const trackers = [
   "tracker:udp://tracker.opentrackr.org:1337/announce",
@@ -31,7 +42,32 @@ const titles = [
     description: "Sintel (Blender Foundation, CC BY 3.0). Fuentes torrent y directas para validar Vela.",
     releaseInfo: "2010",
   },
+  {
+    id: "velatest:tracks",
+    type: "movie",
+    name: "Pistas · Validación",
+    description: "Patrón de prueba sintético con dos pistas de audio (inglés y español) y subtítulos SRT y ASS incrustados.",
+    releaseInfo: "2026",
+  },
 ];
+const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
+const series = {
+  id: "velatest:serie",
+  type: "series",
+  name: "Serie · Validación",
+  description: "Tres episodios sintéticos de 25 s para validar la continuidad entre episodios, más uno sin estrenar.",
+  releaseInfo: "2026",
+  videos: [
+    ...[1, 2, 3].map((episode) => ({
+      id: `velatest:serie:1:${episode}`,
+      title: `Episodio ${episode}`,
+      season: 1,
+      episode,
+      released: "2026-01-0" + episode + "T00:00:00.000Z",
+    })),
+    { id: "velatest:serie:1:4", title: "Episodio sin estrenar", season: 1, episode: 4, released: future },
+  ],
+};
 
 const streams = [
   { name: "Torrent\n1080p", title: "Sintel · fileIdx 5 explícito\nSintel.mp4 · 123 MB", infoHash: sintel, fileIdx: 5 },
@@ -44,15 +80,48 @@ const streams = [
   { name: "Directo\nH.264", title: "MP4 H.264/AAC compatible", url: `${base}/media/h264.mp4` },
 ];
 
+const trackStreams = [
+  {
+    name: "Directo\nMKV multipista",
+    title: "H.264 · 2 audios (eng, spa) · SRT eng/spa y ASS incrustados",
+    url: `${base}/media/multitrack.mkv`,
+    behaviorHints: { filename: "multitrack.mkv" },
+  },
+  {
+    name: "Directo\nMP4 dos audios",
+    title: "H.264 · AAC inglés y español en el mismo MP4",
+    url: `${base}/media/multiaudio.mp4`,
+    subtitles: [{ id: "stream-ass", lang: "eng", url: `${base}/media/styled.ass` }],
+  },
+];
+// The Spanish file is Windows-1252 and listed twice; broken.srt is not a subtitle file.
+const addonSubtitles = [
+  { id: "en", lang: "eng", url: `${base}/media/subs-en.srt` },
+  { id: "es", lang: "spa", url: `${base}/media/subs-es-1252.srt` },
+  { id: "es-copy", lang: "es", url: `${base}/media/subs-es-1252.srt` },
+  { id: "ass", lang: "eng", url: `${base}/media/styled.ass` },
+  { id: "broken", lang: "fre", url: `${base}/media/broken.srt` },
+];
+function episodeStreams(episode) {
+  if (episode > 3) return [];
+  return [
+    { name: "Directo\n360p", title: `Episodio ${episode} · grupo A`, url: `${base}/media/ep${episode}.mp4`, behaviorHints: { bingeGroup: "vela-validation-a" } },
+    { name: "Alternativa\n360p", title: `Episodio ${episode} · grupo B`, url: `${base}/media/ep${episode}.mp4`, behaviorHints: { bingeGroup: "vela-validation-b" } },
+  ];
+}
+
 const manifest = {
   id: "dev.vela.validation",
   name: "Vela Validación",
   version: "1.0.0",
   description: "Fuentes locales y torrents CC para validar el reproductor y Stremio Service.",
-  resources: ["catalog", "meta", "stream"],
-  types: ["movie"],
+  resources: ["catalog", "meta", "stream", "subtitles"],
+  types: ["movie", "series"],
   idPrefixes: ["velatest:"],
-  catalogs: [{ id: "validation", type: "movie", name: "Validación" }],
+  catalogs: [
+    { id: "validation", type: "movie", name: "Validación" },
+    { id: "validation", type: "series", name: "Validación" },
+  ],
 };
 
 function json(res, body) {
@@ -66,7 +135,7 @@ function file(req, res, path) {
     return;
   }
   const size = statSync(path).size;
-  const type = path.endsWith(".mkv") ? "video/x-matroska" : "video/mp4";
+  const type = path.endsWith(".mkv") ? "video/x-matroska" : /\.(srt|ass)$/.test(path) ? "text/plain" : "video/mp4";
   const range = /bytes=(\d+)-(\d*)/.exec(req.headers.range || "");
   if (range) {
     const start = Number(range[1]);
@@ -75,11 +144,12 @@ function file(req, res, path) {
       "content-type": type,
       "accept-ranges": "bytes",
       "content-range": `bytes ${start}-${end}/${size}`,
+      "access-control-allow-origin": "*",
       "content-length": end - start + 1,
     });
     createReadStream(path, { start, end }).pipe(res);
   } else {
-    res.writeHead(200, { "content-type": type, "accept-ranges": "bytes", "content-length": size });
+    res.writeHead(200, { "content-type": type, "accept-ranges": "bytes", "content-length": size, "access-control-allow-origin": "*" });
     createReadStream(path).pipe(res);
   }
 }
@@ -90,8 +160,14 @@ createServer((req, res) => {
   console.log(req.method, path, req.headers["x-vela-token"] ? "(token)" : "");
   if (path === "/manifest.json") return json(res, manifest);
   if (path === "/catalog/movie/validation.json") return json(res, { metas: titles });
-  if (path === "/meta/movie/velatest:sintel.json") return json(res, { meta: titles[0] });
+  if (path === "/catalog/series/validation.json") return json(res, { metas: [series] });
+  const meta = /^\/meta\/(movie|series)\/(.+)\.json$/.exec(path);
+  if (meta) return json(res, { meta: [...titles, series].find((item) => item.id === meta[2]) ?? null });
   if (path === "/stream/movie/velatest:sintel.json") return json(res, { streams });
+  if (path === "/stream/movie/velatest:tracks.json") return json(res, { streams: trackStreams });
+  const episode = /^\/stream\/series\/velatest:serie:1:(\d)\.json$/.exec(path);
+  if (episode) return json(res, { streams: episodeStreams(Number(episode[1])) });
+  if (path.startsWith("/subtitles/movie/velatest:tracks")) return json(res, { subtitles: addonSubtitles });
   const protectedFile = /^\/protected\/(.+)$/.exec(path);
   if (protectedFile) {
     if (req.headers["x-vela-token"] !== "ok") return res.writeHead(403).end("missing header");

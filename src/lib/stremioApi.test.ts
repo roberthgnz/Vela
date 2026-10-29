@@ -5,6 +5,7 @@ vi.mock('./transport', () => transport);
 
 import type { LibraryEntry } from './contracts';
 import { mediaKey } from './store';
+import { decodeWatched, encodeWatched } from './watched';
 import { createLink, entryFromRemote, getLibrary, login, planSync, readLink, remoteFromEntry, type RemoteItem } from './stremioApi';
 
 const day = 86_400_000;
@@ -20,8 +21,10 @@ function remote(id: string, mtime: number, extra: Partial<RemoteItem> = {}, stat
   };
 }
 
-function local(id: string, addedAt: number, progress?: LibraryEntry['progress'], type = 'movie'): [string, LibraryEntry] {
-  return [mediaKey(type, id), { meta: { id, type, name: `Local ${id}` }, addonUrl: 'https://v3-cinemeta.strem.io/manifest.json', addedAt, progress }];
+function local(id: string, addedAt: number, progress?: LibraryEntry['progress'], type = 'movie', saved = true): [string, LibraryEntry] {
+  const entry: LibraryEntry = { meta: { id, type, name: `Local ${id}` }, addonUrl: 'https://v3-cinemeta.strem.io/manifest.json', addedAt, saved };
+  if (progress) entry.progress = progress;
+  return [mediaKey(type, id), entry];
 }
 
 describe('Stremio account API', () => {
@@ -64,7 +67,7 @@ describe('library mapping', () => {
 
   it('preserves unknown remote fields when uploading progress', () => {
     const base = remote('tt1', t0, { temp: true, removed: true, custom: 1 }, { timesWatched: 3, watched: 'bits' });
-    const [, entry] = local('tt1', t0 - day, { videoId: 'tt1', seconds: 12.5, duration: 100, updatedAt: t0 + day });
+    const [, entry] = local('tt1', t0 - day, { videoId: 'tt1', seconds: 12.5, duration: 100, updatedAt: t0 + day }, 'movie', false);
     const item = remoteFromEntry(entry, base, t0 + 2 * day);
     expect(item).toMatchObject({ custom: 1, temp: true, removed: true, _mtime: new Date(t0 + 2 * day).toISOString() });
     expect(item.state).toMatchObject({ timesWatched: 3, watched: 'bits', timeOffset: 12_500, duration: 100_000, video_id: 'tt1' });
@@ -74,18 +77,18 @@ describe('library mapping', () => {
 describe('planSync', () => {
   const empty = { synced: {}, removed: {} };
 
-  it('pulls remote-only titles and pushes local-only ones, ignoring Vela demo ids', () => {
-    const plan = planSync(Object.fromEntries([local('tt2', t0), local('vela:sintel', t0)]), [remote('tt1', t0)], empty, t0 + day);
+  it('pulls remote-only titles and pushes local-only ones, ignoring Vela demo ids', async () => {
+    const plan = await planSync(Object.fromEntries([local('tt2', t0), local('vela:sintel', t0)]), [remote('tt1', t0)], empty, t0 + day);
     expect(plan.pull.map((entry) => entry.meta.id)).toEqual(['tt1']);
     expect(plan.push.map((item) => [item._id, item.removed])).toEqual([['tt2', false]]);
   });
 
-  it('lets the newest side win', () => {
+  it('lets the newest side win', async () => {
     const library = Object.fromEntries([
       local('old', t0, { videoId: 'old', seconds: 5, duration: 10, updatedAt: t0 }),
       local('new', t0, { videoId: 'new', seconds: 9, duration: 10, updatedAt: t0 + 3 * day }),
     ]);
-    const plan = planSync(library, [
+    const plan = await planSync(library, [
       remote('old', t0 + day, {}, { timeOffset: 7000, duration: 10_000, video_id: 'old' }),
       remote('new', t0 + day),
     ], empty, t0 + 4 * day);
@@ -95,8 +98,8 @@ describe('planSync', () => {
     expect(plan.push.map((item) => item._id)).toEqual(['new']);
   });
 
-  it('propagates removals in both directions', () => {
-    const plan = planSync(Object.fromEntries([local('gone-remote', t0)]), [
+  it('propagates removals in both directions', async () => {
+    const plan = await planSync(Object.fromEntries([local('gone-remote', t0)]), [
       remote('gone-remote', t0 + day, { removed: true }),
       remote('gone-local', t0),
     ], { synced: { 'gone-remote': t0, 'gone-local': t0 }, removed: { 'gone-local': { type: 'movie', at: t0 + day } } }, t0 + 2 * day);
@@ -104,15 +107,59 @@ describe('planSync', () => {
     expect(plan.push.map((item) => [item._id, item.removed])).toEqual([['gone-local', true]]);
   });
 
-  it('keeps continue-watching items that Stremio marks as temporary', () => {
-    const plan = planSync({}, [remote('tt9', t0, { removed: true, temp: true }, { timeOffset: 1000, duration: 2000 }), remote('tt8', t0, { removed: true })], empty);
+  it('keeps continue-watching items that Stremio marks as temporary', async () => {
+    const plan = await planSync({}, [remote('tt9', t0, { removed: true, temp: true }, { timeOffset: 1000, duration: 2000 }), remote('tt8', t0, { removed: true })], empty);
     expect(plan.pull.map((entry) => entry.meta.id)).toEqual(['tt9']);
   });
 
-  it('does nothing when both sides are unchanged since the last sync', () => {
+  it('does nothing when both sides are unchanged since the last sync', async () => {
     const [key, entry] = local('tt1', t0 - day, { videoId: 'tt1', seconds: 1, duration: 2, updatedAt: t0 });
-    const plan = planSync({ [key]: entry }, [remote('tt1', t0, {}, { timeOffset: 1000, duration: 2000 })], { synced: { tt1: t0 }, removed: {} });
+    const plan = await planSync({ [key]: entry }, [remote('tt1', t0, {}, { timeOffset: 1000, duration: 2000 })], { synced: { tt1: t0 }, removed: {} });
     expect(plan.pull).toEqual([]);
     expect(plan.push).toEqual([]);
+  });
+
+  const episodes = [1, 2, 3].map((episode) => ({ id: `tt5:1:${episode}`, season: 1, episode }));
+
+  it('uploads titles watched outside the library as temporary items and the next-episode pointer', async () => {
+    const [key, entry] = local('tt5', t0, { videoId: 'tt5:1:2', seconds: 0, duration: 0, updatedAt: t0 + day }, 'series', false);
+    const plan = await planSync({ [key]: entry }, [], empty, t0 + 2 * day);
+    expect(plan.push[0]).toMatchObject({ _id: 'tt5', removed: true, temp: true, state: { timeOffset: 1, video_id: 'tt5:1:2' } });
+    const pulled = entryFromRemote(plan.push[0]);
+    expect(pulled).toMatchObject({ saved: false, progress: { videoId: 'tt5:1:2', seconds: 0, duration: 0 } });
+  });
+
+  it('merges episode marks into the Stremio watched field without dropping remote ones', async () => {
+    const remoteField = await encodeWatched(episodes.map((item) => item.id), new Set(['tt5:1:1']));
+    const [key, entry] = local('tt5', t0, undefined, 'series');
+    entry.meta.videos = episodes;
+    entry.videos = { 'tt5:1:2': { seconds: 0, duration: 0, updatedAt: t0 + 2 * day, watched: true } };
+    const base = remote('tt5', t0 + day, { type: 'series', custom: 'kept' }, { watched: remoteField, timesWatched: 4 });
+    const plan = await planSync({ [key]: entry }, [base], { synced: { tt5: t0 + day }, removed: {} }, t0 + 3 * day);
+    expect(plan.push).toHaveLength(1);
+    expect(plan.push[0]).toMatchObject({ custom: 'kept', state: { timesWatched: 4 } });
+    const watched = await decodeWatched(plan.push[0].state.watched!, episodes.map((item) => item.id));
+    expect([...watched].sort()).toEqual(['tt5:1:1', 'tt5:1:2']);
+    expect(plan.local[0].remoteWatched).toBe(plan.push[0].state.watched);
+  });
+
+  it('keeps an undecodable or unknown remote watched field untouched', async () => {
+    const [key, entry] = local('tt6', t0 + 2 * day, undefined, 'series');
+    entry.videos = { 'tt6:1:1': { seconds: 0, duration: 0, updatedAt: t0 + 2 * day, watched: true } };
+    const plan = await planSync({ [key]: entry }, [remote('tt6', t0, { type: 'series' }, { watched: 'opaque:1:value' })], empty, t0 + 3 * day);
+    expect(plan.push[0].state.watched).toBe('opaque:1:value');
+  });
+
+  it('keeps local history when Stremio removes a watched title, and marks watched movies', async () => {
+    const [key, entry] = local('tt7', t0);
+    entry.videos = { tt7: { seconds: 100, duration: 100, updatedAt: t0, watched: true } };
+    const plan = await planSync({ [key]: entry }, [remote('tt7', t0 + day, { removed: true })], { synced: { tt7: t0 }, removed: {} }, t0 + 2 * day);
+    expect(plan.drop).toEqual([]);
+    expect(plan.pull[0]).toMatchObject({ saved: false, videos: { tt7: { watched: true } } });
+    const [movieKey, movieEntry] = local('tt8', t0);
+    movieEntry.watchedAt = t0 + day;
+    const pushed = await planSync({ [movieKey]: movieEntry }, [], empty, t0 + 2 * day);
+    expect(pushed.push[0].state).toMatchObject({ timesWatched: 1, flaggedWatched: 1 });
+    expect(entryFromRemote(pushed.push[0]).watchedAt).toBe(t0 + 2 * day);
   });
 });

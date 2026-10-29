@@ -15,7 +15,15 @@ import { postJson, requestJson } from "./transport";
 export type TorrentFile = { name: string; length: number };
 export type Probe = {
   format: { name: string; duration?: number };
-  streams: { track: string; codec: string; channels?: number; language?: string | null }[];
+  streams: {
+    /** Index of the stream among those of the same kind (`audio0.m3u8`, `subtitle2.m3u8`). */
+    id?: number;
+    track: string;
+    codec: string;
+    channels?: number;
+    language?: string | null;
+    title?: string | null;
+  }[];
 };
 
 const videoExtensions = /\.(mp4|m4v|mkv|webm|avi|mov|wmv|flv|ts|m2ts|mpg|mpeg|ogv|3gp)$/i;
@@ -183,6 +191,70 @@ export function transcodeUrl(serviceUrl: string, mediaUrl: string, capabilities:
   for (const codec of capabilities.audioCodecs) query.append("audioCodecs", codec);
   query.set("maxAudioChannels", "2");
   return `${base(serviceUrl)}/hlsv2/${id}/master.m3u8?${query}`;
+}
+
+/**
+ * Raw ASS/SSA text of an embedded subtitle track, read by the HLS converter that `master.m3u8`
+ * created (checked against server 4.22: `/hlsv2/{id}/source/subtitle/{n}.ass`; it answers only
+ * for ASS/SSA tracks).
+ */
+export function embeddedAssUrl(transcode: string, subtitleId: number): string {
+  const url = new URL(transcode);
+  url.pathname = url.pathname.replace(/master\.m3u8$/, `source/subtitle/${subtitleId}.ass`);
+  return url.href;
+}
+
+/** WebVTT rendition of an embedded subtitle track (any text codec), split into HLS segments. */
+export function embeddedSubtitlePlaylist(transcode: string, subtitleId: number): string {
+  const url = new URL(transcode);
+  url.pathname = url.pathname.replace(/master\.m3u8$/, `subtitle${subtitleId}.m3u8`);
+  return url.href;
+}
+
+/**
+ * Reads a whole WebVTT rendition: the playlist, then its segments, nearest to `from` first.
+ * The server only sends CORS headers to Stremio's own origins, so these requests go through
+ * the desktop transport rather than the WebView. `onPart` receives each segment as it arrives.
+ */
+export async function readSubtitleRendition(
+  playlistUrl: string,
+  read: (url: string) => Promise<string>,
+  onPart: (text: string) => void,
+  from = 0,
+  signal?: AbortSignal,
+): Promise<void> {
+  const playlist = await read(playlistUrl);
+  const segments: { url: string; start: number }[] = [];
+  let start = 0;
+  let duration = 0;
+  for (const line of playlist.split(/\r?\n/)) {
+    const info = /^#EXTINF:([\d.]+)/.exec(line);
+    if (info) duration = Number(info[1]);
+    else if (line && !line.startsWith("#")) {
+      segments.push({ url: new URL(line, playlistUrl).href, start });
+      start += duration;
+    }
+  }
+  if (!segments.length) throw new Error("La pista de subtítulos está vacía.");
+  // One request at a time: the converter cancels a segment when another is requested meanwhile
+  // ("Segment is canceled", checked with server 4.22.3). Start where the video is, then go back.
+  const first = Math.max(0, segments.findLastIndex((segment) => segment.start <= from));
+  const order = [...segments.slice(first), ...segments.slice(0, first).reverse()];
+  let failures = 0;
+  for (const segment of order) {
+    if (signal?.aborted) return;
+    let text: string | undefined;
+    for (let attempt = 0; attempt < 2 && text === undefined; attempt++) {
+      try {
+        text = await read(segment.url);
+      } catch {
+        /* Retried once; a failed segment only leaves a gap. */
+      }
+    }
+    if (text === undefined) failures++;
+    else onPart(text);
+  }
+  if (failures === segments.length) throw new Error("Stremio Service no pudo extraer esta pista de subtítulos.");
 }
 
 export function subtitleUrl(serviceUrl: string, url: string): string {

@@ -36,7 +36,7 @@ async function upstream(raw: string, signal: AbortSignal): Promise<Uint8Array> {
     const response = await fetch(url, {
       signal,
       redirect: 'manual',
-      headers: { accept: 'application/json, text/plain;q=0.9, */*;q=0.5', 'user-agent': 'Vela/0.2.0' },
+      headers: { accept: 'application/json, text/plain;q=0.9, */*;q=0.5', 'user-agent': 'Vela/0.3.0' },
     });
     if (response.status >= 300 && response.status < 400) {
       await response.body?.cancel();
@@ -90,8 +90,14 @@ async function route(req: IncomingMessage, res: ServerResponse) {
     const raw = query.get('url');
     const format = query.get('format') ?? 'json';
     if (!raw) throw new ProxyError(400, 'An addon URL is required.');
-    if (!['json', 'text'].includes(format)) throw new ProxyError(400, 'Unsupported response format.');
+    if (!['json', 'text', 'bytes'].includes(format)) throw new ProxyError(400, 'Unsupported response format.');
     const bytes = await upstream(raw, controller.signal);
+    if (format === 'bytes') {
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.statusCode = 200;
+      res.end(bytes);
+      return;
+    }
     let body: string;
     try { body = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { throw new ProxyError(502, 'The addon returned invalid UTF-8 text.'); }
     if (format === 'json') {

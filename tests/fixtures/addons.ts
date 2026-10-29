@@ -78,6 +78,22 @@ const series = {
   ],
 };
 
+// Spanish subtitles in Windows-1252 (listed twice), English SRT and a file that is not a subtitle.
+const subtitleFiles: Record<string, Buffer> = {
+  "es.srt": Buffer.from(
+    "1\r\n00:00:00,500 --> 00:00:04,000\r\nCanci\u00f3n de prueba\r\n\r\n2\r\n00:00:06,000 --> 00:00:09,000\r\nSegunda l\u00ednea\r\n",
+    "latin1",
+  ),
+  "en.srt": Buffer.from("1\n00:00:00,500 --> 00:00:04,000\nTest song\n"),
+  "broken.srt": Buffer.from("<html>Not found</html>"),
+};
+const fixtureSubtitles = [
+  { id: "es", lang: "spa", url: "https://fixtures.vela.test/subs/es.srt" },
+  { id: "es-copy", lang: "es", url: "https://fixtures.vela.test/subs/es.srt" },
+  { id: "en", lang: "eng", url: "https://fixtures.vela.test/subs/en.srt" },
+  { id: "broken", lang: "fre", url: "https://fixtures.vela.test/subs/broken.srt" },
+];
+
 const manifest = {
   id: "test.vela.cinema",
   name: "Vela Test Cinema",
@@ -154,7 +170,7 @@ async function videoResponse(route: Route) {
 }
 
 async function mockAddons(page: Page, requests: URL[]) {
-  await page.route("**/fixture-media.mp4", videoResponse);
+  await page.route(/\/fixture-media\.mp4(\?|$)/, videoResponse);
   await page.route("**/*", async (route) => {
     const request = route.request();
     if (
@@ -192,6 +208,12 @@ async function mockAddons(page: Page, requests: URL[]) {
     }
     if (url.pathname.endsWith("/manifest.json"))
       return route.fulfill({ json: manifest });
+    if (url.pathname.startsWith("/subs/")) {
+      const file = subtitleFiles[url.pathname.slice("/subs/".length)];
+      return file
+        ? route.fulfill({ contentType: "application/octet-stream", body: file })
+        : route.fulfill({ status: 404, json: { error: "Unknown subtitle" } });
+    }
     const segments = url.pathname.split("/").filter(Boolean);
     const resource = decodeURIComponent(segments[0] ?? "");
     const type = decodeURIComponent(segments[1] ?? "");
@@ -251,6 +273,14 @@ async function mockAddons(page: Page, requests: URL[]) {
                     name: "Vídeo de prueba",
                     title: "MP4 local · 320 × 180",
                     url: "http://127.0.0.1:1430/fixture-media.mp4",
+                    behaviorHints: { bingeGroup: "fixture-a" },
+                    subtitles: fixtureSubtitles,
+                  },
+                  {
+                    name: "Otra versión",
+                    title: "MP4 local · grupo B",
+                    url: "http://127.0.0.1:1430/fixture-media.mp4?b",
+                    behaviorHints: { bingeGroup: "fixture-b" },
                   },
                 ]
               : [],

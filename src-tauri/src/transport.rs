@@ -7,14 +7,15 @@ const MAX_REDIRECTS: usize = 5;
 
 pub fn checked_url(raw: &str) -> Result<Url, String> {
     if raw.len() > 8192 {
-        return Err("The URL is too long.".to_owned());
+        return Err("La dirección es demasiado larga.".to_owned());
     }
-    let url = Url::parse(raw).map_err(|_| "Enter a valid HTTP or HTTPS URL.".to_owned())?;
+    let url =
+        Url::parse(raw).map_err(|_| "Escribe una dirección HTTP o HTTPS válida.".to_owned())?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
-        return Err("Only HTTP and HTTPS URLs are supported.".to_owned());
+        return Err("Solo se admiten direcciones HTTP y HTTPS.".to_owned());
     }
     if !url.username().is_empty() || url.password().is_some() {
-        return Err("URLs with embedded usernames or passwords are not supported.".to_owned());
+        return Err("No se admiten direcciones con usuario o contraseña.".to_owned());
     }
     Ok(url)
 }
@@ -27,7 +28,7 @@ impl HttpClient {
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(8))
             .timeout(REQUEST_TIMEOUT)
-            .user_agent("Vela/0.2.0")
+            .user_agent("Vela/0.3.0")
             .build()
             .map(Self)
     }
@@ -46,32 +47,35 @@ impl HttpClient {
                 };
                 let mut response = request.send().await.map_err(|error| {
                     if error.is_timeout() {
-                        "The addon request timed out.".to_owned()
+                        "El addon no respondió a tiempo.".to_owned()
                     } else {
-                        "The addon could not be reached. Check its URL and connection.".to_owned()
+                        "No se pudo conectar con el addon. Comprueba su dirección y la conexión."
+                            .to_owned()
                     }
                 })?;
                 if response.status().is_redirection() {
                     if body.is_some() {
-                        return Err("The service returned an unexpected redirect.".to_owned());
+                        return Err(
+                            "El servicio respondió con una redirección inesperada.".to_owned()
+                        );
                     }
                     if redirects == MAX_REDIRECTS {
-                        return Err("The addon redirected too many times.".to_owned());
+                        return Err("El addon redirigió demasiadas veces.".to_owned());
                     }
                     let location = response
                         .headers()
                         .get(reqwest::header::LOCATION)
                         .and_then(|value| value.to_str().ok())
-                        .ok_or_else(|| "The addon returned an invalid redirect.".to_owned())?;
+                        .ok_or_else(|| "El addon devolvió una redirección no válida.".to_owned())?;
                     let next = url
                         .join(location)
-                        .map_err(|_| "The addon returned an invalid redirect.".to_owned())?;
+                        .map_err(|_| "El addon devolvió una redirección no válida.".to_owned())?;
                     url = checked_url(next.as_str())?;
                     continue;
                 }
                 if !response.status().is_success() {
                     return Err(format!(
-                        "The addon returned HTTP {}.",
+                        "El addon respondió con HTTP {}.",
                         response.status().as_u16()
                     ));
                 }
@@ -79,16 +83,16 @@ impl HttpClient {
                     .content_length()
                     .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
                 {
-                    return Err("The addon response exceeds the 8 MB limit.".to_owned());
+                    return Err("La respuesta del addon supera el límite de 8 MB.".to_owned());
                 }
                 let mut bytes = Vec::new();
                 while let Some(chunk) = response
                     .chunk()
                     .await
-                    .map_err(|_| "The addon response could not be read.".to_owned())?
+                    .map_err(|_| "No se pudo leer la respuesta del addon.".to_owned())?
                 {
                     if bytes.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
-                        return Err("The addon response exceeds the 8 MB limit.".to_owned());
+                        return Err("La respuesta del addon supera el límite de 8 MB.".to_owned());
                     }
                     bytes.extend_from_slice(&chunk);
                 }
@@ -97,12 +101,13 @@ impl HttpClient {
             unreachable!()
         })
         .await
-        .map_err(|_| "The addon request timed out.".to_owned())?
+        .map_err(|_| "El addon no respondió a tiempo.".to_owned())?
     }
 
     pub async fn json(&self, url: &str) -> Result<serde_json::Value, String> {
         let bytes = self.bytes(url, None).await?;
-        serde_json::from_slice(&bytes).map_err(|_| "The addon returned invalid JSON.".to_owned())
+        serde_json::from_slice(&bytes)
+            .map_err(|_| "El addon devolvió un JSON no válido.".to_owned())
     }
 
     /// Sends a JSON body with POST. Redirects are refused so the body is never replayed elsewhere.
@@ -112,12 +117,17 @@ impl HttpClient {
         body: &serde_json::Value,
     ) -> Result<serde_json::Value, String> {
         let bytes = self.bytes(url, Some(body)).await?;
-        serde_json::from_slice(&bytes).map_err(|_| "The service returned invalid JSON.".to_owned())
+        serde_json::from_slice(&bytes)
+            .map_err(|_| "El servicio devolvió un JSON no válido.".to_owned())
+    }
+
+    pub async fn raw(&self, url: &str) -> Result<Vec<u8>, String> {
+        self.bytes(url, None).await
     }
 
     pub async fn text(&self, url: &str) -> Result<String, String> {
         let bytes = self.bytes(url, None).await?;
-        String::from_utf8(bytes).map_err(|_| "The addon returned invalid UTF-8 text.".to_owned())
+        String::from_utf8(bytes).map_err(|_| "El addon devolvió texto que no es UTF-8.".to_owned())
     }
 }
 
@@ -171,13 +181,13 @@ mod tests {
                 .await;
         assert_eq!(
             client().json(&url).await.unwrap_err(),
-            "The addon returned HTTP 403."
+            "El addon respondió con HTTP 403."
         );
         let url =
             serve(b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nsecret-token".to_vec()).await;
         assert_eq!(
             client().json(&url).await.unwrap_err(),
-            "The addon returned invalid JSON."
+            "El addon devolvió un JSON no válido."
         );
     }
 
@@ -196,7 +206,7 @@ mod tests {
                 .text(&url)
                 .await
                 .unwrap_err()
-                .contains("8 MB limit")
+                .contains("límite de 8 MB")
         );
         let mut response = b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n".to_vec();
         response.extend(vec![b'x'; MAX_RESPONSE_BYTES + 1]);
@@ -206,7 +216,7 @@ mod tests {
                 .text(&url)
                 .await
                 .unwrap_err()
-                .contains("8 MB limit")
+                .contains("límite de 8 MB")
         );
     }
 
@@ -231,7 +241,7 @@ mod tests {
                 .post_json(&url, &serde_json::json!({}))
                 .await
                 .unwrap_err(),
-            "The service returned an unexpected redirect."
+            "El servicio respondió con una redirección inesperada."
         );
     }
 
@@ -244,7 +254,7 @@ mod tests {
         .await;
         assert_eq!(
             client().text(&url).await.unwrap_err(),
-            "Only HTTP and HTTPS URLs are supported."
+            "Solo se admiten direcciones HTTP y HTTPS."
         );
     }
 }

@@ -46,7 +46,7 @@ test("saved films and metadata survive a full reload", async ({
     page.getByRole("button", { name: "Ver Dune", exact: true }),
   ).toBeVisible();
   const saved = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("vela.preferences.v1") ?? "{}"),
+    JSON.parse(localStorage.getItem("vela.preferences.v2") ?? "{}"),
   );
   expect(
     Object.values(saved.library).some(
@@ -105,7 +105,7 @@ test("addon installation is persisted, can be disabled and removed, and reports 
   await page.goto("/");
   await installFixtureAddon(page);
   let stored = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("vela.preferences.v1") ?? "{}"),
+    JSON.parse(localStorage.getItem("vela.preferences.v2") ?? "{}"),
   );
   expect(
     stored.addons.some(
@@ -117,7 +117,7 @@ test("addon installation is persisted, can be disabled and removed, and reports 
     .locator("..");
   await card.getByRole("switch", { name: /desactivar/i }).click();
   stored = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("vela.preferences.v1") ?? "{}"),
+    JSON.parse(localStorage.getItem("vela.preferences.v2") ?? "{}"),
   );
   expect(
     stored.addons.find((item: any) => item.manifestUrl === addonUrl).enabled,
@@ -140,7 +140,7 @@ test("addon installation is persisted, can be disabled and removed, and reports 
     page.getByRole("heading", { name: "Vela Test Cinema", exact: true }),
   ).toHaveCount(0);
   stored = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("vela.preferences.v1") ?? "{}"),
+    JSON.parse(localStorage.getItem("vela.preferences.v2") ?? "{}"),
   );
   expect(stored.addons.some((item: any) => item.manifestUrl === addonUrl)).toBe(
     false,
@@ -157,7 +157,7 @@ test("addon installation is persisted, can be disabled and removed, and reports 
   await expect(dialog.getByRole("alert")).toBeVisible();
   await expect(dialog).toBeVisible();
   stored = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("vela.preferences.v1") ?? "{}"),
+    JSON.parse(localStorage.getItem("vela.preferences.v2") ?? "{}"),
   );
   expect(
     stored.addons.some((item: any) =>
@@ -286,7 +286,7 @@ test("a direct stream loads real video and saves actual playback progress", asyn
     .poll(() =>
       page.evaluate(() => {
         const preferences = JSON.parse(
-          localStorage.getItem("vela.preferences.v1") ?? "{}",
+          localStorage.getItem("vela.preferences.v2") ?? "{}",
         );
         return Math.max(
           0,

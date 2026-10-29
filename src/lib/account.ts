@@ -154,11 +154,11 @@ export const account = {
     try {
       const key = await authKey();
       const remote = await getLibrary(key);
-      const plan = planSync(preferencesStore.getSnapshot().library, remote, persisted.sync);
+      const plan = await planSync(preferencesStore.getSnapshot().library, remote, persisted.sync);
       if (plan.push.length) await putLibrary(key, plan.push);
       applying = true;
       try {
-        preferencesStore.mergeLibrary(plan.pull, plan.drop);
+        preferencesStore.mergeLibrary([...plan.local, ...plan.pull], plan.drop);
       } finally {
         applying = false;
         knownKeys = new Set(Object.keys(preferencesStore.getSnapshot().library));

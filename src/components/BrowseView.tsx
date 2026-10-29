@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { LayoutGrid, Grid3X3, Puzzle } from "lucide-react";
 import type { CatalogSource } from "../lib/contracts";
-import { getCatalog, getCatalogSources } from "../lib/protocol";
+import { useRouteState } from "../lib/navigation";
+import { browsable, catalogFilters, getCatalog, getCatalogSources, nextCatalogSkip } from "../lib/protocol";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import { useUiSetting } from "../lib/ui";
 import { errorMessage } from "../lib/utils";
@@ -11,6 +12,12 @@ import { MediaCard, PosterSkeletons, type CardMenu } from "./MediaCard";
 import { EmptyState, ErrorState, Segmented, Spinner } from "./Primitives";
 
 const densities = ["comfortable", "compact"] as const;
+
+const filterNames: Record<string, string> = { genre: "Género", year: "Año", sort: "Orden", language: "Idioma", country: "País" };
+
+function filterLabel(name: string): string {
+  return filterNames[name] ?? name.charAt(0).toLocaleUpperCase("es") + name.slice(1);
+}
 
 export function DensityToggle({
   value,
@@ -44,24 +51,31 @@ export function BrowseView({
   onMenu: CardMenu;
 }) {
   const prefs = usePreferences();
-  const sources = getCatalogSources(prefs.addons, type).filter(
-    (source) =>
-      !(
-        source.catalog.extra?.some(
-          (extra) => extra.isRequired && extra.name !== "genre",
-        ) || source.catalog.extraRequired?.some((extra) => extra !== "genre")
-      ),
-  ).sort(
+  const sources = getCatalogSources(prefs.addons, type).filter((source) => browsable(source.catalog)).sort(
     (a, b) =>
       Number(b.addon.manifest.id === "com.linvo.cinemeta") -
       Number(a.addon.manifest.id === "com.linvo.cinemeta"),
   );
-  const [sourceKey, setSourceKey] = useState("");
-  const [genre, setGenre] = useState("");
+  const [sourceKey, setSourceKey] = useRouteState<string>("catalog", "");
+  const [filterState, setFilterState] = useRouteState<string>("filters", "{}");
   const [density, setDensity] = useUiSetting("density", "comfortable", densities);
   const source = sources.find((item) => item.key === sourceKey) || sources[0];
-  const genres =
-    source?.catalog.extra?.find((extra) => extra.name === "genre")?.options || [];
+  const filters = source ? catalogFilters(source.catalog) : [];
+  const chosen = (() => {
+    try {
+      return JSON.parse(filterState) as Record<string, string>;
+    } catch {
+      return {};
+    }
+  })();
+  // Required filters always have a value: the catalog's first option until the user picks one.
+  const values = Object.fromEntries(
+    filters.flatMap((filter) => {
+      const value = filter.options.includes(chosen[filter.name]) ? chosen[filter.name] : filter.required ? filter.options[0] : "";
+      return value ? [[filter.name, value]] : [];
+    }),
+  );
+  const toTop = () => document.getElementById("main")?.scrollTo({ top: 0 });
   const title = type === "movie" ? "Películas" : "Series";
   return (
     <div className="page">
@@ -76,7 +90,8 @@ export function BrowseView({
                 value={source.key}
                 onChange={(event) => {
                   setSourceKey(event.target.value);
-                  setGenre("");
+                  setFilterState("{}");
+                  toTop();
                 }}
               >
                 {sources.map((item) => (
@@ -87,31 +102,34 @@ export function BrowseView({
               </select>
             </label>
           )}
-          {genres.length > 0 && (
-            <label className="select">
-              <span className="select-label">Género</span>
+          {filters.map((filter) => (
+            <label className="select" key={filter.name}>
+              <span className="select-label">{filterLabel(filter.name)}</span>
               <select
-                aria-label="Género"
-                value={genre}
-                onChange={(event) => setGenre(event.target.value)}
+                aria-label={filterLabel(filter.name)}
+                value={values[filter.name] ?? ""}
+                onChange={(event) => {
+                  setFilterState(JSON.stringify({ ...values, [filter.name]: event.target.value }));
+                  toTop();
+                }}
               >
-                <option value="">Todos</option>
-                {genres.map((value) => (
+                {!filter.required && <option value="">Todos</option>}
+                {filter.options.map((value) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
                 ))}
               </select>
             </label>
-          )}
+          ))}
           <DensityToggle value={density} onChange={setDensity} />
         </div>
       </header>
       {source ? (
         <CatalogGrid
-          key={`${source.key}|${genre}`}
+          key={`${source.key}|${JSON.stringify(values)}`}
           source={source}
-          genre={genre}
+          extra={values}
           density={density}
           onOpen={onOpen}
           onMenu={onMenu}
@@ -134,13 +152,13 @@ export function BrowseView({
 
 function CatalogGrid({
   source,
-  genre,
+  extra,
   density,
   onOpen,
   onMenu,
 }: {
   source: CatalogSource;
-  genre: string;
+  extra: Record<string, string>;
   density: string;
   onOpen: OpenMedia;
   onMenu: CardMenu;
@@ -151,18 +169,10 @@ function CatalogGrid({
     source.catalog.extra?.some((extra) => extra.name === "skip") ||
     source.catalog.extraSupported?.includes("skip");
   const query = useInfiniteQuery({
-    queryKey: ["browse", source.key, genre],
+    queryKey: ["browse", source.key, extra],
     initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) =>
-      getCatalog(
-        source,
-        { genre: genre || undefined, skip: pageParam || undefined },
-        signal,
-      ),
-    getNextPageParam: (last, pages) =>
-      supportsSkip && last.length > 0
-        ? pages.reduce((sum, page) => sum + page.length, 0)
-        : undefined,
+    queryFn: ({ pageParam, signal }) => getCatalog(source, { extra, skip: pageParam || undefined }, signal),
+    getNextPageParam: (_last, pages) => nextCatalogSkip(pages, Boolean(supportsSkip)),
   });
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
   useEffect(() => {

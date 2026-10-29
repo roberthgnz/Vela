@@ -4,6 +4,7 @@ fn main() {
             "request_json",
             "post_json",
             "request_text",
+            "request_bytes",
             "open_external",
             "launch_external_player",
             "secret_get",

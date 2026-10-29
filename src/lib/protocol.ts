@@ -218,6 +218,7 @@ function stream(value: unknown): Stream {
       videoHash: optionalText(hints.videoHash, 'Stream video hash'),
       videoSize: hints.videoSize === undefined ? undefined : nonnegativeInteger(hints.videoSize, 'Stream video size'),
       notWebReady: optionalBoolean(hints.notWebReady, 'Stream notWebReady'),
+      bingeGroup: typeof hints.bingeGroup === 'string' && hints.bingeGroup.trim() ? hints.bingeGroup : undefined,
       proxyHeaders: proxy ? { request: headers(proxy.request), response: headers(proxy.response) } : undefined,
     };
   }
@@ -236,12 +237,12 @@ function builtin(addon: InstalledAddon): boolean {
 export function normalizeManifestUrl(value: string): string {
   let raw = value.trim().replace(/^stremio:\/\//i, 'https://');
   if (raw === OPEN_CINEMA_URL) return raw;
-  if (!raw) throw new Error('Enter an add-on manifest address.');
+  if (!raw) throw new Error('Escribe la dirección del manifiesto del addon.');
   if (!/^[a-z][a-z\d+.-]*:/i.test(raw)) raw = `https://${raw}`;
   const valid = httpUrl(raw, 'Add-on address');
   const url = new URL(valid);
   if (!url.pathname.endsWith('/manifest.json')) {
-    if (url.pathname.endsWith('.json')) throw new Error('The add-on address must end in /manifest.json.');
+    if (url.pathname.endsWith('.json')) throw new Error('La dirección del addon debe terminar en /manifest.json.');
     url.pathname = `${url.pathname.replace(/\/$/, '')}/manifest.json`;
   }
   url.hash = '';
@@ -261,7 +262,7 @@ export async function loadManifest(value: string, signal?: AbortSignal): Promise
   if (manifestUrl === OPEN_CINEMA_URL) return { manifestUrl, manifest: structuredClone(openCinemaManifest), enabled: true, installedAt: Date.now() };
   let response: unknown;
   try { response = await requestJson(manifestUrl, signal); }
-  catch (error) { abort(error, signal); throw new Error('The add-on manifest could not be loaded. Check its address and your connection.'); }
+  catch (error) { abort(error, signal); throw new Error('No se pudo cargar el manifiesto del addon. Comprueba la dirección y la conexión.'); }
   signal?.throwIfAborted();
   return { manifestUrl, manifest: manifest(response), enabled: true, installedAt: Date.now() };
 }
@@ -292,7 +293,25 @@ function resourceUrl(addon: InstalledAddon, resource: string, type: string, id: 
   return url.href;
 }
 
-export async function getCatalog(source: CatalogSource, options: { search?: string; genre?: string; skip?: number } = {}, signal?: AbortSignal): Promise<MediaItem[]> {
+/** Extras a user can choose from a list (genre, year, sort…), as declared by the catalog. */
+export function catalogFilters(catalog: AddonCatalog): { name: string; options: string[]; required: boolean }[] {
+  return (catalog.extra ?? [])
+    .filter((extra) => extra.options?.length && extra.name !== 'search' && extra.name !== 'skip')
+    .map((extra) => ({
+      name: extra.name,
+      options: extra.options!,
+      required: Boolean(extra.isRequired || catalog.extraRequired?.includes(extra.name)),
+    }));
+}
+
+/** Whether a catalog can be browsed without typing: every required extra has a list of options. */
+export function browsable(catalog: AddonCatalog): boolean {
+  const filters = new Set(catalogFilters(catalog).map((filter) => filter.name));
+  const required = [...(catalog.extra ?? []).filter((extra) => extra.isRequired).map((extra) => extra.name), ...catalog.extraRequired ?? []];
+  return required.every((name) => filters.has(name) || name === 'skip');
+}
+
+export async function getCatalog(source: CatalogSource, options: { search?: string; genre?: string; skip?: number; extra?: Record<string, string> } = {}, signal?: AbortSignal): Promise<MediaItem[]> {
   signal?.throwIfAborted();
   const { addon, catalog } = source;
   if (!supportsResource(addon, 'catalog', catalog.type, catalog.id)) return [];
@@ -300,6 +319,7 @@ export async function getCatalog(source: CatalogSource, options: { search?: stri
   const supported = new Set([...declared.map((extra) => extra.name), ...catalog.extraSupported ?? [], ...catalog.extraRequired ?? []]);
   const required = new Set([...declared.filter((extra) => extra.isRequired).map((extra) => extra.name), ...catalog.extraRequired ?? []]);
   const extra: Record<string, string> = {};
+  for (const [name, value] of Object.entries(options.extra ?? {})) if (value && name !== 'skip' && name !== 'search') extra[name] = value;
   if (options.search?.trim()) extra.search = options.search.trim();
   if (options.genre) extra.genre = options.genre;
   if (options.skip !== undefined) {
@@ -313,27 +333,27 @@ export async function getCatalog(source: CatalogSource, options: { search?: stri
     (!extra.genre || item.genres?.includes(extra.genre))).slice(Number(extra.skip ?? 0)));
   let response: unknown;
   try { response = await requestJson(resourceUrl(addon, 'catalog', catalog.type, catalog.id, extra), signal); }
-  catch (error) { abort(error, signal); throw new Error(`${addon.manifest.name} could not load this catalog. Try again when the add-on is available.`); }
+  catch (error) { abort(error, signal); throw new Error(`${addon.manifest.name} no ha podido cargar este catálogo. Inténtalo de nuevo cuando el addon esté disponible.`); }
   signal?.throwIfAborted();
   const metas = record(response, 'Catalog response').metas;
-  if (!Array.isArray(metas)) throw new Error('The add-on returned an invalid catalog: metas must be an array.');
+  if (!Array.isArray(metas)) throw new Error('El addon devolvió un catálogo no válido.');
   return metas.map(media);
 }
 
 export async function getMeta(addon: InstalledAddon, type: string, id: string, signal?: AbortSignal): Promise<MediaItem> {
   signal?.throwIfAborted();
-  if (!supportsResource(addon, 'meta', type, id)) throw new Error('This add-on does not provide metadata for this title.');
+  if (!supportsResource(addon, 'meta', type, id)) throw new Error('Este addon no ofrece información de este título.');
   if (builtin(addon)) {
     const item = openCinemaFilms.find((item) => item.id === id && item.type === type);
-    if (!item) throw new Error('This film is not in Open Cinema.');
+    if (!item) throw new Error('Esta película no está en Open Cinema.');
     return structuredClone(item);
   }
   let response: unknown;
   try { response = await requestJson(resourceUrl(addon, 'meta', type, id), signal); }
-  catch (error) { abort(error, signal); throw new Error(`${addon.manifest.name} could not load this title. Try again when the add-on is available.`); }
+  catch (error) { abort(error, signal); throw new Error(`${addon.manifest.name} no ha podido cargar este título. Inténtalo de nuevo cuando el addon esté disponible.`); }
   signal?.throwIfAborted();
   const item = media(record(response, 'Metadata response').meta);
-  if (item.id !== id || item.type !== type) throw new Error('The add-on returned metadata for a different title.');
+  if (item.id !== id || item.type !== type) throw new Error('El addon devolvió la información de otro título.');
   return item;
 }
 
@@ -344,7 +364,7 @@ async function collect<T>(addons: InstalledAddon[], resource: string, type: stri
   signal?.throwIfAborted();
   for (const result of results) if (result.status === 'rejected') abort(result.reason, signal);
   const successful = results.filter((result) => result.status === 'fulfilled');
-  if (results.length && !successful.length) throw new Error(`All ${results.length} ${resource === 'stream' ? 'stream' : 'subtitle'} add-ons failed. Check your connection or the add-ons' configuration and try again.`);
+  if (results.length && !successful.length) throw new Error(`${results.length === 1 ? 'El addon' : `Los ${results.length} addons`} de ${resource === 'stream' ? 'fuentes' : 'subtítulos'} no ${results.length === 1 ? 'ha' : 'han'} respondido. Comprueba la conexión o su configuración e inténtalo de nuevo.`);
   return successful.flatMap((result) => result.value);
 }
 
@@ -378,4 +398,17 @@ export async function getSubtitles(addons: InstalledAddon[], type: string, video
     fetched = [];
   }
   return [...new Map([...embedded, ...fetched].map((item) => [`${item.lang}:${item.url}`, item])).values()];
+}
+
+/**
+ * Offset for the next catalog page, or undefined when there is none. The offset counts every
+ * item received (as the addon paginates), but paging stops when a page brings no title that was
+ * not already shown: addons that ignore `skip` would otherwise be asked for the same page forever.
+ */
+export function nextCatalogSkip(pages: MediaItem[][], supportsSkip: boolean): number | undefined {
+  const last = pages.at(-1);
+  if (!supportsSkip || !last?.length) return undefined;
+  const earlier = new Set(pages.slice(0, -1).flat().map((item) => `${item.type}\u0000${item.id}`));
+  if (pages.length > 1 && last.every((item) => earlier.has(`${item.type}\u0000${item.id}`))) return undefined;
+  return pages.reduce((sum, page) => sum + page.length, 0);
 }

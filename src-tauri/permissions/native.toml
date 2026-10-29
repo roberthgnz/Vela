@@ -1,4 +1,4 @@
 [[permission]]
 identifier = "allow-native-transport"
 description = "Allow the main window to request addon and account data, keep its Stremio session in the OS credential store, and explicitly launch links or a configured player."
-commands.allow = ["request_json", "post_json", "request_text", "open_external", "launch_external_player", "secret_get", "secret_set", "secret_delete"]
+commands.allow = ["request_json", "post_json", "request_text", "request_bytes", "open_external", "launch_external_player", "secret_get", "secret_set", "secret_delete"]

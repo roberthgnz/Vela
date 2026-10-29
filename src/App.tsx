@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ChevronLeft,
@@ -19,16 +19,19 @@ import {
   X,
 } from "lucide-react";
 import { account, useAccount } from "./lib/account";
-import type { InstalledAddon, MediaItem } from "./lib/contracts";
-import { metaAddon, useNavigation, type Route, type Section } from "./lib/navigation";
+import type { Episode, InstalledAddon, MediaItem, ResolvedStream } from "./lib/contracts";
+import { episodeCode, nextEpisode, pickNextStream } from "./lib/episodes";
+import { onExternalClosed, playExternally } from "./lib/externalPlayback";
+import { defaultAddons, getStreams, loadManifest } from "./lib/protocol";
+import { metaAddon, RouteStateProvider, useNavigation, type Route, type Section } from "./lib/navigation";
 import { resolvePlayback } from "./lib/playback";
-import { mediaKey, preferencesStore, usePreferences } from "./lib/store";
-import { launchExternalPlayer, openExternal } from "./lib/transport";
+import { CREDITS_THRESHOLD, mediaKey, preferencesStore, usePreferences } from "./lib/store";
+import { openExternal } from "./lib/transport";
 import { useUiSetting } from "./lib/ui";
-import { errorMessage } from "./lib/utils";
+import { clock, errorMessage, motion } from "./lib/utils";
 import { AddonsView } from "./components/AddonsView";
 import { BrowseView } from "./components/BrowseView";
-import { DetailView, type PlayHandler } from "./components/DetailView";
+import { DetailView, type PlayHandler, type PlayMode } from "./components/DetailView";
 import { HomeView } from "./components/HomeView";
 import { LibraryView } from "./components/LibraryView";
 import type { CardMenu } from "./components/MediaCard";
@@ -65,6 +68,9 @@ export default function App() {
   const menu = useMenu();
   const content = useRef<HTMLElement>(null);
   const scrolls = useRef(new Map<number, number>());
+  /** Accessible name of the focused control in each history entry, restored when going back. */
+  const focused = useRef(new Map<number, string>());
+  const restoring = useRef(false);
   const [sidebar, setSidebar] = useUiSetting("sidebar", "expanded", ["expanded", "collapsed"] as const);
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -79,29 +85,63 @@ export default function App() {
     setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 4500);
   }, []);
 
-  const remember = () => scrolls.current.set(nav.index, content.current?.scrollTop ?? 0);
+  const remember = () => {
+    scrolls.current.set(nav.index, content.current?.scrollTop ?? 0);
+    const active = document.activeElement;
+    const name = active instanceof HTMLElement && content.current?.contains(active) ? active.getAttribute("aria-label") : null;
+    if (name) focused.current.set(nav.index, name);
+    else focused.current.delete(nav.index);
+  };
   const go = (route: Route) => {
     remember();
     scrolls.current.delete(nav.index + 1);
+    focused.current.delete(nav.index + 1);
     nav.navigate(route);
   };
-  const section = (name: Section) => go({ name });
+  const section = (name: Section) => {
+    // Choosing the current section again returns to its top, like tapping the current tab.
+    if (nav.route.name === name) {
+      content.current?.scrollTo({ top: 0, behavior: motion() });
+      return;
+    }
+    go({ name });
+  };
   const back = () => {
     remember();
+    restoring.current = true;
     nav.back();
   };
   const forward = () => {
     remember();
+    restoring.current = true;
     nav.forward();
   };
   useLayoutEffect(() => {
     if (content.current) content.current.scrollTop = scrolls.current.get(nav.index) ?? 0;
+    if (!restoring.current) return;
+    restoring.current = false;
+    const name = focused.current.get(nav.index);
+    if (!name) return;
+    // Restore focus once the view has rendered its cached content.
+    requestAnimationFrame(() => {
+      const target = [...(content.current?.querySelectorAll<HTMLElement>("[aria-label]") ?? [])].find(
+        (element) => element.getAttribute("aria-label") === name,
+      );
+      target?.focus({ preventScroll: true });
+    });
   }, [nav.index]);
 
   const openMedia = (meta: MediaItem, addonUrl: string, sources?: boolean) =>
     go({ name: "detail", meta, addonUrl, sources });
 
-  const onPlay: PlayHandler = async (meta, addon, videoId, stream, mode, episode) => {
+  const startPlayback = async (
+    meta: MediaItem,
+    addonUrl: string,
+    videoId: string,
+    stream: ResolvedStream,
+    mode: PlayMode,
+    episode?: Episode,
+  ) => {
     if (stream.externalUrl || stream.ytId) {
       await openExternal(
         stream.externalUrl || `https://www.youtube.com/watch?v=${encodeURIComponent(stream.ytId!)}`,
@@ -113,18 +153,24 @@ export default function App() {
       episode,
       external: mode === "external",
     });
+    const entry = preferencesStore.getSnapshot().library[mediaKey(meta.type, meta.id)];
+    const saved = entry?.videos?.[videoId] ?? (entry?.progress?.videoId === videoId ? entry.progress : undefined);
+    const resume = saved && saved.duration > 0 && saved.seconds < saved.duration * CREDITS_THRESHOLD ? saved.seconds : 0;
     if (mode === "external") {
-      await launchExternalPlayer(target.externalUrl, prefs.externalPlayerPath, {
+      const { ipc } = await playExternally(target.externalUrl, {
+        meta,
+        addonUrl,
+        videoId,
         headers: target.headers,
-        title: episode ? `${meta.name} · T${episode.season ?? 1}·E${episode.episode ?? 1}` : meta.name,
+        title: episode ? `${meta.name} · ${episodeCode(episode)}` : meta.name,
+        start: resume,
       });
-      notify("Fuente abierta en el reproductor externo.");
+      notify(ipc ? "Abierto en MPV. Vela guardará el progreso al cerrarlo." : "Fuente abierta en el reproductor externo.");
       return;
     }
-    const progress = prefs.library[mediaKey(meta.type, meta.id)]?.progress;
     setPlaying({
       meta,
-      addonUrl: addon.manifestUrl,
+      addonUrl,
       videoId,
       stream: target.subtitles?.length
         ? { ...stream, subtitles: [...(stream.subtitles ?? []), ...target.subtitles] }
@@ -134,14 +180,70 @@ export default function App() {
       headers: target.headers,
       transcodeUrl: target.transcodeUrl,
       transcodedBecause: target.transcodedBecause,
+      probe: target.probe,
+      serviceUrl: prefs.serviceUrl,
       note: target.note,
       episode,
-      resume: progress?.videoId === videoId ? progress.seconds : 0,
+      resume,
     });
   };
 
+  const onPlay: PlayHandler = (meta, addon, videoId, stream, mode, episode) =>
+    startPlayback(meta, addon.manifestUrl, videoId, stream, mode, episode);
+
+  /**
+   * Plays the next episode with a stream of the same `bingeGroup` (or, failing that, the same
+   * addon and stream name). Without a match, the episode's sources are shown instead.
+   */
+  const playNext = async (current: Playing, episode: Episode) => {
+    setPlaying(null);
+    const showSources = () => {
+      go({ name: "detail", meta: current.meta, addonUrl: current.addonUrl, videoId: episode.id, sources: true });
+      notify(`Elige una fuente para ${episodeCode(episode)}.`);
+    };
+    try {
+      // Returning from the player shows the episode that was playing.
+      nav.update((route) =>
+        route.name === "detail" && route.meta.id === current.meta.id
+          ? { ...route, videoId: episode.id, season: episode.season ?? route.season }
+          : route,
+      );
+      const streams = await getStreams(preferencesStore.getSnapshot().addons, current.meta.type, episode.id);
+      const match = pickNextStream(streams, current.stream);
+      if (!match) return showSources();
+      await startPlayback(current.meta, current.addonUrl, episode.id, match, "internal", episode);
+    } catch (error) {
+      notify(errorMessage(error), "error");
+      showSources();
+    }
+  };
+
+  useEffect(
+    () =>
+      onExternalClosed((event) => {
+        const position = event.position !== undefined ? ` en ${clock(event.position)}` : "";
+        notify(
+          event.finished
+            ? `Has terminado ${event.meta.name}${nextEpisode(event.meta, event.videoId) ? "; el siguiente episodio queda en «Seguir viendo»" : ""}.`
+            : event.ipc
+              ? `Reproductor cerrado${position}. Progreso guardado.`
+              : "Reproductor externo cerrado.",
+        );
+        void account.sync();
+      }),
+    [notify],
+  );
+
   useEffect(() => {
     void account.init();
+    // Addons change their catalogs and resources over time; refresh the stored manifests quietly.
+    const bundled = new Set(defaultAddons().map((addon) => addon.manifestUrl));
+    for (const addon of preferencesStore.getSnapshot().addons) {
+      if (!/^https?:/.test(addon.manifestUrl) || bundled.has(addon.manifestUrl)) continue;
+      void loadManifest(addon.manifestUrl)
+        .then((fresh) => preferencesStore.refreshAddon(fresh))
+        .catch(() => {});
+    }
   }, []);
 
   const onCardMenu: CardMenu = (anchor, items, label) => menu.open(anchor, items, label);
@@ -198,6 +300,7 @@ export default function App() {
   }, []);
 
   const route = nav.route;
+  const routeState = useMemo(() => ({ state: route.state ?? {}, patch: nav.patchState }), [route.state, nav.patchState]);
   const active: Section | "detail" = route.name;
   const commands: Command[] = [
     ...primary.map((item) => ({
@@ -311,6 +414,7 @@ export default function App() {
           )}
         </button>
       </aside>
+      <RouteStateProvider value={routeState}>
       <main id="main" className="content" ref={content} tabIndex={-1}>
         {preferencesStore.getPersistenceError() && (
           <div className="banner">
@@ -345,14 +449,18 @@ export default function App() {
             meta={route.meta}
             addon={detailAddon}
             videoId={route.videoId}
+            season={route.season}
             startSources={route.sources}
-            onVideoChange={(videoId) => nav.replace({ ...route, videoId })}
+            onVideoChange={(videoId) => nav.update((current) => ({ ...current, videoId }))}
+            onSeasonChange={(season) => nav.update((current) => ({ ...current, season }))}
+            onSourcesChange={(sources) => nav.update((current) => ({ ...current, sources }))}
             onPlay={onPlay}
             onAddons={() => section("addons")}
             notify={notify}
           />
         )}
       </main>
+      </RouteStateProvider>
       {searchOpen && (
         <SearchPalette
           onClose={() => setSearchOpen(false)}
@@ -363,12 +471,14 @@ export default function App() {
       {shortcutsOpen && (
         <Dialog title="Atajos de teclado" onClose={() => setShortcutsOpen(false)} className="compact-dialog wide">
           <h2>Atajos de teclado</h2>
-          <ShortcutTable />
+          <ShortcutTable seekShort={prefs.player.seekShort} seekLong={prefs.player.seekLong} />
         </Dialog>
       )}
       {playing && (
         <Player
+          key={`${playing.videoId}|${playing.url}`}
           playing={playing}
+          onNext={(episode) => void playNext(playing, episode)}
           onClose={() => {
             setPlaying(null);
             void account.sync();

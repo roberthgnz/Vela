@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { InstalledAddon, MediaItem, PlaybackProgress } from './contracts';
-import { createPreferencesStore, mediaKey } from './store';
+import { createPreferencesStore, defaultPlayer, mediaKey } from './store';
 
 function memoryStorage(initial?: string) {
   const values = new Map<string, string>(initial === undefined ? [] : [['vela.preferences.v1', initial]]);
@@ -24,6 +24,10 @@ const installedAddon: InstalledAddon = {
     id: 'test.addon', name: 'Test addon', version: '1.0.0', types: ['movie'], resources: ['catalog', 'meta', 'stream'],
     catalogs: [{ id: 'films', name: 'Films', type: 'movie', extra: [{ name: 'genre', options: ['Drama'] }] }],
   },
+};
+const series: MediaItem = {
+  id: 'tt9', type: 'series', name: 'Harbour lights',
+  videos: [1, 2, 3].map((episode) => ({ id: `tt9:1:${episode}`, season: 1, episode, overview: 'Long text' })),
 };
 const watchProgress: PlaybackProgress = { videoId: 'tt1234', seconds: 120, duration: 3600, updatedAt: 1 };
 
@@ -62,7 +66,7 @@ describe('local preferences', () => {
     })));
     expect(store.getSnapshot().addons).toHaveLength(1);
     expect(store.getSnapshot().library).toEqual({
-      [mediaKey(movie.type, movie.id)]: { meta: movie, addonUrl: installedAddon.manifestUrl, addedAt: 2 },
+      [mediaKey(movie.type, movie.id)]: { meta: movie, addonUrl: installedAddon.manifestUrl, addedAt: 2, saved: true },
     });
     expect(store.getSnapshot().externalPlayerPath).toBe('vlc');
   });
@@ -159,5 +163,72 @@ describe('local preferences', () => {
     store.saveMedia(movie, 'https://example.com/manifest.json');
     store.clearLibrary();
     expect(createPreferencesStore(storage).getSnapshot().library).toEqual({});
+  });
+
+  it('migrates version 1 data to version 2 without touching the original key', () => {
+    const v1 = JSON.stringify({
+      version: 1, addons: [installedAddon], serviceUrl: 'http://127.0.0.1:11470', externalPlayerPath: '',
+      library: { x: { meta: series, addonUrl: 'https://example.com/manifest.json', addedAt: 5, progress: { videoId: 'tt9:1:2', seconds: 30, duration: 60, updatedAt: 6 } } },
+    });
+    const storage = memoryStorage(v1);
+    const store = createPreferencesStore(storage);
+    const entry = store.getSnapshot().library[mediaKey('series', 'tt9')];
+    expect(store.getSnapshot().version).toBe(2);
+    expect(entry).toMatchObject({ saved: true, addedAt: 5, progress: { videoId: 'tt9:1:2', seconds: 30 } });
+    expect(store.getSnapshot().player).toEqual(defaultPlayer);
+    store.setPlayer({ subtitleLanguage: 'es', seekLong: 9999 });
+    expect(storage.getItem('vela.preferences.v1')).toBe(v1);
+    const restored = createPreferencesStore(storage).getSnapshot();
+    expect(restored.player).toMatchObject({ subtitleLanguage: 'spa', seekLong: 600 });
+    expect(restored.library).toEqual(store.getSnapshot().library);
+  });
+
+  it('keeps per-episode history, watched marks and the next-episode pointer', () => {
+    const store = createPreferencesStore(memoryStorage());
+    const key = mediaKey('series', 'tt9');
+    store.updateProgress(series, '', { videoId: 'tt9:1:1', seconds: 50, duration: 60, updatedAt: 0 });
+    let entry = store.getSnapshot().library[key];
+    expect(entry.saved).toBe(false);
+    expect(entry.videos?.['tt9:1:1']).toMatchObject({ seconds: 50, duration: 60 });
+    // Episode overviews are not persisted in the library.
+    expect(entry.meta.videos?.[0]).not.toHaveProperty('overview');
+    store.setWatched(series, '', ['tt9:1:1'], true);
+    store.finishVideo(series, '', 'tt9:1:1', 'tt9:1:2');
+    entry = store.getSnapshot().library[key];
+    expect(entry.progress).toMatchObject({ videoId: 'tt9:1:2', seconds: 0, duration: 0 });
+    expect(entry.videos?.['tt9:1:1']).toMatchObject({ watched: true, seconds: 0 });
+    store.updateProgress(series, '', { videoId: 'tt9:1:2', seconds: 10, duration: 60, updatedAt: 0 });
+    expect(store.getSnapshot().library[key].videos?.['tt9:1:1'].watched).toBe(true);
+    store.setWatched(series, '', ['tt9:1:1'], false);
+    expect(store.getSnapshot().library[key].videos?.['tt9:1:1'].watched).toBe(false);
+  });
+
+  it('separates the library from «Seguir viendo» and keeps history when a title leaves the library', () => {
+    const store = createPreferencesStore(memoryStorage());
+    const key = mediaKey(movie.type, movie.id);
+    store.saveMedia(movie, '');
+    store.updateProgress(movie, '', watchProgress);
+    // Dismissing from «Seguir viendo» keeps the title saved.
+    store.dismissProgress(movie.type, movie.id);
+    expect(store.getSnapshot().library[key]).toMatchObject({ saved: true });
+    expect(store.getSnapshot().library[key].progress).toBeUndefined();
+    store.setWatched(movie, '', [movie.id], true);
+    store.toggleMedia(movie, '');
+    expect(store.getSnapshot().library[key]).toMatchObject({ saved: false });
+    expect(store.getSnapshot().library[key].watchedAt).toBeGreaterThan(0);
+    store.toggleMedia(movie, '');
+    expect(store.getSnapshot().library[key].saved).toBe(true);
+  });
+
+  it('refreshes an installed manifest only when the address still serves the same addon', () => {
+    const store = createPreferencesStore(memoryStorage());
+    store.installAddon(installedAddon);
+    const canonical = 'https://example.com/configuration/manifest.json';
+    store.toggleAddon(canonical);
+    const newer = { ...installedAddon, manifest: { ...installedAddon.manifest, version: '1.1.0', types: ['movie', 'series'] } };
+    store.refreshAddon(newer);
+    expect(store.getSnapshot().addons.find((item) => item.manifestUrl === canonical)).toMatchObject({ enabled: false, manifest: { version: '1.1.0' } });
+    store.refreshAddon({ ...installedAddon, manifest: { ...installedAddon.manifest, id: 'other.addon', name: 'Other' } });
+    expect(store.getSnapshot().addons.find((item) => item.manifestUrl === canonical)?.manifest.id).toBe('test.addon');
   });
 });

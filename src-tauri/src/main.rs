@@ -1,12 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod mpv;
 mod secrets;
 mod transport;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use tauri::State;
+use std::process::Stdio;
+use tauri::{AppHandle, Emitter, State};
+use tokio::process::Command;
 use transport::{HttpClient, checked_url};
 
 #[tauri::command]
@@ -31,24 +33,35 @@ async fn request_text(url: String, client: State<'_, HttpClient>) -> Result<Stri
     client.text(&url).await
 }
 
+/// Raw bytes for files whose encoding Vela detects itself, such as subtitles.
+#[tauri::command]
+async fn request_bytes(
+    url: String,
+    client: State<'_, HttpClient>,
+) -> Result<tauri::ipc::Response, String> {
+    client.raw(&url).await.map(tauri::ipc::Response::new)
+}
+
 #[tauri::command]
 async fn open_external(url: String) -> Result<(), String> {
     let url = checked_url(&url)?;
-    webbrowser::open(url.as_str()).map_err(|_| "The browser could not be opened.".to_owned())
+    webbrowser::open(url.as_str()).map_err(|_| "No se pudo abrir el navegador.".to_owned())
 }
 
 fn player_executable(configured: &str) -> Result<PathBuf, String> {
     if !configured.trim().is_empty() {
         let path = Path::new(configured);
         if !path.is_absolute() || !path.is_file() {
-            return Err("Choose the full path to an installed player executable.".to_owned());
+            return Err(
+                "Elige la ruta completa del ejecutable de un reproductor instalado.".to_owned(),
+            );
         }
         #[cfg(windows)]
         if !path
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
         {
-            return Err("Choose a Windows .exe player executable.".to_owned());
+            return Err("Elige un ejecutable .exe de Windows.".to_owned());
         }
         return Ok(path.to_owned());
     }
@@ -71,7 +84,8 @@ fn player_executable(configured: &str) -> Result<PathBuf, String> {
         .into_iter()
         .find(|path| path.is_file())
         .ok_or_else(|| {
-            "mpv was not found. Install a player and select its executable in Settings.".to_owned()
+            "No se encontró MPV. Instálalo o elige su ejecutable en Ajustes › Reproductor externo."
+                .to_owned()
         })
 }
 
@@ -81,15 +95,12 @@ fn mpv_arguments(
     headers: &BTreeMap<String, String>,
     title: Option<&str>,
 ) -> Result<Vec<String>, String> {
-    let is_mpv = executable
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .is_some_and(|stem| stem.to_ascii_lowercase().starts_with("mpv"));
+    let is_mpv = is_mpv(executable);
     let mut arguments = Vec::new();
     if !headers.is_empty() {
         if !is_mpv {
             return Err(
-                "This source needs HTTP headers, which Vela can pass only to MPV.".to_owned(),
+                "Esta fuente necesita cabeceras HTTP, que Vela solo puede pasar a MPV.".to_owned(),
             );
         }
         for (name, value) in headers {
@@ -98,7 +109,7 @@ fn mpv_arguments(
                     .bytes()
                     .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte));
             if !valid_name || value.chars().any(|c| c.is_control()) {
-                return Err("The source returned an invalid HTTP header.".to_owned());
+                return Err("La fuente indicó una cabecera HTTP no válida.".to_owned());
             }
             arguments.push(format!("--http-header-fields-append={name}: {value}"));
         }
@@ -114,16 +125,34 @@ fn mpv_arguments(
     Ok(arguments)
 }
 
+fn is_mpv(executable: &Path) -> bool {
+    executable
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .is_some_and(|stem| stem.to_ascii_lowercase().starts_with("mpv"))
+}
+
+/// Starts the player. With MPV and a session id, Vela follows playback through IPC and emits
+/// `player-progress` while it runs; for every player it emits `player-closed` when the process exits.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn launch_external_player(
+    app: AppHandle,
     url: String,
     path: String,
     headers: Option<BTreeMap<String, String>>,
     title: Option<String>,
-) -> Result<(), String> {
+    session: Option<String>,
+    start: Option<f64>,
+) -> Result<serde_json::Value, String> {
     let url = checked_url(&url)?;
     let executable = player_executable(&path)?;
-    let arguments = mpv_arguments(&executable, &headers.unwrap_or_default(), title.as_deref())?;
+    let mut arguments = mpv_arguments(&executable, &headers.unwrap_or_default(), title.as_deref())?;
+    let session = session.filter(|value| mpv::valid_session(value));
+    let ipc = session.is_some() && is_mpv(&executable);
+    if let (true, Some(session)) = (ipc, &session) {
+        arguments.extend(mpv::ipc_arguments(session, start));
+    }
     let mut command = Command::new(executable);
     command
         .args(arguments)
@@ -131,16 +160,48 @@ async fn launch_external_player(
         .arg(url.as_str())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stderr(Stdio::null())
+        .kill_on_drop(false);
     #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000);
-    }
-    command
+    command.creation_flags(0x0800_0000);
+    let mut child = command
         .spawn()
-        .map_err(|_| "The selected player could not be started.".to_owned())?;
-    Ok(())
+        .map_err(|_| "No se pudo iniciar el reproductor elegido.".to_owned())?;
+    if let Some(session) = session {
+        tauri::async_runtime::spawn(async move {
+            let exited = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let watcher = {
+                let exited = exited.clone();
+                async move {
+                    let status = child.wait().await.ok().and_then(|status| status.code());
+                    exited.store(true, std::sync::atomic::Ordering::Relaxed);
+                    status
+                }
+            };
+            let follower = async {
+                #[cfg(windows)]
+                if ipc {
+                    let app = app.clone();
+                    return mpv::follow(
+                        &mpv::pipe_name(&session),
+                        &session,
+                        || !exited.load(std::sync::atomic::Ordering::Relaxed),
+                        move |value| {
+                            let _ = app.emit("player-progress", value);
+                        },
+                    )
+                    .await;
+                }
+                None
+            };
+            let (code, state) = tokio::join!(watcher, follower);
+            let mut payload = state.clone().unwrap_or_default().to_json(&session);
+            payload["ipc"] = serde_json::json!(state.is_some());
+            payload["exitCode"] = serde_json::json!(code);
+            let _ = app.emit("player-closed", payload);
+        });
+    }
+    Ok(serde_json::json!({ "ipc": ipc }))
 }
 
 #[cfg(test)]
@@ -182,6 +243,7 @@ fn main() {
             request_json,
             post_json,
             request_text,
+            request_bytes,
             open_external,
             launch_external_player,
             secrets::secret_get,

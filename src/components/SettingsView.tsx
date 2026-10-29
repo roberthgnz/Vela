@@ -1,11 +1,14 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   CheckCircle2,
   Download,
   ExternalLink,
+  Captions,
   Info,
   Keyboard,
+  Languages,
+  Play,
   Library,
   MonitorPlay,
   Radio,
@@ -13,30 +16,40 @@ import {
   User,
   XCircle,
 } from "lucide-react";
+import type { PlayerPreferences } from "../lib/contracts";
+import { languageLabel, preferredLanguageOptions } from "../lib/languages";
 import { preferencesStore, usePreferences } from "../lib/store";
 import { openExternal, requestJson } from "../lib/transport";
-import { errorMessage } from "../lib/utils";
+import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
-import { Dialog, Spinner } from "./Primitives";
+import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
+import { native } from "./WindowControls";
 
-export const shortcuts: [string, string][] = [
-  ["Ctrl K  ·  /", "Buscar y comandos"],
-  ["Ctrl 1–4", "Inicio, Películas, Series, Biblioteca"],
-  ["Ctrl ,", "Ajustes"],
-  ["Ctrl B", "Mostrar u ocultar la barra lateral"],
-  ["Alt ←  ·  Alt →", "Atrás y adelante"],
-  ["Esc", "Volver desde los detalles o cerrar"],
-  ["Mayús F10", "Menú contextual de un título o fuente"],
-  ["Espacio  ·  K", "Reproducir o pausar"],
-  ["←  →  ·  J  L", "Retroceder o avanzar 5 s · 10 s"],
-  ["↑  ↓  ·  M", "Volumen · silenciar"],
-  ["F  ·  C", "Pantalla completa · subtítulos"],
-  ["0–9", "Saltar a un punto del vídeo"],
-];
+export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
+  return [
+    ["Ctrl K  ·  /", "Buscar y comandos"],
+    ["Ctrl 1–4", "Inicio, Películas, Series, Biblioteca"],
+    ["Ctrl ,", "Ajustes"],
+    ["Ctrl B", "Mostrar u ocultar la barra lateral"],
+    ["Alt ←  ·  Alt →", "Atrás y adelante"],
+    ["Esc", "Volver desde los detalles o cerrar"],
+    ["Mayús F10", "Menú contextual de un título, episodio o fuente"],
+    ["Espacio  ·  K", "Reproducir o pausar"],
+    ["←  →  ·  J  L", `Retroceder o avanzar ${seekShort} s · ${seekLong} s`],
+    ["↑  ↓  ·  M", "Volumen · silenciar"],
+    ["F  ·  C  ·  A", "Pantalla completa · subtítulos · audio"],
+    ["G  ·  H", "Adelantar o retrasar subtítulos 0,1 s (con Mayús, 1 s)"],
+    ["N", "Siguiente episodio"],
+    ["0–9", "Saltar a un punto del vídeo"],
+  ];
+}
 
 const sections = [
   { id: "account", label: "Cuenta", icon: User },
-  { id: "playback", label: "Reproducción", icon: MonitorPlay },
+  { id: "subtitles", label: "Subtítulos", icon: Captions },
+  { id: "audio", label: "Audio", icon: Languages },
+  { id: "playback", label: "Reproducción", icon: Play },
+  ...(native ? [{ id: "external", label: "Reproductor externo", icon: MonitorPlay }] : []),
   { id: "streaming", label: "Streaming", icon: Radio },
   { id: "library", label: "Biblioteca", icon: Library },
   { id: "keyboard", label: "Teclado", icon: Keyboard },
@@ -78,7 +91,8 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
   const prefs = usePreferences();
   const [service, setService] = useState(prefs.serviceUrl);
   const [serviceError, setServiceError] = useState("");
-  const [player, setPlayer] = useState(prefs.externalPlayerPath);
+  const [playerPath, setPlayerPath] = useState(prefs.externalPlayerPath);
+  const setPlayer = (value: Partial<PlayerPreferences>) => preferencesStore.setPlayer(value);
   const [clearing, setClearing] = useState(false);
   const probe = useMutation({
     mutationFn: async () => {
@@ -109,9 +123,9 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
     }
   };
   const commitPlayer = () => {
-    if (player.trim() !== prefs.externalPlayerPath) {
-      preferencesStore.setExternalPlayerPath(player);
-      notify(player.trim() ? "Ruta del reproductor guardada." : "Vela buscará MPV automáticamente.");
+    if (playerPath.trim() !== prefs.externalPlayerPath) {
+      preferencesStore.setExternalPlayerPath(playerPath);
+      notify(playerPath.trim() ? "Ruta del reproductor guardada." : "Vela buscará MPV automáticamente.");
     }
   };
   const exportLibrary = () => {
@@ -142,8 +156,8 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
     nodes.forEach((node) => observer.observe(node));
     return () => observer.disconnect();
   }, []);
-  const count = Object.keys(prefs.library).length;
-  const withProgress = Object.values(prefs.library).filter((entry) => entry.progress).length;
+  const count = Object.values(prefs.library).filter((entry) => entry.saved).length;
+  const withProgress = Object.values(prefs.library).filter((entry) => entry.progress || entry.videos).length;
   return (
     <div className="page settings-page">
       <header className="page-header">
@@ -158,7 +172,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
               aria-current={current === id ? "true" : undefined}
               onClick={(event) => {
               event.preventDefault();
-              document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: motion(), block: "start" });
             }}>
               <Icon size={15} /> {label}
             </a>
@@ -170,32 +184,152 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
             <AccountSection notify={notify} />
           </section>
 
+          <section id="settings-subtitles" className="settings-group" aria-labelledby="settings-subtitles-title">
+            <h2 id="settings-subtitles-title">Subtítulos</h2>
+            <div className="settings-card">
+              <Row label="Idioma principal" htmlFor="subtitle-language" description="Se elige primero al activar subtítulos de un idioma.">
+                <LanguageSelect id="subtitle-language" value={prefs.player.subtitleLanguage} onChange={(value) => setPlayer({ subtitleLanguage: value })} />
+              </Row>
+              <Row label="Idioma secundario" htmlFor="subtitle-secondary" description="Se usa si no hay subtítulos en el idioma principal.">
+                <LanguageSelect id="subtitle-secondary" value={prefs.player.subtitleSecondary} onChange={(value) => setPlayer({ subtitleSecondary: value })} />
+              </Row>
+              <Row
+                label="Activar automáticamente"
+                description="Al empezar un vídeo, muestra los primeros subtítulos en tus idiomas, salvo que el audio ya esté en el idioma principal."
+              >
+                <Switch
+                  checked={prefs.player.subtitlesAuto}
+                  label="Activar subtítulos automáticamente"
+                  onChange={() => setPlayer({ subtitlesAuto: !prefs.player.subtitlesAuto })}
+                />
+              </Row>
+              <Row label="Tamaño">
+                <Segmented
+                  label="Tamaño de los subtítulos"
+                  value={String(prefs.player.subtitleSize)}
+                  onChange={(value) => setPlayer({ subtitleSize: Number(value) })}
+                  options={[75, 100, 125, 150, 200].map((value) => ({ value: String(value), label: <span className="segment-text">{value} %</span>, title: `${value} %` }))}
+                />
+              </Row>
+              <Row label="Opacidad del texto">
+                <Segmented
+                  label="Opacidad del texto"
+                  value={String(prefs.player.subtitleOpacity)}
+                  onChange={(value) => setPlayer({ subtitleOpacity: Number(value) })}
+                  options={[1, 0.75, 0.5].map((value) => ({ value: String(value), label: <span className="segment-text">{value * 100} %</span>, title: `${value * 100} %` }))}
+                />
+              </Row>
+              <Row label="Fondo">
+                <Segmented
+                  label="Opacidad del fondo"
+                  value={String(prefs.player.subtitleBackground)}
+                  onChange={(value) => setPlayer({ subtitleBackground: Number(value) })}
+                  options={[0, 0.25, 0.5, 0.75, 1].map((value) => ({
+                    value: String(value),
+                    label: <span className="segment-text">{value ? `${value * 100} %` : "Sin fondo"}</span>,
+                    title: value ? `Fondo al ${value * 100} %` : "Sin fondo",
+                  }))}
+                />
+              </Row>
+              <div className="subtitle-preview" aria-hidden="true" style={{
+                "--subtitle-scale": prefs.player.subtitleSize / 100,
+                "--subtitle-opacity": prefs.player.subtitleOpacity,
+                "--subtitle-background": prefs.player.subtitleBackground,
+              } as CSSProperties}>
+                <div className="player-subtitle bottom">
+                  <span>Así se verán los subtítulos</span>
+                </div>
+              </div>
+              <Row
+                label="Desfase"
+                description="Se ajusta durante la reproducción desde Audio y subtítulos, o con G y H. Los subtítulos ASS conservan sus propios estilos."
+              />
+            </div>
+          </section>
+
+          <section id="settings-audio" className="settings-group" aria-labelledby="settings-audio-title">
+            <h2 id="settings-audio-title">Audio</h2>
+            <div className="settings-card">
+              <Row label="Idioma preferido" htmlFor="audio-language" description="Si el vídeo tiene varias pistas, Vela elige esta al empezar.">
+                <LanguageSelect id="audio-language" value={prefs.player.audioLanguage} empty="Original del vídeo" onChange={(value) => setPlayer({ audioLanguage: value })} />
+              </Row>
+              <Row label="Idioma alternativo" htmlFor="audio-secondary" description="Se usa si no hay pista en el idioma preferido.">
+                <LanguageSelect id="audio-secondary" value={prefs.player.audioSecondary} disabled={!prefs.player.audioLanguage} onChange={(value) => setPlayer({ audioSecondary: value })} />
+              </Row>
+            </div>
+          </section>
+
           <section id="settings-playback" className="settings-group" aria-labelledby="settings-playback-title">
             <h2 id="settings-playback-title">Reproducción</h2>
             <div className="settings-card">
               <Row
                 label="Reproductor integrado"
-                description="WebView2 reproduce MP4/WebM con H.264, VP9 o AV1 y listas HLS. MKV, HEVC, DTS o TrueHD suelen necesitar un reproductor externo."
+                description="Reproduce MP4, WebM y MKV con H.264, VP9 o AV1 y listas HLS, con varias pistas de audio. HEVC, DTS o TrueHD necesitan la conversión de Stremio Service o un reproductor externo."
               />
-              <Row
-                label="Ruta de MPV"
-                htmlFor="player-path"
-                description="Opcional. Si la dejas vacía, Vela busca mpv.exe en el PATH, en Programas y en Program Files."
-                stacked
-              >
-                <input
-                  id="player-path"
-                  className="input"
-                  value={player}
-                  onChange={(event) => setPlayer(event.target.value)}
-                  onBlur={commitPlayer}
-                  onKeyDown={(event) => event.key === "Enter" && commitPlayer()}
-                  placeholder="C:\Program Files\mpv\mpv.exe"
-                  spellCheck={false}
+              <Row label="Salto corto" description="Flechas izquierda y derecha.">
+                <Segmented
+                  label="Salto corto"
+                  value={String(prefs.player.seekShort)}
+                  onChange={(value) => setPlayer({ seekShort: Number(value) })}
+                  options={[5, 10, 15, 30].map((value) => ({ value: String(value), label: <span className="segment-text">{value} s</span>, title: `${value} segundos` }))}
                 />
               </Row>
+              <Row label="Salto largo" description="J y L, y los botones del reproductor.">
+                <Segmented
+                  label="Salto largo"
+                  value={String(prefs.player.seekLong)}
+                  onChange={(value) => setPlayer({ seekLong: Number(value) })}
+                  options={[10, 15, 30, 60, 85].map((value) => ({ value: String(value), label: <span className="segment-text">{value} s</span>, title: `${value} segundos` }))}
+                />
+              </Row>
+              <Row label="Siguiente episodio" description="Al terminar un episodio, propone el siguiente con una fuente del mismo grupo.">
+                <Switch
+                  checked={prefs.player.autoNext}
+                  label="Proponer el siguiente episodio"
+                  onChange={() => setPlayer({ autoNext: !prefs.player.autoNext })}
+                />
+              </Row>
+              {prefs.player.autoNext && (
+                <Row label="Empezar automáticamente" description="Cuenta atrás antes de reproducirlo. Sin cuenta atrás, espera a que lo elijas.">
+                  <Segmented
+                    label="Cuenta atrás del siguiente episodio"
+                    value={String(prefs.player.nextCountdown)}
+                    onChange={(value) => setPlayer({ nextCountdown: Number(value) })}
+                    options={[0, 5, 10, 20].map((value) => ({
+                      value: String(value),
+                      label: <span className="segment-text">{value ? `${value} s` : "No"}</span>,
+                      title: value ? `Tras ${value} segundos` : "Esperar",
+                    }))}
+                  />
+                </Row>
+              )}
             </div>
           </section>
+
+          {native && (
+            <section id="settings-external" className="settings-group" aria-labelledby="settings-external-title">
+              <h2 id="settings-external-title">Reproductor externo</h2>
+              <div className="settings-card">
+                <Row
+                  label="Ruta de MPV"
+                  htmlFor="player-path"
+                  description="Opcional. Si la dejas vacía, Vela busca mpv.exe en el PATH, en Programas y en Program Files. Con MPV, Vela pasa las cabeceras de la fuente, reanuda donde lo dejaste y guarda el progreso al cerrarlo."
+                  stacked
+                >
+                  <input
+                    id="player-path"
+                    className="input"
+                    value={playerPath}
+                    onChange={(event) => setPlayerPath(event.target.value)}
+                    onBlur={commitPlayer}
+                    onKeyDown={(event) => event.key === "Enter" && commitPlayer()}
+                    placeholder="C:\Program Files\mpv\mpv.exe"
+                    spellCheck={false}
+                  />
+                </Row>
+              </div>
+            </section>
+          )}
 
           <section id="settings-streaming" className="settings-group" aria-labelledby="settings-streaming-title">
             <h2 id="settings-streaming-title">Streaming</h2>
@@ -280,14 +414,14 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-keyboard" className="settings-group" aria-labelledby="settings-keyboard-title">
             <h2 id="settings-keyboard-title">Teclado</h2>
             <div className="settings-card">
-              <ShortcutTable />
+              <ShortcutTable seekShort={prefs.player.seekShort} seekLong={prefs.player.seekLong} />
             </div>
           </section>
 
           <section id="settings-about" className="settings-group" aria-labelledby="settings-about-title">
             <h2 id="settings-about-title">Acerca de</h2>
             <div className="settings-card">
-              <Row label="Vela 0.2.0" description="Cliente de escritorio independiente compatible con el protocolo de addons de Stremio. No es una aplicación oficial de Stremio." />
+              <Row label="Vela 0.3.0" description="Cliente de escritorio independiente compatible con el protocolo de addons de Stremio. No es una aplicación oficial de Stremio." />
               <Row
                 label="Privacidad"
                 description="Tu biblioteca se guarda localmente. Cada addon recibe las consultas que le haces; Vela no envía datos a otros servicios."
@@ -337,10 +471,10 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
   );
 }
 
-export function ShortcutTable() {
+export function ShortcutTable({ seekShort, seekLong }: { seekShort?: number; seekLong?: number }) {
   return (
     <dl className="shortcut-table">
-      {shortcuts.map(([keys, label]) => (
+      {shortcutList(seekShort, seekLong).map(([keys, label]) => (
         <div key={label}>
           <dt>
             {keys.split("  ·  ").map((group, index) => (
@@ -356,5 +490,35 @@ export function ShortcutTable() {
         </div>
       ))}
     </dl>
+  );
+}
+
+function LanguageSelect({
+  id,
+  value,
+  onChange,
+  empty = "Ninguno",
+  disabled,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  empty?: string;
+  disabled?: boolean;
+}) {
+  const options = preferredLanguageOptions
+    .map((code) => ({ code, label: languageLabel(code) }))
+    .sort((a, b) => a.label.localeCompare(b.label, "es"));
+  return (
+    <label className="select">
+      <select id={id} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{empty}</option>
+        {options.map((option) => (
+          <option key={option.code} value={option.code}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

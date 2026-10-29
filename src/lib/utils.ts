@@ -33,6 +33,9 @@ export function clock(seconds: number): string {
 }
 
 export function errorMessage(error: unknown): string {
+  // Without a connection every addon "fails"; say what actually happened.
+  if (typeof navigator !== "undefined" && navigator.onLine === false)
+    return "No hay conexión a internet. Vela lo intentará de nuevo cuando vuelvas a estar en línea.";
   return error instanceof Error
     ? error.message
     : "No hemos podido completar la solicitud. Inténtalo de nuevo.";
@@ -56,4 +59,9 @@ export function isDirectUrl(value?: string): value is string {
   } catch {
     return false;
   }
+}
+
+/** Scroll behavior that honors the system's reduced-motion setting. */
+export function motion(): ScrollBehavior {
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 }
