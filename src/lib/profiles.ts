@@ -8,7 +8,8 @@ import { MAIN_PROFILE, preferencesStore } from "./store";
  * external player and the TMDB key are shared. The main profile keeps the data Vela already had.
  */
 
-export type Profile = { id: string; name: string; color: string };
+/** `kids`: Home, Explorar and search show only children's catalogs. */
+export type Profile = { id: string; name: string; color: string; kids?: boolean };
 type Saved = { profiles: Profile[]; last?: string };
 
 const storageKey = "vela.profiles.v1";
@@ -80,7 +81,7 @@ export const profiles = {
     save({ ...saved, profiles: [...saved.profiles, profile] });
     return profile;
   },
-  update(id: string, change: Partial<Pick<Profile, "name" | "color">>) {
+  update(id: string, change: Partial<Pick<Profile, "name" | "color" | "kids">>) {
     const name = change.name === undefined ? undefined : clean(change.name);
     if (name === "") throw new Error("Escribe un nombre para el perfil.");
     if (name && saved.profiles.some((profile) => profile.id !== id && profile.name.toLocaleLowerCase("es") === name.toLocaleLowerCase("es")))
@@ -88,7 +89,15 @@ export const profiles = {
     save({
       ...saved,
       profiles: saved.profiles.map((profile) =>
-        profile.id === id ? { ...profile, ...(name ? { name } : {}), ...(change.color ? { color: change.color } : {}) } : profile,
+        profile.id === id
+          ? {
+              ...profile,
+              ...(name ? { name } : {}),
+              ...(change.color ? { color: change.color } : {}),
+              // The main profile keeps the install's original data and settings; it is never a child's.
+              ...(change.kids !== undefined && id !== MAIN_PROFILE ? { kids: change.kids } : {}),
+            }
+          : profile,
       ),
     });
   },
@@ -116,4 +125,10 @@ if (chosen && saved.last && saved.last !== MAIN_PROFILE && saved.profiles.some((
 
 export function useProfiles() {
   return useSyncExternalStore(profiles.subscribe, profiles.getSnapshot, profiles.getSnapshot);
+}
+
+/** Whether the active profile is a child's. */
+export function useKidsMode(): boolean {
+  const state = useProfiles();
+  return Boolean(state.profiles.find((profile) => profile.id === state.active)?.kids);
 }

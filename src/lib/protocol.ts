@@ -10,6 +10,7 @@ import type {
   Subtitle,
 } from './contracts';
 import { OPEN_CINEMA_URL, openCinemaFilms, openCinemaManifest, openCinemaStreams } from './open-cinema';
+import { currentTmdbContext, TMDB_CATALOGS_URL, tmdbCatalog, tmdbCatalogsManifest } from './tmdbCatalogs';
 import { requestJson } from './transport';
 
 const CINEMETA_URL = 'https://v3-cinemeta.strem.io/manifest.json';
@@ -250,9 +251,13 @@ function builtin(addon: InstalledAddon): boolean {
   return addon.manifestUrl === OPEN_CINEMA_URL && addon.manifest.id === openCinemaManifest.id;
 }
 
+export function isTmdbCatalogs(addon: Pick<InstalledAddon, 'manifestUrl' | 'manifest'>): boolean {
+  return addon.manifestUrl === TMDB_CATALOGS_URL && addon.manifest.id === tmdbCatalogsManifest.id;
+}
+
 export function normalizeManifestUrl(value: string): string {
   let raw = value.trim().replace(/^stremio:\/\//i, 'https://');
-  if (raw === OPEN_CINEMA_URL) return raw;
+  if (raw === OPEN_CINEMA_URL || raw === TMDB_CATALOGS_URL) return raw;
   if (!raw) throw new Error('Escribe la dirección del manifiesto del addon.');
   if (!/^[a-z][a-z\d+.-]*:/i.test(raw)) raw = `https://${raw}`;
   const valid = httpUrl(raw, 'Add-on address');
@@ -276,6 +281,7 @@ export async function loadManifest(value: string, signal?: AbortSignal): Promise
   signal?.throwIfAborted();
   const manifestUrl = normalizeManifestUrl(value);
   if (manifestUrl === OPEN_CINEMA_URL) return { manifestUrl, manifest: structuredClone(openCinemaManifest), enabled: true, installedAt: Date.now() };
+  if (manifestUrl === TMDB_CATALOGS_URL) return { manifestUrl, manifest: structuredClone(tmdbCatalogsManifest), enabled: true, installedAt: Date.now() };
   let response: unknown;
   try { response = await requestJson(manifestUrl, signal); }
   catch (error) { abort(error, signal); throw new Error('No se pudo cargar el manifiesto del addon. Comprueba la dirección y la conexión.'); }
@@ -347,6 +353,11 @@ export async function getCatalog(source: CatalogSource, options: { search?: stri
   if (builtin(addon)) return structuredClone(openCinemaFilms.filter((item) =>
     (!extra.search || `${item.name} ${item.description}`.toLowerCase().includes(extra.search.toLowerCase())) &&
     (!extra.genre || item.genres?.includes(extra.genre))).slice(Number(extra.skip ?? 0)));
+  if (isTmdbCatalogs(addon)) {
+    const items = await tmdbCatalog(catalog.id, catalog.type, extra, await currentTmdbContext());
+    signal?.throwIfAborted();
+    return items;
+  }
   let response: unknown;
   try { response = await requestJson(resourceUrl(addon, 'catalog', catalog.type, catalog.id, extra), signal); }
   catch (error) { abort(error, signal); throw new Error(`${addon.manifest.name} no ha podido cargar este catálogo. Inténtalo de nuevo cuando el addon esté disponible.`); }

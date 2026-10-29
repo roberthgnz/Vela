@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Puzzle, X } from "lucide-react";
 import type { CatalogSource, LibraryEntry, MediaItem } from "../lib/contracts";
 import { homeRows } from "../lib/catalogLayout";
+import { useKidsMode } from "../lib/profiles";
+import { kidsCatalog } from "../lib/tmdbCatalogs";
 import { getCatalog, getCatalogSources } from "../lib/protocol";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import { episodeCode } from "../lib/episodes";
@@ -232,7 +234,8 @@ export function HomeView({
   onMenu: CardMenu;
 }) {
   const prefs = usePreferences();
-  const rows = homeRows(getCatalogSources(prefs.addons), prefs.catalogs);
+  const kids = useKidsMode();
+  const rows = homeRows(getCatalogSources(prefs.addons).filter((source) => !kids || kidsCatalog(source)), prefs.catalogs);
   const visible = rows.filter((row) => row.visible);
   const continuing = Object.values(prefs.library)
     .filter(inProgress)
@@ -263,7 +266,14 @@ export function HomeView({
           onMenu={onMenu}
         />
       ))}
-      {!rows.length && (
+      {!rows.length && kids && (
+        <EmptyState
+          icon={<Puzzle size={20} />}
+          title="No hay catálogos infantiles"
+          description="Este perfil infantil solo muestra los catálogos infantiles de TMDB. Actívalos en Ajustes › Información con una clave de TMDB."
+        />
+      )}
+      {!rows.length && !kids && (
         <EmptyState
           icon={<Puzzle size={20} />}
           title="No hay catálogos activos"

@@ -45,7 +45,9 @@ export function homeRows(sources: CatalogSource[], layout: CatalogLayout): HomeR
     .sort((a, b) => (rank.get(a.source.key) ?? Infinity) - (rank.get(b.source.key) ?? Infinity) || a.index - b.index);
   return ordered.map(({ source, index }) => {
     const browse = source === movie ? 'movie' : source === series ? 'series' : undefined;
-    const defaultTitle = browse === 'movie' ? 'Películas populares' : browse === 'series' ? 'Series populares' : source.catalog.name;
+    // «Populares» describes Cinemeta's top catalogs; any other addon keeps its own catalog name.
+    const popular = browse && source.addon.manifest.id === 'com.linvo.cinemeta';
+    const defaultTitle = popular ? (browse === 'movie' ? 'Películas populares' : 'Series populares') : source.catalog.name;
     const hidden = layout.hidden[source.key];
     return {
       source,

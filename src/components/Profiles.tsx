@@ -157,11 +157,21 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
             onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
           />
           <span className="profile-meta">
-            {[profile.id === active ? "En uso" : "", linked === profile.id && accountState.user ? `Cuenta de Stremio` : ""]
+            {[profile.id === active ? "En uso" : "", profile.kids ? "Infantil" : "", linked === profile.id && accountState.user ? `Cuenta de Stremio` : ""]
               .filter(Boolean)
               .join(" · ")}
           </span>
           <div className="profile-actions">
+            {profile.id !== MAIN_PROFILE && (
+              <button
+                className={`chip ${profile.kids ? "selected" : ""}`}
+                aria-pressed={Boolean(profile.kids)}
+                title="Solo catálogos infantiles en Inicio, Explorar y la búsqueda"
+                onClick={() => profiles.update(profile.id, { kids: !profile.kids })}
+              >
+                Infantil
+              </button>
+            )}
             {profile.id !== active && (
               <button className="button subtle small" onClick={() => (profiles.select(profile.id), notify(`Perfil: ${profile.name}`))}>
                 Usar

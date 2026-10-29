@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Episode, MediaItem } from "./contracts";
-import { usePreferences } from "./store";
+import { preferencesStore, usePreferences } from "./store";
+import { provideTmdbContext } from "./tmdbCatalogs";
 import { deleteSecret, getSecret, requestJson, setSecret } from "./transport";
 
 /**
@@ -153,6 +154,18 @@ export const tmdb = {
     notify();
   },
 };
+
+provideTmdbContext(async () => {
+  const apiKey = await tmdb.key();
+  if (!apiKey) return null;
+  const state = preferencesStore.getSnapshot();
+  // Saved or started titles, most recent first: the seeds of «Recomendado para ti».
+  const library = Object.values(state.library)
+    .filter((entry) => entry.saved || entry.progress || entry.watchedAt)
+    .sort((a, b) => Math.max(b.addedAt, b.progress?.updatedAt ?? 0) - Math.max(a.addedAt, a.progress?.updatedAt ?? 0))
+    .map((entry) => ({ id: entry.meta.id, type: entry.meta.type }));
+  return { apiKey, language: state.metadataLanguage || "es-ES", library };
+});
 
 export function useTmdbConfigured(): boolean {
   return useSyncExternalStore(tmdb.subscribe, () => Boolean(key), () => Boolean(key));

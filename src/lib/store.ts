@@ -15,6 +15,7 @@ import type {
 } from './contracts';
 import { normalizeLanguage } from './languages';
 import { defaultAddons, normalizeManifestUrl } from './protocol';
+import { TMDB_CATALOGS_URL, tmdbCatalogsManifest } from './tmdbCatalogs';
 
 /**
  * Version 2 adds per-video history, watched marks, library vs «Seguir viendo» entries and player
@@ -162,7 +163,7 @@ function manifest(value: unknown): AddonManifest | undefined {
 function addon(value: unknown): InstalledAddon | undefined {
   if (!record(value)) return undefined;
   const manifestUrl = canonicalManifestUrl(value.manifestUrl);
-  const parsedManifest = manifest(value.manifest);
+  const parsedManifest = manifestUrl === TMDB_CATALOGS_URL ? structuredClone(tmdbCatalogsManifest) : manifest(value.manifest);
   if (!manifestUrl || !parsedManifest) return undefined;
   return {
     manifestUrl,

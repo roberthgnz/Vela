@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { CornerDownLeft, Search } from "lucide-react";
 import type { InstalledAddon, MediaItem } from "../lib/contracts";
 import { getCatalog, getCatalogSources } from "../lib/protocol";
+import { useKidsMode } from "../lib/profiles";
 import { mediaKey, usePreferences } from "../lib/store";
 import { errorMessage, yearOf } from "../lib/utils";
 import { typeLabel } from "./MediaCard";
@@ -42,10 +43,12 @@ export function SearchPalette({
   const prefs = usePreferences();
   const [input, setInput] = useState("");
   const search = useDeferredValue(input.trim());
+  // A children's profile does not search: addon search results cannot be filtered by age.
+  const kids = useKidsMode();
   const sources = getCatalogSources(prefs.addons).filter(
     (source) =>
-      source.catalog.extra?.some((extra) => extra.name === "search") ||
-      source.catalog.extraSupported?.includes("search"),
+      !kids &&
+      (source.catalog.extra?.some((extra) => extra.name === "search") || source.catalog.extraSupported?.includes("search")),
   );
   const query = useQuery({
     queryKey: ["search", sources.map((source) => source.key), search],

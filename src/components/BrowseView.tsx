@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { LayoutGrid, Grid3X3, Puzzle } from "lucide-react";
 import { catalogTitle } from "../lib/catalogLayout";
+import { useKidsMode } from "../lib/profiles";
+import { kidsCatalog } from "../lib/tmdbCatalogs";
 import type { CatalogSource } from "../lib/contracts";
 import { useRouteState } from "../lib/navigation";
 import { browsable, catalogFilters, getCatalog, getCatalogSources, nextCatalogSkip } from "../lib/protocol";
@@ -52,7 +54,8 @@ export function BrowseView({
   onMenu: CardMenu;
 }) {
   const prefs = usePreferences();
-  const sources = getCatalogSources(prefs.addons, type).filter((source) => browsable(source.catalog)).sort(
+  const kids = useKidsMode();
+  const sources = getCatalogSources(prefs.addons, type).filter((source) => browsable(source.catalog) && (!kids || kidsCatalog(source))).sort(
     (a, b) =>
       Number(b.addon.manifest.id === "com.linvo.cinemeta") -
       Number(a.addon.manifest.id === "com.linvo.cinemeta"),

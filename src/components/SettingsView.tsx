@@ -34,6 +34,7 @@ import { updates, useUpdates } from "../lib/updates";
 import { native } from "./WindowControls";
 import { ProfileSettings } from "./Profiles";
 import { CatalogSettings } from "./CatalogSettings";
+import { TmdbCatalogsRow } from "./TmdbCatalogsRow";
 import { parseKeywords, sourceKeywords, useSourceKeywords } from "../lib/sourceKeywords";
 
 export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
@@ -782,6 +783,7 @@ function MetadataSettings({ notify }: { notify: (message: string) => void }) {
           </>
         )}
       </Row>
+      <TmdbCatalogsRow />
     </div>
   );
 }
