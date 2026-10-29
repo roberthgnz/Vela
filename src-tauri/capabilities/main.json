@@ -16,6 +16,7 @@
     "core:window:allow-internal-toggle-maximize",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
-    "allow-native-transport"
+    "allow-native-transport",
+    "allow-downloads"
   ]
 }

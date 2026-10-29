@@ -1,4 +1,9 @@
 [[permission]]
 identifier = "allow-native-transport"
 description = "Allow the main window to request addon and account data, keep its Stremio session in the OS credential store, explicitly launch links or a configured player, and check for and install signed updates."
-commands.allow = ["request_json", "post_json", "request_text", "request_bytes", "open_external", "launch_external_player", "secret_get", "secret_set", "secret_delete", "update_check", "update_install"]
+commands.allow = ["request_json", "post_json", "request_text", "request_bytes", "request_range", "open_external", "launch_external_player", "secret_get", "secret_set", "secret_delete", "update_check", "update_install"]
+
+[[permission]]
+identifier = "allow-downloads"
+description = "Allow the main window to download video files to the Vela folder in Downloads, pause and resume them, delete them and show them in Explorer (only inside that folder)."
+commands.allow = ["download_folder", "download_start", "download_cancel", "download_remove", "download_reveal"]
