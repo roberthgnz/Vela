@@ -539,7 +539,7 @@ export default function App() {
           <HomeView
             onOpen={openMedia}
             onResume={(meta, addonUrl) => void resumeTitle(meta, addonUrl)}
-            onBrowse={(type) => section(type === "movie" ? "movies" : "series")}
+            onBrowse={(type, catalog) => go({ name: type === "movie" ? "movies" : "series", state: { catalog } })}
             onAddons={() => section("addons")}
             onMenu={onCardMenu}
           />

@@ -229,7 +229,7 @@ export function HomeView({
 }: {
   onOpen: OpenMedia;
   onResume: (meta: MediaItem, addonUrl: string) => void;
-  onBrowse: (type: "movie" | "series") => void;
+  onBrowse: (type: "movie" | "series", catalog: string) => void;
   onAddons: () => void;
   onMenu: CardMenu;
 }) {
@@ -262,7 +262,7 @@ export function HomeView({
           source={source}
           title={title}
           onOpen={onOpen}
-          onBrowse={browse ? () => onBrowse(browse) : undefined}
+          onBrowse={browse ? () => onBrowse(browse, source.key) : undefined}
           onMenu={onMenu}
         />
       ))}

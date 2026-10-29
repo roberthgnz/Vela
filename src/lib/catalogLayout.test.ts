@@ -23,7 +23,8 @@ describe('home catalog layout', () => {
     expect(rows.slice(0, 3).map((row) => row.title)).toEqual(['Películas populares', 'Series populares', 'other top']);
     expect(rows.map((row) => row.source)).not.toContain(searchOnly);
     expect(rows.filter((row) => row.visible)).toHaveLength(10);
-    expect(rows[0].browse).toBe('movie');
+    expect(rows.slice(0, 3).map((row) => row.browse)).toEqual(['movie', 'series', 'movie']);
+    expect(homeRows([source('tv', 'tv', 'live')], emptyLayout)[0].browse).toBeUndefined();
   });
 
   it('moves, hides and renames rows, keeping new catalogs at the end', () => {

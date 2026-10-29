@@ -12,7 +12,7 @@ export type HomeRow = {
   /** Name the row has without a custom one. */
   defaultTitle: string;
   visible: boolean;
-  /** Cinemeta's popular rows link to the movies and series sections. */
+  /** Movie and series rows open their catalog in the movies or series section («Ver todo»). */
   browse?: 'movie' | 'series';
 };
 
@@ -44,10 +44,11 @@ export function homeRows(sources: CatalogSource[], layout: CatalogLayout): HomeR
     .map((source, index) => ({ source, index }))
     .sort((a, b) => (rank.get(a.source.key) ?? Infinity) - (rank.get(b.source.key) ?? Infinity) || a.index - b.index);
   return ordered.map(({ source, index }) => {
-    const browse = source === movie ? 'movie' : source === series ? 'series' : undefined;
+    const type = source.catalog.type;
+    const browse = type === 'movie' || type === 'series' ? type : undefined;
     // «Populares» describes Cinemeta's top catalogs; any other addon keeps its own catalog name.
-    const popular = browse && source.addon.manifest.id === 'com.linvo.cinemeta';
-    const defaultTitle = popular ? (browse === 'movie' ? 'Películas populares' : 'Series populares') : source.catalog.name;
+    const popular = (source === movie || source === series) && source.addon.manifest.id === 'com.linvo.cinemeta';
+    const defaultTitle = popular ? (type === 'movie' ? 'Películas populares' : 'Series populares') : source.catalog.name;
     const hidden = layout.hidden[source.key];
     return {
       source,
