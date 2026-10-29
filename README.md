@@ -75,6 +75,18 @@ El servidor de Stremio solo envía cabeceras CORS a orígenes de Stremio, así q
 
 El proxy de cabeceras del servidor de Stremio solo acepta destinos HTTPS. Los enlaces directos y las listas HLS dependen de sus códecs, CORS y disponibilidad. Abrir un instalador generado localmente sin firma puede mostrar el aviso habitual de Windows.
 
+## Contribuir
+
+Las aportaciones son bienvenidas. Lee [CONTRIBUTING.md](CONTRIBUTING.md) antes de abrir un pull request y el [código de conducta](CODE_OF_CONDUCT.md). Los errores y propuestas van en [issues](https://github.com/roberthgnz/Vela/issues); los problemas de seguridad, por el informe privado descrito en [SECURITY.md](SECURITY.md).
+
+## Aviso legal
+
+Vela no proporciona, aloja ni indexa contenido. Reproduce lo que ofrecen los addons que instala cada usuario, que son responsabilidad de sus autores; usa solo fuentes a las que tengas derecho a acceder. Stremio es una marca de sus titulares; Vela no está afiliado ni respaldado por Stremio.
+
+## Licencia
+
+Vela se distribuye bajo la [licencia MIT](LICENSE). Las dependencias y los recursos de terceros conservan sus propias licencias (ver «Créditos»).
+
 ## Créditos
 
 Big Buck Bunny y Sintel son obras de Blender Foundation. Vela incluye ilustraciones propias y enlaces a sus tráileres, alojados por W3C; no incluye las películas completas. Los tráileres se distribuyen bajo [Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/). Véanse [Big Buck Bunny](https://peach.blender.org/) y [Sintel](https://durian.blender.org/). El addon de validación usa los torrents de muestra de WebTorrent de esas mismas obras.

@@ -1,0 +1,62 @@
+name: Error
+description: Algo no funciona como debería.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes de abrir el informe, comprueba que usas la última versión de [Releases](https://github.com/roberthgnz/Vela/releases).
+        No incluyas enlaces, hashes ni capturas de contenido protegido, ni URLs de configuración de addons (pueden contener tokens).
+        Los problemas de seguridad van por el informe privado (ver SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: Qué pasa
+      description: Qué esperabas y qué ocurre en su lugar. Copia los mensajes de error tal como aparecen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. Abre…
+        2. Elige la fuente…
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Reproductor integrado
+        - Subtítulos o audio
+        - Reproductor externo (MPV)
+        - Torrents / Stremio Service
+        - Catálogos, búsqueda o detalles
+        - Biblioteca, progreso o episodios
+        - Cuenta de Stremio y sincronización
+        - Addons
+        - Instalación o ventana
+        - Otra
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Vela
+      placeholder: "0.3.1"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Versión de Windows
+      placeholder: Windows 11 24H2
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto
+      description: |
+        Tipo de fuente (directa, HLS, torrent), formato si lo sabes (MKV, HEVC, AC3…), si Stremio Service estaba abierto y su versión (Ajustes › Streaming › Probar conexión).

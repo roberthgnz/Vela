@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Vulnerabilidad de seguridad
+    url: https://github.com/roberthgnz/Vela/security/advisories/new
+    about: Informa en privado; no abras un issue público.
+  - name: Problema con un addon o con Stremio
+    url: https://github.com/Stremio/stremio-addon-sdk
+    about: Vela no mantiene los addons de terceros ni el servidor de streaming de Stremio.

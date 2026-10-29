@@ -1,0 +1,20 @@
+name: Propuesta
+description: Una función nueva o una mejora.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qué necesitas
+      description: El problema o la situación, no solo la solución.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+      description: Cómo debería funcionar. Si depende de un contrato de Stremio o de un addon, enlaza su documentación.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas
