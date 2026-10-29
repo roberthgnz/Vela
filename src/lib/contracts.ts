@@ -154,6 +154,9 @@ export type PlayerPreferences = {
   nextCountdown: number;
 };
 
+/** How the user arranged Home: catalog keys in order, hidden or shown, and custom names. */
+export type CatalogLayout = { order: string[]; hidden: Record<string, boolean>; names: Record<string, string> };
+
 export type AppPreferences = {
   version: 2;
   addons: InstalledAddon[];
@@ -163,4 +166,6 @@ export type AppPreferences = {
   player: PlayerPreferences;
   /** Language of titles and synopses (BCP 47, for example "es-ES"); empty keeps the addon's. */
   metadataLanguage: string;
+  /** Home catalogs, per profile. */
+  catalogs: CatalogLayout;
 };

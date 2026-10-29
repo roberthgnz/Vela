@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Captions,
   Globe,
+  House,
   Info,
   Keyboard,
   Languages,
@@ -30,6 +31,7 @@ import { tmdb, useTmdbConfigured } from "../lib/tmdb";
 import { updates, useUpdates } from "../lib/updates";
 import { native } from "./WindowControls";
 import { ProfileSettings } from "./Profiles";
+import { CatalogSettings } from "./CatalogSettings";
 
 export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
   return [
@@ -54,6 +56,7 @@ const sections = [
   { id: "account", label: "Cuenta", icon: User },
   { id: "profiles", label: "Perfiles", icon: Users },
   { id: "metadata", label: "Información", icon: Globe },
+  { id: "home", label: "Inicio", icon: House },
   { id: "subtitles", label: "Subtítulos", icon: Captions },
   { id: "audio", label: "Audio", icon: Languages },
   { id: "playback", label: "Reproducción", icon: Play },
@@ -200,6 +203,11 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-metadata" className="settings-group" aria-labelledby="settings-metadata-title">
             <h2 id="settings-metadata-title">Información</h2>
             <MetadataSettings notify={notify} />
+          </section>
+
+          <section id="settings-home" className="settings-group" aria-labelledby="settings-home-title">
+            <h2 id="settings-home-title">Inicio</h2>
+            <CatalogSettings />
           </section>
 
           <section id="settings-subtitles" className="settings-group" aria-labelledby="settings-subtitles-title">

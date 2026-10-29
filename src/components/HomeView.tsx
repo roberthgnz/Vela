@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Puzzle, X } from "lucide-react";
 import type { CatalogSource, LibraryEntry, MediaItem } from "../lib/contracts";
+import { homeRows } from "../lib/catalogLayout";
 import { getCatalog, getCatalogSources } from "../lib/protocol";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import { episodeCode } from "../lib/episodes";
@@ -231,21 +232,8 @@ export function HomeView({
   onMenu: CardMenu;
 }) {
   const prefs = usePreferences();
-  const sources = getCatalogSources(prefs.addons).filter(
-    (source) =>
-      !source.catalog.extra?.some((extra) => extra.isRequired) &&
-      !source.catalog.extraRequired?.length,
-  );
-  const cinemeta = sources.filter(
-    (source) => source.addon.manifest.id === "com.linvo.cinemeta",
-  );
-  const movie =
-    cinemeta.find((source) => source.catalog.type === "movie") ||
-    sources.find((source) => source.catalog.type === "movie");
-  const series =
-    cinemeta.find((source) => source.catalog.type === "series") ||
-    sources.find((source) => source.catalog.type === "series");
-  const others = sources.filter((source) => source !== movie && source !== series);
+  const rows = homeRows(getCatalogSources(prefs.addons), prefs.catalogs);
+  const visible = rows.filter((row) => row.visible);
   const continuing = Object.values(prefs.library)
     .filter(inProgress)
     .sort((a, b) => (b.progress?.updatedAt || 0) - (a.progress?.updatedAt || 0))
@@ -265,34 +253,17 @@ export function HomeView({
           ))}
         </Shelf>
       )}
-      {movie && (
-        <CatalogShelf
-          source={movie}
-          title="Películas populares"
-          onOpen={onOpen}
-          onBrowse={() => onBrowse("movie")}
-          onMenu={onMenu}
-        />
-      )}
-      {series && (
-        <CatalogShelf
-          source={series}
-          title="Series populares"
-          onOpen={onOpen}
-          onBrowse={() => onBrowse("series")}
-          onMenu={onMenu}
-        />
-      )}
-      {others.slice(0, 8).map((source) => (
+      {visible.map(({ source, title, browse }) => (
         <CatalogShelf
           key={source.key}
           source={source}
-          title={source.catalog.name}
+          title={title}
           onOpen={onOpen}
+          onBrowse={browse ? () => onBrowse(browse) : undefined}
           onMenu={onMenu}
         />
       ))}
-      {!sources.length && (
+      {!rows.length && (
         <EmptyState
           icon={<Puzzle size={20} />}
           title="No hay catálogos activos"

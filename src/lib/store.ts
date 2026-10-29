@@ -4,6 +4,7 @@ import type {
   AddonCatalog,
   AddonManifest,
   AppPreferences,
+  CatalogLayout,
   Episode,
   InstalledAddon,
   LibraryEntry,
@@ -28,10 +29,10 @@ export const MAIN_PROFILE = 'main';
 export const profileKey = (id: string) => `vela.profile.${id}.v1`;
 
 /** What each profile has of its own; addons and services are shared. */
-type ProfileData = Pick<AppPreferences, 'library' | 'player' | 'metadataLanguage'>;
+type ProfileData = Pick<AppPreferences, 'library' | 'player' | 'metadataLanguage' | 'catalogs'>;
 
 function profileData(value: AppPreferences): ProfileData {
-  return { library: value.library, player: value.player, metadataLanguage: value.metadataLanguage };
+  return { library: value.library, player: value.player, metadataLanguage: value.metadataLanguage, catalogs: value.catalogs };
 }
 const defaultServiceUrl = 'http://127.0.0.1:11470';
 
@@ -265,7 +266,19 @@ function defaults(): AppPreferences {
     externalPlayerPath: '',
     player: { ...defaultPlayer },
     metadataLanguage: 'es-ES',
+    catalogs: { order: [], hidden: {}, names: {} },
   };
+}
+
+function catalogLayout(value: unknown): CatalogLayout {
+  const layout: CatalogLayout = { order: [], hidden: {}, names: {} };
+  if (!record(value)) return layout;
+  layout.order = [...new Set(strings(value.order) ?? [])];
+  if (record(value.hidden))
+    for (const [key, hidden] of Object.entries(value.hidden)) if (safeKey(key) && typeof hidden === 'boolean') layout.hidden[key] = hidden;
+  if (record(value.names))
+    for (const [key, name] of Object.entries(value.names)) if (safeKey(key) && nonempty(name)) layout.names[key] = name.trim().slice(0, 80);
+  return layout;
 }
 
 function metadataLanguage(value: unknown, fallback: string): string {
@@ -301,6 +314,7 @@ function readPreferences(value: unknown, fallback: AppPreferences): AppPreferenc
     externalPlayerPath: typeof value.externalPlayerPath === 'string' ? value.externalPlayerPath : '',
     player: player(value.player),
     metadataLanguage: metadataLanguage(value.metadataLanguage, fallback.metadataLanguage),
+    catalogs: catalogLayout(value.catalogs),
   };
 }
 
@@ -556,6 +570,10 @@ export function createPreferencesStore(providedStorage?: PreferenceStorage) {
     setMetadataLanguage(value: string) {
       const next = metadataLanguage(value, state.metadataLanguage);
       if (next !== state.metadataLanguage) update({ ...state, metadataLanguage: next });
+    },
+    setCatalogLayout(value: CatalogLayout) {
+      const next = catalogLayout(value);
+      if (JSON.stringify(next) !== JSON.stringify(state.catalogs)) update({ ...state, catalogs: next });
     },
     setPlayer(value: Partial<PlayerPreferences>) {
       const next = player({ ...state.player, ...value });

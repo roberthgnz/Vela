@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { LayoutGrid, Grid3X3, Puzzle } from "lucide-react";
+import { catalogTitle } from "../lib/catalogLayout";
 import type { CatalogSource } from "../lib/contracts";
 import { useRouteState } from "../lib/navigation";
 import { browsable, catalogFilters, getCatalog, getCatalogSources, nextCatalogSkip } from "../lib/protocol";
@@ -96,7 +97,7 @@ export function BrowseView({
               >
                 {sources.map((item) => (
                   <option key={item.key} value={item.key}>
-                    {item.addon.manifest.name} · {item.catalog.name}
+                    {item.addon.manifest.name} · {catalogTitle(item, prefs.catalogs)}
                   </option>
                 ))}
               </select>
