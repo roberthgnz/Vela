@@ -7,6 +7,7 @@ export type Section =
   | "movies"
   | "series"
   | "library"
+  | "downloads"
   | "addons"
   | "settings";
 

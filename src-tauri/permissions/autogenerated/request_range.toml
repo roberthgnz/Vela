@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-request-range"
+description = "Enables the request_range command without any pre-configured scope."
+commands.allow = ["request_range"]
+
+[[permission]]
+identifier = "deny-request-range"
+description = "Denies the request_range command without any pre-configured scope."
+commands.deny = ["request_range"]

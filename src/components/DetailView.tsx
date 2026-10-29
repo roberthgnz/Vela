@@ -11,6 +11,7 @@ import {
   Circle,
   Eraser,
   Clipboard,
+  Download as DownloadIcon,
   ExternalLink,
   Globe,
   Magnet,
@@ -36,6 +37,7 @@ import { useTranslatedMeta } from "../lib/tmdb";
 import { useRouteState } from "../lib/navigation";
 import { useUiSetting } from "../lib/ui";
 import { matchesKeywords, useSourceKeywords } from "../lib/sourceKeywords";
+import { downloads, downloadsAvailable } from "../lib/downloads";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import {
   kindLabel,
@@ -823,6 +825,20 @@ function SourcesPanel({
           disabled: kind === "external" || kind === "youtube",
           onSelect: () => start(stream, "external", index),
         },
+        ...(downloadsAvailable
+          ? [
+              {
+                label: "Descargar",
+                icon: <DownloadIcon size={15} />,
+                disabled: kind === "external" || kind === "youtube" || !videoId,
+                onSelect: () =>
+                  void downloads
+                    .start({ meta, addonUrl: addon.manifestUrl, videoId: videoId!, stream, episode, serviceUrl: prefs.serviceUrl })
+                    .then(() => notify("Descarga iniciada. Puedes seguirla en Descargas."))
+                    .catch((error) => notify(errorMessage(error))),
+              },
+            ]
+          : []),
         "separator",
         ...(marks[sourceKey(stream)]
           ? [{ label: "Quitar marca", icon: <Eraser size={15} />, onSelect: () => videoId && sourceHistory.clear(videoId, stream) }]

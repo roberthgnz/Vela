@@ -2102,6 +2102,75 @@ kbd {
   color: var(--muted);
   font-size: 12px;
 }
+.download-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 24px;
+  list-style: none;
+}
+.download-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.download-art {
+  flex: none;
+  width: 44px;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-sm);
+}
+.download-body {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+.download-body strong,
+.download-file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.download-episode,
+.download-file,
+.download-status {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.download-status {
+  font-variant-numeric: tabular-nums;
+}
+.download-item.failed .download-status {
+  color: var(--danger, #f38b8b);
+}
+.download-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 10%);
+  overflow: hidden;
+}
+.download-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s;
+}
+.download-item.paused .download-bar span,
+.download-item.failed .download-bar span {
+  background: var(--muted);
+}
+.download-actions,
+.download-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .catalog-list {
   display: grid;
   max-height: 420px;

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CircleCheck,
   CircleUserRound,
+  Download as DownloadIcon,
   Users,
   Film,
   Home,
@@ -35,6 +36,8 @@ import { BrowseView } from "./components/BrowseView";
 import { DetailView, type PlayHandler, type PlayMode } from "./components/DetailView";
 import { HomeView } from "./components/HomeView";
 import { LibraryView } from "./components/LibraryView";
+import { DownloadsView } from "./components/DownloadsView";
+import { downloads, downloadsAvailable, type Download } from "./lib/downloads";
 import type { CardMenu } from "./components/MediaCard";
 import { Player, type Playing } from "./components/Player";
 import { Dialog, ErrorState, useMenu } from "./components/Primitives";
@@ -54,6 +57,7 @@ const primary = [
   { id: "library", label: "Biblioteca", icon: Library, shortcut: "Ctrl 4" },
 ] as const;
 const secondary = [
+  ...(downloadsAvailable ? [{ id: "downloads", label: "Descargas", icon: DownloadIcon, shortcut: "" } as const] : []),
   { id: "addons", label: "Addons", icon: Puzzle, shortcut: "" },
   { id: "settings", label: "Ajustes", icon: Settings, shortcut: "Ctrl ," },
 ] as const;
@@ -200,6 +204,26 @@ export default function App() {
       serviceUrl: prefs.serviceUrl,
       note: target.note,
       episode,
+      resume,
+    });
+  };
+
+  /** Plays a downloaded file from disk, resuming like any other source. */
+  const playDownload = (item: Download) => {
+    const entry = preferencesStore.getSnapshot().library[mediaKey(item.meta.type, item.meta.id)];
+    const saved = entry?.videos?.[item.videoId];
+    const resume = saved && saved.duration > 0 && saved.seconds < saved.duration * CREDITS_THRESHOLD ? saved.seconds : 0;
+    setPlaying({
+      meta: entry?.meta.videos ? { ...item.meta, videos: entry.meta.videos } : item.meta,
+      addonUrl: item.addonUrl,
+      videoId: item.videoId,
+      stream: item.stream,
+      url: downloads.playableUrl(item),
+      externalUrl: item.url,
+      headers: item.headers,
+      serviceUrl: prefs.serviceUrl,
+      note: "Archivo descargado",
+      episode: item.episode,
       resume,
     });
   };
@@ -532,6 +556,7 @@ export default function App() {
         {route.name === "library" && (
           <LibraryView onOpen={openMedia} onDiscover={() => section("home")} onMenu={onCardMenu} />
         )}
+        {route.name === "downloads" && <DownloadsView onPlay={playDownload} notify={notify} />}
         {route.name === "addons" && <AddonsView notify={notify} installRequest={installRequest} />}
         {route.name === "settings" && <SettingsView notify={notify} />}
         {route.name === "detail" && detailAddon && (
