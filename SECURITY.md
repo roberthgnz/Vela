@@ -18,5 +18,6 @@ Interesan especialmente:
 - Salida de la clave de sesión de Stremio del Administrador de credenciales de Windows, o su aparición en registros o capturas.
 - Peticiones del transporte nativo que se salten las comprobaciones de URL (solo HTTP/HTTPS, sin credenciales en la URL, límites de tamaño).
 - Inyección de argumentos o cabeceras al lanzar un reproductor externo.
+- Formas de que la actualización automática instale algo no firmado con la clave de Vela.
 
 Los addons de terceros y el servidor de streaming de Stremio no forman parte de Vela; sus vulnerabilidades deben comunicarse a quienes los mantienen.

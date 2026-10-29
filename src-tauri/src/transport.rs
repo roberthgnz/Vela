@@ -28,7 +28,7 @@ impl HttpClient {
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(8))
             .timeout(REQUEST_TIMEOUT)
-            .user_agent("Vela/0.3.1")
+            .user_agent("Vela/0.3.2")
             .build()
             .map(Self)
     }

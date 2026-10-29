@@ -12,6 +12,7 @@ import {
   Library,
   MonitorPlay,
   Radio,
+  RefreshCw,
   Trash2,
   User,
   XCircle,
@@ -23,6 +24,7 @@ import { openExternal, requestJson } from "../lib/transport";
 import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
 import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
+import { updates, useUpdates } from "../lib/updates";
 import { native } from "./WindowControls";
 
 export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
@@ -421,7 +423,8 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-about" className="settings-group" aria-labelledby="settings-about-title">
             <h2 id="settings-about-title">Acerca de</h2>
             <div className="settings-card">
-              <Row label="Vela 0.3.1" description="Cliente de escritorio independiente compatible con el protocolo de addons de Stremio. No es una aplicación oficial de Stremio." />
+              <Row label="Vela 0.3.2" description="Cliente de escritorio independiente compatible con el protocolo de addons de Stremio. No es una aplicación oficial de Stremio." />
+              {updates.supported() && <UpdateRows />}
               <Row
                 label="Privacidad"
                 description="Tu biblioteca se guarda localmente. Cada addon recibe las consultas que le haces; Vela no envía datos a otros servicios."
@@ -490,6 +493,47 @@ export function ShortcutTable({ seekShort, seekLong }: { seekShort?: number; see
         </div>
       ))}
     </dl>
+  );
+}
+
+function UpdateRows() {
+  const state = useUpdates();
+  const automatic = updates.automatic();
+  const busy = state.status === "checking" || state.status === "installing";
+  return (
+    <>
+      <Row label="Buscar actualizaciones al iniciar" description="Vela consulta las versiones publicadas en GitHub y avisa cuando hay una nueva. Nada se instala sin tu confirmación.">
+        <Switch checked={automatic} label="Buscar actualizaciones al iniciar" onChange={() => updates.setAutomatic(!automatic)} />
+      </Row>
+      <Row
+        label="Actualizaciones"
+        description={
+          <span aria-live="polite">
+            {state.status === "checking"
+              ? "Comprobando…"
+              : state.status === "current"
+                ? "Tienes la última versión."
+                : state.status === "available" && state.info
+                  ? `Vela ${state.info.version} está disponible.`
+                  : state.status === "installing"
+                    ? "Instalando la actualización…"
+                    : state.status === "error"
+                      ? state.error
+                      : "Sin comprobar en esta sesión."}
+          </span>
+        }
+      >
+        {state.status === "available" ? (
+          <button className="button primary" onClick={() => void updates.install()}>
+            <Download size={14} /> Instalar y reiniciar
+          </button>
+        ) : (
+          <button className="button secondary" disabled={busy} onClick={() => void updates.check()}>
+            {state.status === "checking" ? <Spinner /> : <RefreshCw size={14} />} Buscar ahora
+          </button>
+        )}
+      </Row>
+    </>
   );
 }
 

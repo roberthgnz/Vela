@@ -77,6 +77,10 @@ jobs:
           cargo test --locked --manifest-path src-tauri/Cargo.toml
 
       - name: Build installer
+        env:
+          # Signs the installer for the in-app updater (public key in tauri.conf.json).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: pnpm package
 
       - name: Publish release
@@ -86,12 +90,15 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           DRAFT: ${{ inputs.draft && '--draft' || '' }}
         run: |
-          installer="src-tauri/target/release/bundle/nsis/Vela_${VERSION}_x64-setup.exe"
-          test -f "$installer"
-          (cd "$(dirname "$installer")" && sha256sum "$(basename "$installer")") > "Vela_${VERSION}_x64-setup.exe.sha256"
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "$installer" "Vela_${VERSION}_x64-setup.exe.sha256" --clobber
-          else
-            gh release create "$TAG" "$installer" "Vela_${VERSION}_x64-setup.exe.sha256" \
-              --target "$GITHUB_SHA" --title "Vela $VERSION" --generate-notes $DRAFT
+          name="Vela_${VERSION}_x64-setup.exe"
+          installer="src-tauri/target/release/bundle/nsis/$name"
+          test -f "$installer" && test -f "$installer.sig"
+          (cd "$(dirname "$installer")" && sha256sum "$name") > "$name.sha256"
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$name"
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Vela $VERSION" --generate-notes $DRAFT
           fi
+          # Installed copies poll latest.json; it carries the release notes and the signature.
+          gh release view "$TAG" --json body -q .body > notes.md
+          node dev/updater-manifest.mjs "$VERSION" "$installer" "$url" notes.md > latest.json
+          gh release upload "$TAG" "$installer" "$installer.sig" "$name.sha256" latest.json --clobber

@@ -36,7 +36,7 @@ async function upstream(raw: string, signal: AbortSignal): Promise<Uint8Array> {
     const response = await fetch(url, {
       signal,
       redirect: 'manual',
-      headers: { accept: 'application/json, text/plain;q=0.9, */*;q=0.5', 'user-agent': 'Vela/0.3.1' },
+      headers: { accept: 'application/json, text/plain;q=0.9, */*;q=0.5', 'user-agent': 'Vela/0.3.2' },
     });
     if (response.status >= 300 && response.status < 400) {
       await response.body?.cancel();

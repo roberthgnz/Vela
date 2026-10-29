@@ -3,6 +3,7 @@
 mod mpv;
 mod secrets;
 mod transport;
+mod updater;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -238,6 +239,8 @@ fn main() {
     let client = HttpClient::new().expect("could not initialize the addon transport");
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updater::PendingUpdate::default())
         .manage(client)
         .invoke_handler(tauri::generate_handler![
             request_json,
@@ -248,7 +251,9 @@ fn main() {
             launch_external_player,
             secrets::secret_get,
             secrets::secret_set,
-            secrets::secret_delete
+            secrets::secret_delete,
+            updater::update_check,
+            updater::update_install
         ])
         .run(tauri::generate_context!())
         .expect("could not start Vela");

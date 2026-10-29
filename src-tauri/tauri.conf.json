@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Vela",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "identifier": "com.vela.desktop",
   "build": {
     "beforeDevCommand": "node src-tauri/start-ui.mjs",
@@ -30,8 +30,16 @@
       "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http: https: data: blob:; connect-src 'self' ipc: http://ipc.localhost http: https:; media-src 'self' http: https: blob:; worker-src 'self' blob:; font-src 'self' data:; frame-src 'none'; object-src 'none'; base-uri 'self'"
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJDOTNCMzk0N0I0MkI5MUMKUldRY3VVSjdsTE9UTEo0SnRxdjB0Q0lYV3M4MEloOWVtcjRhVjBLMjNCSC9qTW54emlNK0d3dTkK",
+      "endpoints": ["https://github.com/roberthgnz/Vela/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
     "category": "Entertainment",
     "shortDescription": "Cliente de escritorio compatible con addons de Stremio",

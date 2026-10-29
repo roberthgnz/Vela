@@ -2,8 +2,6 @@
 
 Cliente de escritorio independiente para Windows, construido con Tauri 2, Rust, React y TypeScript. Compatible con el protocolo HTTP/JSON de addons de Stremio. No es una aplicación oficial de Stremio.
 
-La [investigación de Stremio y el estado de integración](docs/stremio.md) recoge los repositorios, licencias observadas, contratos de addons, API de cuenta, servidor de streaming, arquitectura de Vela, verificaciones realizadas y trabajo pendiente. Leerla antes de continuar las integraciones.
-
 ## Desarrollo
 
 Requiere Node 22.12 o posterior, pnpm 11, Rust estable, las herramientas de compilación C++ de Microsoft y WebView2.
@@ -22,7 +20,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 pnpm package
 ```
 
-El instalador se genera en `src-tauri/target/release/bundle/nsis/`.
+El instalador se genera en `src-tauri/target/release/bundle/nsis/`. `pnpm package` firma además el instalador para la actualización automática, así que necesita la clave privada de actualizaciones: `$env:TAURI_SIGNING_PRIVATE_KEY = "<ruta o contenido de la clave>"` y `$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""`. Sin ella, compila con `pnpm tauri build --bundles nsis --config '{"bundle":{"createUpdaterArtifacts":false}}'` (PowerShell 7.3 o posterior).
 
 ### Versiones en GitHub
 
@@ -31,9 +29,17 @@ El instalador se genera en `src-tauri/target/release/bundle/nsis/`.
   - subiendo una etiqueta igual a la versión: actualiza la versión en `package.json`, `src-tauri/Cargo.toml` y `src-tauri/tauri.conf.json`, haz commit y ejecuta `git tag v0.3.0` y `git push origin v0.3.0`;
   - o desde Actions › Release › Run workflow, que etiqueta el commit elegido como `v<versión>` (opcionalmente como borrador).
 
-El flujo falla si las tres versiones no coinciden o si la etiqueta no corresponde a la versión. Si la versión ya está publicada, sustituye los archivos adjuntos. El instalador no está firmado. La aplicación empaquetada incluye su interfaz y no requiere Node ni el servidor Vite en el equipo del usuario. WebView2 es un requisito de ejecución.
+El flujo falla si las tres versiones no coinciden o si la etiqueta no corresponde a la versión. Si la versión ya está publicada, sustituye los archivos adjuntos.
 
-`node dev/validation-addon.mjs` sirve en `http://127.0.0.1:7010/manifest.json` un addon local con fuentes de validación: torrents CC de Blender (con y sin `fileIdx`, con trackers, índice erróneo, hash sin pares), un MP4 que exige cabeceras, un MKV/HEVC, un MKV con dos pistas de audio y subtítulos SRT y ASS incrustados, subtítulos externos (Windows‑1252, ASS, duplicados y un archivo dañado) y una serie de tres episodios con `bingeGroup`. `node dev/make-validation-media.mjs` genera esos archivos sintéticos con FFmpeg en `.tmp/media/`. Su uso se describe en [docs/stremio.md](docs/stremio.md#validación-con-el-servicio-real).
+### Actualización automática
+
+Desde la 0.3.2, Vela consulta al arrancar `https://github.com/roberthgnz/Vela/releases/latest/download/latest.json` (se puede desactivar en Ajustes › Acerca de, donde también está «Buscar ahora»). Si hay una versión nueva lo avisa; al aceptar, descarga el instalador, comprueba su firma con la clave pública de `tauri.conf.json`, lo instala en modo pasivo y vuelve a abrir Vela. Nada se instala sin confirmación.
+
+El workflow de release firma el instalador con el secreto `TAURI_SIGNING_PRIVATE_KEY` y publica el `.sig` y `latest.json` ([dev/updater-manifest.mjs](dev/updater-manifest.mjs)). La clave privada no está en el repositorio: si se pierde, las copias instaladas no aceptarán más actualizaciones y habrá que reinstalar a mano con una clave nueva. `VELA_UPDATE_ENDPOINT` cambia la dirección consultada para probar con un `latest.json` local; la firma se comprueba igual.
+
+La firma de actualizaciones no es la firma de código de Windows: el instalador no está firmado con un certificado y Windows puede mostrar su aviso al ejecutarlo a mano. La aplicación empaquetada incluye su interfaz y no requiere Node ni el servidor Vite en el equipo del usuario. WebView2 es un requisito de ejecución.
+
+`node dev/validation-addon.mjs` sirve en `http://127.0.0.1:7010/manifest.json` un addon local con fuentes de validación: torrents CC de Blender (con y sin `fileIdx`, con trackers, índice erróneo, hash sin pares), un MP4 que exige cabeceras, un MKV/HEVC, un MKV con dos pistas de audio y subtítulos SRT y ASS incrustados, subtítulos externos (Windows‑1252, ASS, duplicados y un archivo dañado) y una serie de tres episodios con `bingeGroup`. `node dev/make-validation-media.mjs` genera esos archivos sintéticos con FFmpeg en `.tmp/media/`.
 
 ## Interfaz
 

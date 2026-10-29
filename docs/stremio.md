@@ -190,6 +190,10 @@ La versión 2 se guarda en `vela.preferences.v2`. Al arrancar, si no existe, se 
 
 Preferencias de reproducción (`player`): idiomas principal y secundario de subtítulos, activación automática, tamaño, opacidad y fondo; idioma preferido y alternativo de audio; saltos corto y largo; siguiente episodio y su cuenta atrás. Los valores se validan y acotan al leerlos.
 
+## Actualizaciones
+
+Desde 0.3.2 se usa [tauri-plugin-updater](https://v2.tauri.app/plugin/updater/) 2.13.1 con comandos propios ([updater.rs](../src-tauri/src/updater.rs), [updates.ts](../src/lib/updates.ts)): `update_check` consulta `latest.json` de la última release de GitHub y `update_install` descarga, verifica la firma minisign con la clave pública de `tauri.conf.json`, ejecuta el instalador NSIS en modo pasivo y reinicia. La comprobación al arrancar solo ocurre en compilaciones de release y se puede desactivar. Ver «Actualización automática» en el README para la clave y el workflow.
+
 ## Auditoría de Stremio Tech Update #86
 
 [Tech Update #86](https://blog.stremio.com/stremio-tech-update-86-stremio-update-for-macos-and-ios/) (22 de octubre de 2026) describe Stremio 2.1 para iOS, iPadOS, tvOS y macOS. No se ha copiado ningún parche: cada punto se comprobó en el código de Vela, se reprodujo cuando era posible y se cubrió con pruebas.

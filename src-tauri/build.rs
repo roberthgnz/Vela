@@ -10,6 +10,8 @@ fn main() {
             "secret_get",
             "secret_set",
             "secret_delete",
+            "update_check",
+            "update_install",
         ]),
     ))
     .expect("could not prepare Vela desktop assets");

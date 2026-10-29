@@ -39,7 +39,9 @@ import { Player, type Playing } from "./components/Player";
 import { Dialog, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
+import { UpdateNotice } from "./components/UpdateNotice";
 import { native, WindowControls } from "./components/WindowControls";
+import { updates } from "./lib/updates";
 
 const primary = [
   { id: "home", label: "Inicio", icon: Home, shortcut: "Ctrl 1" },
@@ -236,6 +238,11 @@ export default function App() {
 
   useEffect(() => {
     void account.init();
+    // Look for a new version shortly after starting (installed builds only).
+    const timer =
+      updates.supported() && import.meta.env.PROD && updates.automatic()
+        ? setTimeout(() => void updates.check(), 5000)
+        : undefined;
     // Addons change their catalogs and resources over time; refresh the stored manifests quietly.
     const bundled = new Set(defaultAddons().map((addon) => addon.manifestUrl));
     for (const addon of preferencesStore.getSnapshot().addons) {
@@ -244,6 +251,7 @@ export default function App() {
         .then((fresh) => preferencesStore.refreshAddon(fresh))
         .catch(() => {});
     }
+    return () => clearTimeout(timer);
   }, []);
 
   const onCardMenu: CardMenu = (anchor, items, label) => menu.open(anchor, items, label);
@@ -486,6 +494,7 @@ export default function App() {
         />
       )}
       {menu.element}
+      <UpdateNotice />
       <div className="toasts" aria-live="polite">
         {toasts.map((toast) => (
           <div className={`toast ${toast.tone}`} key={toast.id} role="status">
