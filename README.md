@@ -34,7 +34,7 @@ Ventana sin marco con barra de título propia (arrastre, doble clic para maximiz
 
 - **Inicio**: «Seguir viendo» y estanterías de catálogos activos, sin cabecera promocional.
 - **Películas y Series**: rejilla con catálogo, género y tamaño de carteles; carga continua.
-- **Detalle**: página con información a la izquierda y panel lateral de episodios y fuentes. Las fuentes muestran calidad, tipo, tamaño, etiquetas (HEVC, HDR, MKV) y advertencias; se pueden filtrar por addon.
+- **Detalle**: página con información a la izquierda y panel lateral de episodios y fuentes. Las fuentes muestran calidad, tipo, banderas de idioma, tamaño, pares, proveedor, etiquetas (HEVC, HDR, MKV) y advertencias; se pueden filtrar por addon y por idioma.
 - **Biblioteca**: filtros por tipo y «Seguir viendo», orden, filtro de texto y vista de cuadrícula o lista.
 - **Reproductor**: ventana completa con controles que se ocultan, búfer, previsualización del tiempo, volumen, velocidad, subtítulos por idioma, reproductor externo y pantalla completa nativa.
 - **Addons y Ajustes**: listas compactas, filtros y secciones con índice.
@@ -64,5 +64,7 @@ El proxy de cabeceras del servidor de Stremio solo acepta destinos HTTPS. Los en
 ## Créditos
 
 Big Buck Bunny y Sintel son obras de Blender Foundation. Vela incluye ilustraciones propias y enlaces a sus tráileres, alojados por W3C; no incluye las películas completas. Los tráileres se distribuyen bajo [Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/). Véanse [Big Buck Bunny](https://peach.blender.org/) y [Sintel](https://durian.blender.org/). El addon de validación usa los torrents de muestra de WebTorrent de esas mismas obras.
+
+Las banderas de idioma usan la fuente «Twemoji Country Flags» de [country-flag-emoji-polyfill](https://github.com/talkjs/country-flag-emoji-polyfill) (código MIT), incluida en `public/fonts/` porque Windows no dibuja emojis de banderas. Sus gráficos son de [Twemoji](https://github.com/twitter/twemoji), © Twitter, Inc. y otros colaboradores, bajo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 El cliente implementa el [protocolo de addons](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/protocol.md). No incorpora código de las interfaces oficiales de Stremio. Las dependencias conservan sus propias licencias.

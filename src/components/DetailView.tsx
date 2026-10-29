@@ -15,6 +15,7 @@ import {
   Puzzle,
   RotateCw,
   Star,
+  Users,
   SquarePlay,
 } from "lucide-react";
 import type {
@@ -28,6 +29,8 @@ import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import {
   kindLabel,
   streamDetail,
+  streamFacts,
+  streamLanguages,
   streamHeading,
   streamKind,
   streamQuality,
@@ -480,6 +483,7 @@ function SourcesPanel({
   const prefs = usePreferences();
   const menu = useMenu();
   const [addonFilter, setAddonFilter] = useState("");
+  const [languageFilter, setLanguageFilter] = useState("");
   const [active, setActive] = useState<number | null>(null);
   const enabled = prefs.addons.filter((item) => item.enabled).map((item) => item.manifestUrl);
   const sources = useQuery({
@@ -495,7 +499,17 @@ function SourcesPanel({
   });
   const streams = sources.data || [];
   const addonNames = [...new Set(streams.map((stream) => stream.addonName))];
-  const visible = addonFilter ? streams.filter((stream) => stream.addonName === addonFilter) : streams;
+  const languages = new Map<string, { label: string; count: number }>();
+  for (const stream of streams)
+    for (const language of streamLanguages(stream)) {
+      const current = languages.get(language.flag);
+      languages.set(language.flag, { label: language.label, count: (current?.count ?? 0) + 1 });
+    }
+  const visible = streams.filter(
+    (stream) =>
+      (!addonFilter || stream.addonName === addonFilter) &&
+      (!languageFilter || streamLanguages(stream).some((language) => language.flag === languageFilter)),
+  );
   const start = (stream: ResolvedStream, mode: PlayMode, index: number) => {
     setActive(index);
     play.mutate({ stream, mode });
@@ -578,6 +592,32 @@ function SourcesPanel({
           ))}
         </div>
       )}
+      {languages.size > 0 && (
+        <div className="chip-row" role="toolbar" aria-label="Filtrar por idioma">
+          <button
+            className={`chip ${!languageFilter ? "selected" : ""}`}
+            aria-pressed={!languageFilter}
+            onClick={() => setLanguageFilter("")}
+          >
+            Todos los idiomas
+          </button>
+          {[...languages]
+            .sort((a, b) => b[1].count - a[1].count)
+            .map(([flag, { label, count }]) => (
+              <button
+                key={flag}
+                className={`chip ${languageFilter === flag ? "selected" : ""}`}
+                aria-pressed={languageFilter === flag}
+                aria-label={`${label}: ${count} fuentes`}
+                title={label}
+                onClick={() => setLanguageFilter(languageFilter === flag ? "" : flag)}
+              >
+                <span className="flag" aria-hidden="true">{flag}</span>
+                <span>{count}</span>
+              </button>
+            ))}
+        </div>
+      )}
       {play.isError && (
         <div className="panel-alert">
           <ErrorState title="No se pudo reproducir" message={errorMessage(play.error)} />
@@ -612,6 +652,8 @@ function SourcesPanel({
               const quality = streamQuality(stream);
               const warnings = streamWarnings(stream);
               const detail = streamDetail(stream);
+              const streamLanguageList = streamLanguages(stream);
+              const facts = streamFacts(stream);
               return (
                 <li
                   key={`${stream.addonUrl}-${index}`}
@@ -646,6 +688,23 @@ function SourcesPanel({
                       {detail.length > 0 && <span className="source-detail">{detail.join(" · ")}</span>}
                       <span className="source-tags">
                         <span className={`tag kind-${kind}`}>{kindLabel[kind]}</span>
+                        {streamLanguageList.length > 0 && (
+                          <span
+                            className="flags"
+                            title={streamLanguageList.map((language) => language.label).join(", ")}
+                            aria-label={`Idiomas: ${streamLanguageList.map((language) => language.label).join(", ")}`}
+                          >
+                            {streamLanguageList.slice(0, 6).map((language) => (
+                              <span className="flag" key={language.flag}>
+                                {language.flag}
+                              </span>
+                            ))}
+                            {streamLanguageList.length > 6 && (
+                              <span className="flag-more">+{streamLanguageList.length - 6}</span>
+                            )}
+                          </span>
+                        )}
+                        {facts.multiAudio && <span className="tag">Multiaudio</span>}
                         {streamTags(stream).map((tag) => (
                           <span className="tag" key={tag}>
                             {tag}
@@ -656,7 +715,14 @@ function SourcesPanel({
                             <AlertTriangle size={11} /> {warnings.length > 1 ? "Limitaciones" : warnings[0].startsWith("Requiere") ? "Cabeceras" : "No web"}
                           </span>
                         )}
-                        <span className="source-addon">{stream.addonName}</span>
+                        {facts.seeders !== undefined && (
+                          <span className="tag seeders" title={`${facts.seeders} pares`}>
+                            <Users size={11} /> {facts.seeders}
+                          </span>
+                        )}
+                        <span className="source-addon">
+                          {[stream.addonName, facts.provider].filter(Boolean).join(" · ")}
+                        </span>
                       </span>
                     </span>
                   </button>

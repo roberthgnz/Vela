@@ -69,11 +69,71 @@ export function streamHeading(stream: ResolvedStream): string {
   );
 }
 
+const flagPattern = /[\u{1F1E6}-\u{1F1FF}]{2}/gu;
+const metadataLine = /👤|💾|⚙/u;
+
+/** Torrent addons such as Torrentio mark audio languages with country flags. */
+const flagLanguages: Record<string, string> = {
+  GB: "Inglés", US: "Inglés", ES: "Español (España)", MX: "Español (Latinoamérica)", AR: "Español (Latinoamérica)",
+  FR: "Francés", DE: "Alemán", IT: "Italiano", PT: "Portugués", BR: "Portugués (Brasil)", RU: "Ruso", UA: "Ucraniano",
+  JP: "Japonés", KR: "Coreano", CN: "Chino", TW: "Chino (Taiwán)", HK: "Chino (Hong Kong)", IN: "Hindi",
+  NL: "Neerlandés", PL: "Polaco", TR: "Turco", SE: "Sueco", NO: "Noruego", DK: "Danés", FI: "Finés", CZ: "Checo",
+  HU: "Húngaro", GR: "Griego", RO: "Rumano", BG: "Búlgaro", RS: "Serbio", HR: "Croata", IL: "Hebreo", SA: "Árabe",
+  TH: "Tailandés", VN: "Vietnamita", ID: "Indonesio", MY: "Malayo", PH: "Filipino", IR: "Persa", LT: "Lituano",
+  LV: "Letón", EE: "Estonio", SK: "Eslovaco", SI: "Esloveno",
+};
+
+const regionNames = (() => {
+  try {
+    return new Intl.DisplayNames(["es"], { type: "region" });
+  } catch {
+    return undefined;
+  }
+})();
+
+export type StreamLanguage = { flag: string; code: string; label: string };
+
+export function regionCode(flag: string): string {
+  return [...flag].map((char) => String.fromCharCode(char.codePointAt(0)! - 0x1f1e6 + 65)).join("");
+}
+
+export function languageOfFlag(flag: string): StreamLanguage {
+  const code = regionCode(flag);
+  return { flag, code, label: flagLanguages[code] ?? regionNames?.of(code) ?? code };
+}
+
+function text(stream: ResolvedStream): string {
+  return [stream.title, stream.description].filter(Boolean).join("\n");
+}
+
+export function streamLanguages(stream: ResolvedStream): StreamLanguage[] {
+  return [...new Set(text(stream).match(flagPattern) ?? [])].map(languageOfFlag);
+}
+
+/** Seeders, provider and multi-audio notes that torrent addons put in the description. */
+export function streamFacts(stream: ResolvedStream): { seeders?: number; provider?: string; multiAudio: boolean } {
+  const source = text(stream);
+  const seeders = /👤\s*(\d+)/u.exec(source)?.[1];
+  const provider = /⚙️?\s*([^\n👤💾]+)/u.exec(source)?.[1]?.trim();
+  return {
+    seeders: seeders === undefined ? undefined : Number(seeders),
+    provider: provider || undefined,
+    multiAudio: /\b(multi|dual)[ -]?audio\b/i.test(source),
+  };
+}
+
 export function streamDetail(stream: ResolvedStream): string[] {
   return (stream.description || stream.title || "")
     .replace(/\r/g, "")
     .split("\n")
-    .map((line) => line.trim())
+    .filter((line) => !metadataLine.test(line))
+    .map((line) =>
+      line
+        .replace(flagPattern, "")
+        .replace(/\b(multi|dual)[ -]?audio\b/gi, "")
+        .replace(/^[\s/|·-]+|[\s/|·-]+$/g, "")
+        .trim(),
+    )
     .filter(Boolean)
-    .slice(0, 4);
+    .slice(0, 3);
 }
