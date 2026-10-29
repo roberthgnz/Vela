@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Vela",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.vela.desktop",
   "build": {
     "beforeDevCommand": "node src-tauri/start-ui.mjs",
@@ -16,7 +16,7 @@
         "title": "Vela",
         "width": 1280,
         "height": 860,
-        "minWidth": 900,
+        "minWidth": 960,
         "minHeight": 640,
         "center": true,
         "decorations": false,
@@ -33,7 +33,7 @@
     "active": true,
     "targets": ["nsis"],
     "category": "Entertainment",
-    "shortDescription": "Your addons. Your library. One beautiful desktop.",
+    "shortDescription": "Cliente de escritorio compatible con addons de Stremio",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "windows": {
       "nsis": {

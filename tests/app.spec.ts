@@ -33,14 +33,14 @@ test("saved films and metadata survive a full reload", async ({
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await page
-    .getByRole("button", { name: "Mi biblioteca", exact: true })
+    .getByRole("button", { name: "Biblioteca", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Ver Dune", exact: true }),
   ).toBeVisible();
   await page.reload();
   await page
-    .getByRole("button", { name: "Mi biblioteca", exact: true })
+    .getByRole("button", { name: "Biblioteca", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Ver Dune", exact: true }),
@@ -189,7 +189,7 @@ test("series show their real episode metadata and season selector", async ({
     .getByRole("button", { name: "Ver Stranger Things", exact: true })
     .first()
     .click();
-  const detail = page.getByRole("dialog", {
+  const detail = page.getByRole("region", {
     name: "Stranger Things",
     exact: true,
   });
@@ -244,7 +244,7 @@ test("keyboard search restores focus and the mobile layout stays within its view
     fullPage: false,
   });
   await page
-    .getByRole("button", { name: "Mi biblioteca", exact: true })
+    .getByRole("button", { name: "Biblioteca", exact: true })
     .click();
   expect(
     await page.evaluate(
@@ -301,4 +301,53 @@ test("a direct stream loads real video and saves actual playback progress", asyn
     path: testInfo.outputPath("desktop-playback.png"),
     fullPage: true,
   });
+});
+
+test("desktop navigation keeps history, context menus and player shortcuts on the keyboard", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await installFixtureAddon(page);
+  await page.getByRole("button", { name: "Películas", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Catálogo", exact: true })
+    .selectOption({ label: "Vela Test Cinema · Cine de prueba" });
+  const card = page.getByRole("button", { name: "Ver Dune", exact: true });
+  await card.focus();
+  await page.keyboard.press("Shift+F10");
+  const menu = page.getByRole("menu", { name: "Dune" });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem").first()).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  const detail = page.getByRole("region", { name: "Dune", exact: true });
+  await expect(detail).toBeVisible();
+  await page.keyboard.press("Alt+ArrowLeft");
+  await expect(detail).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Películas", level: 1 })).toBeVisible();
+  await page.keyboard.press("Alt+ArrowRight");
+  await expect(detail).toBeVisible();
+  await detail.getByRole("button", { name: /^Reproducir/ }).first().click();
+  const video = page.locator("video");
+  await expect
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
+    .toBeGreaterThan(0.2);
+  await page.keyboard.press("k");
+  await expect
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.paused))
+    .toBe(true);
+  await page.keyboard.press("m");
+  expect(await video.evaluate((element: HTMLVideoElement) => element.muted)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("video")).toHaveCount(0);
+  await expect(detail).toBeVisible();
+  await page.keyboard.press("F1");
+  await expect(
+    page.getByRole("dialog", { name: "Atajos de teclado" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Control+,");
+  await expect(
+    page.getByRole("heading", { name: "Ajustes", level: 1 }),
+  ).toBeVisible();
 });

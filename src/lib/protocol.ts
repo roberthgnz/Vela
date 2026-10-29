@@ -199,6 +199,10 @@ function stream(value: unknown): Stream {
     infoHash: optionalText(item.infoHash, 'Torrent info hash'),
     fileIdx: item.fileIdx === undefined || item.fileIdx === null ? undefined : nonnegativeInteger(item.fileIdx, 'Torrent file index'),
   };
+  const sources = Array.isArray(item.sources)
+    ? item.sources.filter((source): source is string => typeof source === 'string' && /^(tracker|dht):\S+$/.test(source))
+    : [];
+  if (sources.length) result.sources = sources;
   if (!result.url && !result.externalUrl && !result.ytId && !result.infoHash) throw new Error('Stream has no supported source.');
   if (result.ytId && !/^[\w-]{11}$/.test(result.ytId)) throw new Error('Invalid YouTube video ID.');
   if (result.infoHash && !/^[a-f\d]{40}$/i.test(result.infoHash)) throw new Error('Invalid torrent info hash.');

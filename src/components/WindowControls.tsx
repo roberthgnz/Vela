@@ -1,0 +1,80 @@
+import { useEffect, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+export const native = isTauri();
+
+function Glyph({ kind }: { kind: "min" | "max" | "restore" | "close" }) {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+      {kind === "min" && <path d="M0 5.5h10" stroke="currentColor" />}
+      {kind === "max" && <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" />}
+      {kind === "restore" && (
+        <>
+          <rect x="0.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" />
+          <path d="M2.5 2.5V.5h7v7h-2" fill="none" stroke="currentColor" />
+        </>
+      )}
+      {kind === "close" && <path d="M.5.5l9 9M9.5.5l-9 9" stroke="currentColor" />}
+    </svg>
+  );
+}
+
+export function useWindowState() {
+  const [state, setState] = useState({ maximized: false, fullscreen: false });
+  useEffect(() => {
+    if (!native) return;
+    const window = getCurrentWindow();
+    let disposed = false;
+    const refresh = () =>
+      void Promise.all([window.isMaximized(), window.isFullscreen()])
+        .then(([maximized, fullscreen]) => {
+          if (!disposed) setState({ maximized, fullscreen });
+        })
+        .catch(() => {});
+    refresh();
+    const unlisten = window.onResized(refresh);
+    return () => {
+      disposed = true;
+      void unlisten.then((stop) => stop());
+    };
+  }, []);
+  return state;
+}
+
+export function WindowControls({ onError }: { onError: (message: string) => void }) {
+  const { maximized } = useWindowState();
+  if (!native) return null;
+  const run = (action: "minimize" | "toggleMaximize" | "close") =>
+    void getCurrentWindow()
+      [action]()
+      .catch(() => onError("La ventana no ha respondido a la acción."));
+  return (
+    <div className="window-controls">
+      <button aria-label="Minimizar" title="Minimizar" tabIndex={-1} onClick={() => run("minimize")}>
+        <Glyph kind="min" />
+      </button>
+      <button
+        aria-label={maximized ? "Restaurar" : "Maximizar"}
+        title={maximized ? "Restaurar" : "Maximizar"}
+        tabIndex={-1}
+        onClick={() => run("toggleMaximize")}
+      >
+        <Glyph kind={maximized ? "restore" : "max"} />
+      </button>
+      <button className="close" aria-label="Cerrar Vela" title="Cerrar" tabIndex={-1} onClick={() => run("close")}>
+        <Glyph kind="close" />
+      </button>
+    </div>
+  );
+}
+
+/** Uses the native window in Tauri and the Fullscreen API in a browser. */
+export async function setFullscreen(element: HTMLElement | null, value: boolean) {
+  if (native) {
+    await getCurrentWindow().setFullscreen(value);
+    return;
+  }
+  if (value && !document.fullscreenElement) await element?.requestFullscreen();
+  if (!value && document.fullscreenElement) await document.exitFullscreen();
+}

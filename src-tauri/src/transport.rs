@@ -27,16 +27,24 @@ impl HttpClient {
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(8))
             .timeout(REQUEST_TIMEOUT)
-            .user_agent("Vela/0.1.0")
+            .user_agent("Vela/0.2.0")
             .build()
             .map(Self)
     }
 
-    async fn bytes(&self, raw: &str) -> Result<Vec<u8>, String> {
+    async fn bytes(&self, raw: &str, body: Option<&serde_json::Value>) -> Result<Vec<u8>, String> {
         let mut url = checked_url(raw)?;
         tokio::time::timeout(REQUEST_TIMEOUT, async {
             for redirects in 0..=MAX_REDIRECTS {
-                let mut response = self.0.get(url.clone()).send().await.map_err(|error| {
+                let request = match body {
+                    Some(body) => self
+                        .0
+                        .post(url.clone())
+                        .header(reqwest::header::CONTENT_TYPE, "application/json")
+                        .body(body.to_string()),
+                    None => self.0.get(url.clone()),
+                };
+                let mut response = request.send().await.map_err(|error| {
                     if error.is_timeout() {
                         "The addon request timed out.".to_owned()
                     } else {
@@ -44,6 +52,9 @@ impl HttpClient {
                     }
                 })?;
                 if response.status().is_redirection() {
+                    if body.is_some() {
+                        return Err("The service returned an unexpected redirect.".to_owned());
+                    }
                     if redirects == MAX_REDIRECTS {
                         return Err("The addon redirected too many times.".to_owned());
                     }
@@ -90,12 +101,22 @@ impl HttpClient {
     }
 
     pub async fn json(&self, url: &str) -> Result<serde_json::Value, String> {
-        let bytes = self.bytes(url).await?;
+        let bytes = self.bytes(url, None).await?;
         serde_json::from_slice(&bytes).map_err(|_| "The addon returned invalid JSON.".to_owned())
     }
 
+    /// Sends a JSON body with POST. Redirects are refused so the body is never replayed elsewhere.
+    pub async fn post_json(
+        &self,
+        url: &str,
+        body: &serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let bytes = self.bytes(url, Some(body)).await?;
+        serde_json::from_slice(&bytes).map_err(|_| "The service returned invalid JSON.".to_owned())
+    }
+
     pub async fn text(&self, url: &str) -> Result<String, String> {
-        let bytes = self.bytes(url).await?;
+        let bytes = self.bytes(url, None).await?;
         String::from_utf8(bytes).map_err(|_| "The addon returned invalid UTF-8 text.".to_owned())
     }
 }
@@ -186,6 +207,31 @@ mod tests {
                 .await
                 .unwrap_err()
                 .contains("8 MB limit")
+        );
+    }
+
+    #[tokio::test]
+    async fn posts_json_and_refuses_redirects() {
+        let url =
+            serve(b"HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\n{\"ok\":true}".to_vec()).await;
+        assert_eq!(
+            client()
+                .post_json(&url, &serde_json::json!({"a": 1}))
+                .await
+                .unwrap(),
+            serde_json::json!({"ok": true})
+        );
+        let url = serve(
+            b"HTTP/1.1 307 Temporary Redirect\r\nLocation: http://127.0.0.1:1/x\r\nContent-Length: 0\r\n\r\n"
+                .to_vec(),
+        )
+        .await;
+        assert_eq!(
+            client()
+                .post_json(&url, &serde_json::json!({}))
+                .await
+                .unwrap_err(),
+            "The service returned an unexpected redirect."
         );
     }
 

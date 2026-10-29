@@ -181,6 +181,12 @@ describe('streams and subtitles', () => {
     expect(result.fileIdx).toBeUndefined();
   });
 
+  it('keeps tracker and DHT sources for torrents and drops malformed entries', async () => {
+    request.mockResolvedValueOnce({ streams: [{ infoHash: 'a'.repeat(40), sources: ['tracker:udp://t.example:1337', 'dht:' + 'a'.repeat(40), 'http://x', 7, 'tracker: bad'] }] });
+    const [result] = await getStreams([addon()], 'movie', 'tt1');
+    expect(result.sources).toEqual(['tracker:udp://t.example:1337', 'dht:' + 'a'.repeat(40)]);
+  });
+
   it('uses video ID with file-specific subtitle extras, merges embedded subtitles and deduplicates', async () => {
     const embedded = { id: 'one', lang: 'eng', url: 'https://subs.example/1.srt' };
     const selected: ResolvedStream = { addonName: 'Stream', addonUrl: 'https://stream.example/manifest.json', subtitles: [embedded], behaviorHints: { videoHash: '0123456789abcdef', videoSize: 123456, filename: 'Film & Movie.mkv' } };

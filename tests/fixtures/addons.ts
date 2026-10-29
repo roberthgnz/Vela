@@ -284,9 +284,9 @@ export async function openDune(page: Page) {
     .getByRole("button", { name: "Ver Dune", exact: true })
     .first()
     .click();
-  const dialog = page.getByRole("dialog", { name: "Dune", exact: true });
-  await expect(dialog).toBeVisible();
-  return dialog;
+  const detail = page.getByRole("region", { name: "Dune", exact: true });
+  await expect(detail).toBeVisible();
+  return detail;
 }
 
 export async function installFixtureAddon(page: Page) {
