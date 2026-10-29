@@ -64,6 +64,20 @@ export async function requestBytes(url: string, signal?: AbortSignal): Promise<U
   return new Uint8Array(await response.arrayBuffer());
 }
 
+/** Up to `length` bytes of a file from `start` (desktop only: it needs an HTTP Range request). */
+export async function requestRange(url: string, start: number, length: number, signal?: AbortSignal): Promise<Uint8Array> {
+  checkSignal(signal);
+  if (!isTauri()) throw new Error('Partial reads need the desktop app.');
+  try {
+    const result = await invoke<ArrayBuffer | number[]>('request_range', { url, start, length });
+    checkSignal(signal);
+    return result instanceof ArrayBuffer ? new Uint8Array(result) : Uint8Array.from(result);
+  } catch (error) {
+    checkSignal(signal);
+    throw message(error);
+  }
+}
+
 /** POSTs JSON through Rust in the desktop app. In a browser it calls the service directly, which must allow CORS. */
 export async function postJson(url: string, body: unknown, signal?: AbortSignal): Promise<unknown> {
   checkSignal(signal);

@@ -43,6 +43,17 @@ async fn request_bytes(
     client.raw(&url).await.map(tauri::ipc::Response::new)
 }
 
+/// A slice of a media file, for reading container headers (MKV chapters) without the whole file.
+#[tauri::command]
+async fn request_range(
+    url: String,
+    start: u64,
+    length: u64,
+    client: State<'_, HttpClient>,
+) -> Result<tauri::ipc::Response, String> {
+    client.range(&url, start, length).await.map(tauri::ipc::Response::new)
+}
+
 #[tauri::command]
 async fn open_external(url: String) -> Result<(), String> {
     let url = checked_url(&url)?;
@@ -247,6 +258,7 @@ fn main() {
             post_json,
             request_text,
             request_bytes,
+            request_range,
             open_external,
             launch_external_player,
             secrets::secret_get,

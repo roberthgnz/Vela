@@ -4,6 +4,8 @@ use url::Url;
 const MAX_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_REDIRECTS: usize = 5;
+/// Largest slice of a media file read at once (container headers such as MKV chapters).
+pub const MAX_RANGE_BYTES: u64 = 4 * 1024 * 1024;
 
 pub fn checked_url(raw: &str) -> Result<Url, String> {
     if raw.len() > 8192 {
@@ -33,7 +35,12 @@ impl HttpClient {
             .map(Self)
     }
 
-    async fn bytes(&self, raw: &str, body: Option<&serde_json::Value>) -> Result<Vec<u8>, String> {
+    async fn bytes(
+        &self,
+        raw: &str,
+        body: Option<&serde_json::Value>,
+        range: Option<(u64, u64)>,
+    ) -> Result<Vec<u8>, String> {
         let mut url = checked_url(raw)?;
         tokio::time::timeout(REQUEST_TIMEOUT, async {
             for redirects in 0..=MAX_REDIRECTS {
@@ -43,7 +50,13 @@ impl HttpClient {
                         .post(url.clone())
                         .header(reqwest::header::CONTENT_TYPE, "application/json")
                         .body(body.to_string()),
-                    None => self.0.get(url.clone()),
+                    None => match range {
+                        Some((start, length)) => self.0.get(url.clone()).header(
+                            reqwest::header::RANGE,
+                            format!("bytes={}-{}", start, start + length - 1),
+                        ),
+                        None => self.0.get(url.clone()),
+                    },
                 };
                 let mut response = request.send().await.map_err(|error| {
                     if error.is_timeout() {
@@ -79,9 +92,20 @@ impl HttpClient {
                         response.status().as_u16()
                     ));
                 }
-                if response
-                    .content_length()
-                    .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
+                // A server that ignores Range sends the whole file from the start: keep the first
+                // bytes when they are the ones asked for, refuse otherwise.
+                let partial = response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+                let wanted = match range {
+                    Some((start, _)) if !partial && start > 0 => {
+                        return Err("El servidor no admite lecturas parciales.".to_owned())
+                    }
+                    Some((_, length)) => Some(length as usize),
+                    None => None,
+                };
+                if wanted.is_none()
+                    && response
+                        .content_length()
+                        .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
                 {
                     return Err("La respuesta del addon supera el límite de 8 MB.".to_owned());
                 }
@@ -91,6 +115,14 @@ impl HttpClient {
                     .await
                     .map_err(|_| "No se pudo leer la respuesta del addon.".to_owned())?
                 {
+                    if let Some(wanted) = wanted {
+                        let take = chunk.len().min(wanted - bytes.len());
+                        bytes.extend_from_slice(&chunk[..take]);
+                        if bytes.len() == wanted {
+                            break;
+                        }
+                        continue;
+                    }
                     if bytes.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
                         return Err("La respuesta del addon supera el límite de 8 MB.".to_owned());
                     }
@@ -105,7 +137,7 @@ impl HttpClient {
     }
 
     pub async fn json(&self, url: &str) -> Result<serde_json::Value, String> {
-        let bytes = self.bytes(url, None).await?;
+        let bytes = self.bytes(url, None, None).await?;
         serde_json::from_slice(&bytes)
             .map_err(|_| "El addon devolvió un JSON no válido.".to_owned())
     }
@@ -116,17 +148,25 @@ impl HttpClient {
         url: &str,
         body: &serde_json::Value,
     ) -> Result<serde_json::Value, String> {
-        let bytes = self.bytes(url, Some(body)).await?;
+        let bytes = self.bytes(url, Some(body), None).await?;
         serde_json::from_slice(&bytes)
             .map_err(|_| "El servicio devolvió un JSON no válido.".to_owned())
     }
 
     pub async fn raw(&self, url: &str) -> Result<Vec<u8>, String> {
-        self.bytes(url, None).await
+        self.bytes(url, None, None).await
+    }
+
+    /// Up to `length` bytes from `start` (fewer at the end of the file), with an HTTP Range request.
+    pub async fn range(&self, url: &str, start: u64, length: u64) -> Result<Vec<u8>, String> {
+        if length == 0 || length > MAX_RANGE_BYTES {
+            return Err("Lectura parcial demasiado grande.".to_owned());
+        }
+        self.bytes(url, None, Some((start, length))).await
     }
 
     pub async fn text(&self, url: &str) -> Result<String, String> {
-        let bytes = self.bytes(url, None).await?;
+        let bytes = self.bytes(url, None, None).await?;
         String::from_utf8(bytes).map_err(|_| "El addon devolvió texto que no es UTF-8.".to_owned())
     }
 }
@@ -166,6 +206,22 @@ mod tests {
         ] {
             assert!(checked_url(url).is_err());
         }
+    }
+
+    #[tokio::test]
+    async fn reads_ranges_and_handles_servers_that_ignore_them() {
+        let url = serve(b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\n\r\nabcd".to_vec()).await;
+        assert_eq!(client().range(&url, 100, 4).await.unwrap(), b"abcd");
+        // A whole-file answer is cut to the length asked for when it starts at zero…
+        let url = serve(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789".to_vec()).await;
+        assert_eq!(client().range(&url, 0, 4).await.unwrap(), b"0123");
+        // …and refused when it would be read from the wrong place.
+        let url = serve(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789".to_vec()).await;
+        assert_eq!(
+            client().range(&url, 5, 4).await.unwrap_err(),
+            "El servidor no admite lecturas parciales."
+        );
+        assert!(client().range(&url, 0, MAX_RANGE_BYTES + 1).await.is_err());
     }
 
     #[tokio::test]

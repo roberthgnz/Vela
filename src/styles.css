@@ -2794,6 +2794,39 @@ kbd {
 .speed-panel {
   width: 160px;
 }
+.speed-panel.with-marks {
+  display: grid;
+  grid-template-columns: 140px 220px;
+  gap: 16px;
+  width: auto;
+}
+.skip-marks-value {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.skip-marks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.player-skip {
+  position: absolute;
+  right: 24px;
+  bottom: 96px;
+  z-index: 3;
+  background: rgb(20 21 24 / 88%);
+  backdrop-filter: blur(12px);
+}
+.seek-segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgb(255 255 255 / 35%);
+  pointer-events: none;
+}
 .track-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

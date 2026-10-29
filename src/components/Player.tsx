@@ -38,7 +38,9 @@ import {
 } from "../lib/streamingServer";
 import { streamQuality } from "../lib/streams";
 import { activeCues, decodeSubtitle, dedupeSubtitles, parseSubtitle, syncCandidates, syncDelay, type Cue } from "../lib/subtitles";
-import { requestBytes, requestText } from "../lib/transport";
+import { requestBytes, requestRange, requestText } from "../lib/transport";
+import { readMkvChapters, type Chapter } from "../lib/mkvChapters";
+import { activeSegment, skipMarks, skipSegments, useSeriesMarks, type SeriesMarks } from "../lib/skipSegments";
 import { clock, errorMessage } from "../lib/utils";
 import { Dialog } from "./Primitives";
 import { native, setFullscreen, useWindowState, WindowControls } from "./WindowControls";
@@ -226,6 +228,9 @@ export function Player({
   const [probe, setProbe] = useState<Probe | undefined>(playing.probe);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [nextDismissed, setNextDismissed] = useState(false);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const seriesId = playing.meta.type === "series" ? playing.meta.id : "";
+  const marks = useSeriesMarks(seriesId);
   // Resuming a few seconds in is not useful; start over instead.
   const resumeAt = useRef(playing.resume >= 15 ? playing.resume : 0);
   const converting = source === playing.transcodeUrl;
@@ -240,6 +245,20 @@ export function Player({
     setFlash(value);
     setTimeout(() => setFlash((current) => (current === value ? "" : current)), 900);
   }, []);
+
+  /* ---------- Intro and credits ---------- */
+
+  // Chapters come from the original file (not the conversion); only Matroska files are read.
+  useEffect(() => {
+    const controller = new AbortController();
+    setChapters([]);
+    readMkvChapters((start, length) => requestRange(playing.url, start, length, controller.signal))
+      .then((list) => !controller.signal.aborted && setChapters(list))
+      .catch(() => {
+        /* No chapters: files that are not MKV, servers without ranges, the browser build. */
+      });
+    return () => controller.abort();
+  }, [playing.url]);
 
   /* ---------- Progress, watched marks and the next episode ---------- */
 
@@ -841,6 +860,7 @@ export function Player({
       chooseAudio(nextTrack);
       showFlash(`Audio: ${nextTrack.label}`);
     } else if (key === "n" && next && onNext) playNext(next);
+    else if (key === "s" && skip) skipSegment();
     else if (/^[0-9]$/.test(key) && video.current && Number.isFinite(video.current.duration))
       video.current.currentTime = (Number(key) / 10) * video.current.duration;
     else handled = false;
@@ -855,9 +875,25 @@ export function Player({
   const quality = streamQuality(playing.stream);
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const remaining = duration - time;
+  const segments = useMemo(() => skipSegments(chapters, marks, duration), [chapters, duration, marks]);
+  const segment = activeSegment(segments, time);
+  const inCredits = segment?.kind === "credits";
   const showNext = Boolean(
-    next && onNext && !nextDismissed && !error && (status === "ended" || (duration > 120 && remaining <= 30 && remaining > 0)),
+    next &&
+      onNext &&
+      !nextDismissed &&
+      !error &&
+      (status === "ended" || inCredits || (duration > 120 && remaining <= 30 && remaining > 0)),
   );
+  // With a next episode, its card is how credits are skipped; otherwise a button jumps past them.
+  const skip = segment && !(inCredits && showNext) && !error ? segment : undefined;
+  const skipSegment = () => {
+    const element = video.current;
+    if (!element || !skip) return;
+    element.currentTime = Math.min(skip.end, Number.isFinite(element.duration) ? element.duration : skip.end);
+    showFlash(skip.kind === "intro" ? "Intro saltada" : "Créditos saltados");
+    wake();
+  };
   const subtitleStyle = {
     "--subtitle-scale": settings.subtitleSize / 100,
     "--subtitle-opacity": settings.subtitleOpacity,
@@ -1052,6 +1088,11 @@ export function Player({
             </button>
           </div>
         )}
+        {skip && (
+          <button className="button player-skip" onClick={skipSegment} aria-keyshortcuts="S">
+            <SkipForward size={15} /> {skip.kind === "intro" ? "Saltar intro" : "Saltar créditos"}
+          </button>
+        )}
         {showNext && next && (
           <section className="player-next" aria-label="Siguiente episodio">
             <span className="player-next-label">
@@ -1112,7 +1153,14 @@ export function Player({
             onDelay={changeDelay}
           />
         )}
-        {popover?.kind === "speed" && <SpeedPanel right={popover.right} rate={rate} onChange={changeRate} />}
+        {popover?.kind === "speed" && (
+          <SpeedPanel
+            right={popover.right}
+            rate={rate}
+            onChange={changeRate}
+            marks={seriesId ? { value: marks, time, duration, fromChapters: segments.filter((item) => item.source === "chapters").map((item) => item.kind), onChange: (value) => skipMarks.set(seriesId, value) } : undefined}
+          />
+        )}
         <div className="player-controls">
           <div
             className="seek"
@@ -1125,6 +1173,15 @@ export function Player({
           >
             <div className="seek-track">
               <span className="seek-buffer" style={{ width: `${duration ? Math.min(100, (buffered / duration) * 100) : 0}%` }} />
+              {duration > 0 &&
+                segments.map((item) => (
+                  <span
+                    key={`${item.kind}-${item.start}`}
+                    className="seek-segment"
+                    aria-hidden="true"
+                    style={{ left: `${(item.start / duration) * 100}%`, width: `${((item.end - item.start) / duration) * 100}%` }}
+                  />
+                ))}
               <span className="seek-fill" style={{ width: `${percent}%` }} />
             </div>
             <input
@@ -1283,14 +1340,39 @@ function Option({
   );
 }
 
-/** Speed choices, in the same popover as audio and subtitles. */
-function SpeedPanel({ right, rate, onChange }: { right: number; rate: number; onChange: (value: number) => void }) {
+type MarksControl = {
+  value: SeriesMarks | undefined;
+  time: number;
+  duration: number;
+  /** Kinds the file's chapters already provide (those take precedence over the marks). */
+  fromChapters: ("intro" | "credits")[];
+  onChange: (value: SeriesMarks) => void;
+};
+
+/** Speed choices and, for series, the intro and credits marks shared by all episodes. */
+function SpeedPanel({
+  right,
+  rate,
+  onChange,
+  marks,
+}: {
+  right: number;
+  rate: number;
+  onChange: (value: number) => void;
+  marks?: MarksControl;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>("[aria-checked=true]")?.focus();
   }, []);
   return (
-    <div className="player-popover speed-panel" role="dialog" aria-label="Velocidad" ref={ref} style={{ right }}>
+    <div
+      className={`player-popover speed-panel ${marks ? "with-marks" : ""}`}
+      role="dialog"
+      aria-label={marks ? "Velocidad, intro y créditos" : "Velocidad"}
+      ref={ref}
+      style={{ right }}
+    >
       <section>
         <h3>Velocidad</h3>
         <div role="radiogroup" aria-label="Velocidad de reproducción">
@@ -1299,7 +1381,38 @@ function SpeedPanel({ right, rate, onChange }: { right: number; rate: number; on
           ))}
         </div>
       </section>
+      {marks && <MarksSection {...marks} />}
     </div>
+  );
+}
+
+/** Intro start and end, and where the credits begin, set from the current position. */
+function MarksSection({ value, time, duration, fromChapters, onChange }: MarksControl) {
+  const intro = value?.intro;
+  const now = Math.round(time);
+  const setStart = () => onChange({ ...value, intro: { start: now, end: intro && intro.end > now ? intro.end : now + 90 } });
+  const setEnd = () => onChange({ ...value, intro: { start: intro && intro.start < now ? intro.start : Math.max(0, now - 90), end: now } });
+  const setCredits = () => duration > now && onChange({ ...value, creditsFromEnd: Math.round(duration - now) });
+  return (
+    <section className="skip-marks">
+      <h3>Intro y créditos de la serie</h3>
+      <p className="skip-marks-value">
+        Intro: {intro ? `${clock(intro.start)} – ${clock(intro.end)}` : "sin marcar"}
+        {fromChapters.includes("intro") && " (usa los capítulos)"}
+      </p>
+      <div className="skip-marks-actions">
+        <button className="button small subtle" onClick={setStart}>Empieza aquí</button>
+        <button className="button small subtle" onClick={setEnd}>Termina aquí</button>
+      </div>
+      <p className="skip-marks-value">
+        Créditos: {value?.creditsFromEnd ? `últimos ${clock(value.creditsFromEnd)}` : "sin marcar"}
+        {fromChapters.includes("credits") && " (usa los capítulos)"}
+      </p>
+      <div className="skip-marks-actions">
+        <button className="button small subtle" disabled={!duration} onClick={setCredits}>Empiezan aquí</button>
+        <button className="button small subtle" disabled={!value} onClick={() => onChange({})}>Borrar</button>
+      </div>
+    </section>
   );
 }
 
