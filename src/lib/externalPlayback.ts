@@ -1,7 +1,10 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { MediaItem } from "./contracts";
+import type { MediaItem, ResolvedStream, Subtitle } from "./contracts";
 import { nextEpisode } from "./episodes";
+import { normalizeLanguage } from "./languages";
+import { getSubtitles } from "./protocol";
+import { dedupeSubtitles } from "./subtitles";
 import { CREDITS_THRESHOLD, preferencesStore, WATCHED_THRESHOLD } from "./store";
 import { launchExternalPlayer } from "./transport";
 
@@ -90,6 +93,40 @@ export function onExternalClosed(listener: (event: ExternalClosed) => void): () 
   };
 }
 
+/** Files handed to MPV: preferred language first (MPV shows the first one), a few per language. */
+export function externalSubtitles(items: Subtitle[], primary: string, secondary: string, limit = 8, perLanguage = 3): string[] {
+  const rank = (lang: string) => {
+    const code = normalizeLanguage(lang);
+    if (code && code === normalizeLanguage(primary)) return 0;
+    if (code && code === normalizeLanguage(secondary)) return 1;
+    return 2;
+  };
+  const counts = new Map<string, number>();
+  return dedupeSubtitles(items)
+    .filter((item) => /^https?:\/\//i.test(item.url))
+    .map((item, index) => ({ item, index, rank: rank(item.lang) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .filter(({ item }) => {
+      const code = normalizeLanguage(item.lang) || "?";
+      const count = counts.get(code) ?? 0;
+      counts.set(code, count + 1);
+      return count < perLanguage;
+    })
+    .slice(0, limit)
+    .map(({ item }) => item.url);
+}
+
+/** Subtitles from the stream and the subtitle addons, without holding the player back for slow addons. */
+async function subtitlesFor(meta: MediaItem, videoId: string, stream: ResolvedStream | undefined, extra: Subtitle[]) {
+  let fetched: Subtitle[] = [];
+  try {
+    fetched = await getSubtitles(preferencesStore.getSnapshot().addons, meta.type, videoId, stream, AbortSignal.timeout(6000));
+  } catch {
+    fetched = stream?.subtitles ?? [];
+  }
+  return [...extra, ...fetched];
+}
+
 /** Opens a video in the configured player and follows it. Returns whether progress is reported. */
 export async function playExternally(
   url: string,
@@ -100,8 +137,18 @@ export async function playExternally(
     headers?: Record<string, string>;
     title?: string;
     start?: number;
+    /** The stream, so subtitle addons can match its file. */
+    stream?: ResolvedStream;
+    /** Subtitles already known (from the torrent or loaded by the integrated player). */
+    subtitles?: Subtitle[];
   },
 ): Promise<{ ipc: boolean }> {
+  const settings = preferencesStore.getSnapshot().player;
+  const subtitles = externalSubtitles(
+    await subtitlesFor(options.meta, options.videoId, options.stream, options.subtitles ?? []),
+    settings.subtitleLanguage,
+    settings.subtitleSecondary,
+  );
   const session = isTauri() ? crypto.randomUUID() : undefined;
   if (session) {
     listening ??= listenOnce().catch((error) => {
@@ -117,6 +164,8 @@ export async function playExternally(
       title: options.title,
       session,
       start: options.start && options.start >= 15 ? options.start : undefined,
+      subtitles,
+      showSubtitles: settings.subtitlesAuto,
     });
   } catch (error) {
     if (session) sessions.delete(session);

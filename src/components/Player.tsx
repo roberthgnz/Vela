@@ -807,6 +807,7 @@ export function Player({
         headers: playing.headers,
         title: [playing.meta.name, episodeLine].filter(Boolean).join(" · "),
         start: video.current?.currentTime,
+        stream: playing.stream,
       });
       video.current?.pause();
       showFlash(ipc ? "Abierto en MPV · Vela guardará el progreso" : "Abierto en el reproductor externo");

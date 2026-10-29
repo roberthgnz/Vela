@@ -147,7 +147,15 @@ export async function deleteSecret(name: SecretName): Promise<void> {
 export async function launchExternalPlayer(
   raw: string,
   path: string,
-  options: { headers?: Record<string, string>; title?: string; session?: string; start?: number } = {},
+  options: {
+    headers?: Record<string, string>;
+    title?: string;
+    session?: string;
+    start?: number;
+    /** Subtitle URLs, preferred first; only MPV receives them. */
+    subtitles?: string[];
+    showSubtitles?: boolean;
+  } = {},
 ): Promise<{ ipc: boolean }> {
   const url = externalUrl(raw);
   if (!isTauri()) throw new Error('Open Vela Desktop to launch an external player.');
@@ -159,6 +167,8 @@ export async function launchExternalPlayer(
       title: options.title ?? null,
       session: options.session ?? null,
       start: options.start ?? null,
+      subtitles: options.subtitles?.length ? options.subtitles : null,
+      showSubtitles: options.showSubtitles ?? false,
     });
   } catch (error) { throw message(error); }
 }

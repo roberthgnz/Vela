@@ -131,6 +131,22 @@ pub fn ipc_arguments(session: &str, start: Option<f64>) -> Vec<String> {
     arguments
 }
 
+/// External subtitle files, preferred first: MPV shows the first one unless `show` is false.
+/// Only plain HTTP(S) URLs are accepted, since they become command-line options.
+pub fn subtitle_arguments(urls: &[String], show: bool) -> Vec<String> {
+    let mut arguments: Vec<String> = urls
+        .iter()
+        .filter(|url| url.len() <= 2048)
+        .filter_map(|url| crate::transport::checked_url(url).ok())
+        .take(10)
+        .map(|url| format!("--sub-files-append={url}"))
+        .collect();
+    if !arguments.is_empty() && !show {
+        arguments.push("--sid=no".to_owned());
+    }
+    arguments
+}
+
 /// Connects to the pipe, observes playback and calls `progress` while MPV runs.
 /// Returns the last state once MPV closes the pipe, or `None` if it never answered.
 #[cfg(windows)]
@@ -230,6 +246,24 @@ mod tests {
         assert_eq!(arguments[1], "--start=95.0");
         assert_eq!(ipc_arguments("abc", Some(0.2)).len(), 1);
         assert_eq!(ipc_arguments("abc", Some(f64::NAN)).len(), 1);
+    }
+
+    #[test]
+    fn passes_only_http_subtitles_and_hides_them_when_asked() {
+        let urls = vec![
+            "https://subs.example/a b.srt".to_owned(),
+            "file:///C:/x.srt".to_owned(),
+            "http://127.0.0.1:11470/sub.vtt".to_owned(),
+        ];
+        assert_eq!(
+            subtitle_arguments(&urls, true),
+            vec![
+                "--sub-files-append=https://subs.example/a%20b.srt".to_owned(),
+                "--sub-files-append=http://127.0.0.1:11470/sub.vtt".to_owned(),
+            ]
+        );
+        assert_eq!(subtitle_arguments(&urls, false).last().unwrap(), "--sid=no");
+        assert!(subtitle_arguments(&[], false).is_empty());
     }
 
     /// Plays the role of MPV on a real named pipe: answers the observe commands with

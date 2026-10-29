@@ -159,6 +159,8 @@ async fn launch_external_player(
     title: Option<String>,
     session: Option<String>,
     start: Option<f64>,
+    subtitles: Option<Vec<String>>,
+    show_subtitles: Option<bool>,
 ) -> Result<serde_json::Value, String> {
     let url = checked_url(&url)?;
     let executable = player_executable(&path)?;
@@ -167,6 +169,12 @@ async fn launch_external_player(
     let ipc = session.is_some() && is_mpv(&executable);
     if let (true, Some(session)) = (ipc, &session) {
         arguments.extend(mpv::ipc_arguments(session, start));
+    }
+    if is_mpv(&executable) {
+        arguments.extend(mpv::subtitle_arguments(
+            &subtitles.unwrap_or_default(),
+            show_subtitles.unwrap_or(false),
+        ));
     }
     let mut command = Command::new(executable);
     command

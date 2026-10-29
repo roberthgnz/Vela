@@ -177,6 +177,8 @@ export default function App() {
         headers: target.headers,
         title: episode ? `${meta.name} · ${episodeCode(episode)}` : meta.name,
         start: resume,
+        stream,
+        subtitles: target.subtitles,
       });
       sourceHistory.mark(meta.type, meta.id, videoId, stream, "played");
       notify(ipc ? "Abierto en MPV. Vela guardará el progreso al cerrarlo." : "Fuente abierta en el reproductor externo.");
