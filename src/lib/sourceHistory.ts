@@ -16,7 +16,9 @@ type Saved = {
   last: Record<string, { videoId: string; stream: ResolvedStream; at: number }>;
 };
 
-const storageKey = "vela.sources.v1";
+const mainKey = "vela.sources.v1";
+/** Each profile has its own history; the main profile keeps the original key. */
+export const sourcesKey = (profile: string) => (profile === "main" ? mainKey : `vela.sources.${profile}.v1`);
 const maxVideos = 300;
 
 /** Stable identity of a source: the addon plus what it points to. */
@@ -31,9 +33,9 @@ function titleKey(type: string, id: string): string {
   return `${type}|${id}`;
 }
 
-function read(storage: Pick<Storage, "getItem"> | undefined): Saved {
+function read(storage: Pick<Storage, "getItem"> | undefined, key: string): Saved {
   try {
-    const value = JSON.parse(storage?.getItem(storageKey) ?? "null") as Saved | null;
+    const value = JSON.parse(storage?.getItem(key) ?? "null") as Saved | null;
     if (value && typeof value === "object" && value.videos && value.last) return value;
   } catch {
     /* A damaged history only loses the marks. */
@@ -42,12 +44,13 @@ function read(storage: Pick<Storage, "getItem"> | undefined): Saved {
 }
 
 export function createSourceHistory(storage?: Pick<Storage, "getItem" | "setItem">) {
-  let state = read(storage);
+  let key = mainKey;
+  let state = read(storage, key);
   const listeners = new Set<() => void>();
   const update = (next: Saved) => {
     state = next;
     try {
-      storage?.setItem(storageKey, JSON.stringify(state));
+      storage?.setItem(key, JSON.stringify(state));
     } catch {
       /* Marks are a convenience. */
     }
@@ -55,6 +58,11 @@ export function createSourceHistory(storage?: Pick<Storage, "getItem" | "setItem
   };
   return {
     getSnapshot: () => state,
+    switchProfile(profile: string) {
+      key = sourcesKey(profile);
+      state = read(storage, key);
+      for (const listener of [...listeners]) listener();
+    },
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => {

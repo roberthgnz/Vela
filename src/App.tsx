@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CircleCheck,
   CircleUserRound,
+  Users,
   Film,
   Home,
   Keyboard,
@@ -40,6 +41,8 @@ import { Dialog, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
 import { UpdateNotice } from "./components/UpdateNotice";
+import { ProfileAvatar, ProfilePicker } from "./components/Profiles";
+import { profiles, useProfiles } from "./lib/profiles";
 import { native, WindowControls } from "./components/WindowControls";
 import { sourceHistory } from "./lib/sourceHistory";
 import { updates } from "./lib/updates";
@@ -291,6 +294,24 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  const profileState = useProfiles();
+  const currentProfile = profileState.profiles.find((profile) => profile.id === profileState.active);
+  const openSettings = (part: string) => {
+    section("settings");
+    requestAnimationFrame(() => document.getElementById(`settings-${part}`)?.scrollIntoView());
+  };
+  // Another profile means another library: start a fresh history and synchronize if it owns the account.
+  const shownProfile = useRef(profileState.active);
+  useEffect(() => {
+    if (shownProfile.current === profileState.active) return;
+    shownProfile.current = profileState.active;
+    setPlaying(null);
+    scrolls.current.clear();
+    focused.current.clear();
+    nav.reset({ name: "home" });
+    void account.sync();
+  }, [profileState.active, nav]);
+
   const onCardMenu: CardMenu = (anchor, items, label) => menu.open(anchor, items, label);
 
   const latest = useRef({ back, forward, section, route: nav.route, setSidebar, sidebar });
@@ -300,12 +321,12 @@ export default function App() {
       const ctrl = event.ctrlKey || event.metaKey;
       const key = event.key.toLowerCase();
       if (ctrl && key === "k") {
-        if (document.querySelector("dialog[open]:not(.palette)")) return;
+        if (document.querySelector("dialog[open]:not(.palette), .profile-picker")) return;
         event.preventDefault();
         setSearchOpen((value) => !value);
         return;
       }
-      if (document.querySelector("dialog[open]") || event.defaultPrevented) return;
+      if (document.querySelector("dialog[open], .profile-picker") || event.defaultPrevented) return;
       const app = latest.current;
       if (event.altKey && key === "arrowleft") app.back();
       else if (event.altKey && key === "arrowright") app.forward();
@@ -427,16 +448,45 @@ export default function App() {
         <nav aria-label="Configuración" className="nav-group">
           {secondary.map(navButton)}
         </nav>
-        {(() => {
+        {profileState.profiles.length > 1 && currentProfile ? (
+          <button
+            className="nav-item account-item"
+            aria-haspopup="menu"
+            aria-label={`Perfil: ${currentProfile.name}`}
+            title="Cambiar de perfil"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              menu.open(
+                { x: rect.left, y: rect.top - 6, above: true },
+                [
+                  ...profileState.profiles.map((profile) => ({
+                    label: profile.name,
+                    icon: <ProfileAvatar profile={profile} size={16} />,
+                    checked: profile.id === profileState.active,
+                    onSelect: () => profiles.select(profile.id),
+                  })),
+                  "separator" as const,
+                  { label: "Administrar perfiles", icon: <Users size={15} />, onSelect: () => openSettings("profiles") },
+                  {
+                    label: accountState.user ? "Cuenta de Stremio" : "Iniciar sesión en Stremio",
+                    icon: <CircleUserRound size={15} />,
+                    onSelect: () => openSettings("account"),
+                  },
+                ],
+                "Perfiles",
+              );
+            }}
+          >
+            <ProfileAvatar profile={currentProfile} size={18} />
+            <span>{currentProfile.name}</span>
+          </button>
+        ) : (() => {
           const user = accountState.status === "signed-in" ? accountState.user : undefined;
           const state = accountState.syncing ? "Sincronizando…" : accountState.error ? "Error de sincronización" : "Stremio conectado";
           return (
             <button
               className="nav-item account-item"
-              onClick={() => {
-                section("settings");
-                requestAnimationFrame(() => document.getElementById("settings-account")?.scrollIntoView());
-              }}
+              onClick={() => openSettings("account")}
               title={user ? `${user.email} · ${state}` : "Conectar la cuenta de Stremio"}
               aria-label={user ? `Cuenta de Stremio: ${user.email}. ${state}` : "Iniciar sesión en Stremio"}
             >
@@ -531,6 +581,14 @@ export default function App() {
       )}
       {menu.element}
       <UpdateNotice />
+      {!profileState.chosen && (
+        <ProfilePicker
+          onManage={() => {
+            profiles.select(profileState.last ?? profileState.active);
+            openSettings("profiles");
+          }}
+        />
+      )}
       {opening && (
         <div className="opening-status" role="status">
           <RefreshCw size={14} className="spin" /> Abriendo {opening}…

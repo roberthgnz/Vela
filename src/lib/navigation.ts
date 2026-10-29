@@ -52,6 +52,8 @@ export function useNavigation(initial: Route = { name: "home" }) {
     (patch: ViewState) => update((route) => ({ ...route, state: { ...route.state, ...patch } })),
     [update],
   );
+  /** Starts a new history (for example, after switching profiles). */
+  const reset = useCallback((route: Route) => setHistory({ entries: [route], index: 0 }), []);
   const back = useCallback(
     () =>
       setHistory((value) =>
@@ -77,6 +79,7 @@ export function useNavigation(initial: Route = { name: "home" }) {
     replace,
     update,
     patchState,
+    reset,
     back,
     forward,
   };

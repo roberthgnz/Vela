@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Trash2,
   User,
+  Users,
   XCircle,
 } from "lucide-react";
 import type { PlayerPreferences } from "../lib/contracts";
@@ -28,6 +29,7 @@ import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
 import { tmdb, useTmdbConfigured } from "../lib/tmdb";
 import { updates, useUpdates } from "../lib/updates";
 import { native } from "./WindowControls";
+import { ProfileSettings } from "./Profiles";
 
 export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
   return [
@@ -50,6 +52,7 @@ export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
 
 const sections = [
   { id: "account", label: "Cuenta", icon: User },
+  { id: "profiles", label: "Perfiles", icon: Users },
   { id: "metadata", label: "Información", icon: Globe },
   { id: "subtitles", label: "Subtítulos", icon: Captions },
   { id: "audio", label: "Audio", icon: Languages },
@@ -187,6 +190,11 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-account" className="settings-group" aria-labelledby="settings-account-title">
             <h2 id="settings-account-title">Cuenta</h2>
             <AccountSection notify={notify} />
+          </section>
+
+          <section id="settings-profiles" className="settings-group" aria-labelledby="settings-profiles-title">
+            <h2 id="settings-profiles-title">Perfiles</h2>
+            <ProfileSettings notify={notify} />
           </section>
 
           <section id="settings-metadata" className="settings-group" aria-labelledby="settings-metadata-title">

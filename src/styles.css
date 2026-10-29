@@ -3100,3 +3100,125 @@ kbd {
 .source-toolbar .segmented button {
   padding: 0 2px;
 }
+
+/* Profiles */
+.profile-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--profile-color, var(--raised-2));
+  color: #14161a;
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1;
+}
+.profile-avatar.add {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong, rgb(255 255 255 / 18%));
+  color: var(--muted);
+}
+.profile-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  background: var(--bg);
+}
+.profile-picker-bar {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  height: var(--titlebar);
+}
+.profile-picker h1 {
+  font: 500 24px/1.2 var(--font-display);
+}
+.profile-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 28px;
+  max-width: 720px;
+}
+.profile-choice {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: 96px;
+  color: var(--fg-2);
+}
+.profile-choice .profile-avatar {
+  transition: box-shadow 0.12s, transform 0.12s var(--ease);
+}
+.profile-choice:hover,
+.profile-choice:focus-visible {
+  outline: none;
+  color: var(--fg);
+}
+.profile-choice:hover .profile-avatar,
+.profile-choice:focus-visible .profile-avatar {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--fg);
+}
+.profile-choice span:last-child {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-add {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.profile-add .input {
+  width: 220px;
+}
+.profile-add .form-error {
+  flex-basis: 100%;
+  text-align: center;
+}
+.profile-manage {
+  color: var(--muted);
+}
+.profile-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 220px) 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+.profile-color-button {
+  border-radius: 50%;
+}
+.profile-name {
+  height: 32px;
+}
+.profile-meta {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.profile-actions {
+  display: flex;
+  gap: 4px;
+}
+.profile-swatch {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.button.danger-text,
+.danger-text {
+  color: var(--danger);
+}
+.settings-note {
+  padding: 10px 16px 14px;
+  color: var(--muted);
+  font-size: 12.5px;
+}

@@ -22,6 +22,17 @@ import { defaultAddons, normalizeManifestUrl } from './protocol';
  */
 const storageKey = 'vela.preferences.v2';
 const legacyKey = 'vela.preferences.v1';
+/** The profile whose data lives in `vela.preferences.v2` (every install's original data). */
+export const MAIN_PROFILE = 'main';
+/** Other profiles keep their own library and preferences under this prefix. */
+export const profileKey = (id: string) => `vela.profile.${id}.v1`;
+
+/** What each profile has of its own; addons and services are shared. */
+type ProfileData = Pick<AppPreferences, 'library' | 'player' | 'metadataLanguage'>;
+
+function profileData(value: AppPreferences): ProfileData {
+  return { library: value.library, player: value.player, metadataLanguage: value.metadataLanguage };
+}
 const defaultServiceUrl = 'http://127.0.0.1:11470';
 
 type PreferenceStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -329,17 +340,50 @@ export function createPreferencesStore(providedStorage?: PreferenceStorage) {
   }
 
   const listeners = new Set<() => void>();
+  let profile = MAIN_PROFILE;
+  // The main profile's data, kept while another profile is active so that
+  // `vela.preferences.v2` (which also holds the shared settings) can be rewritten intact.
+  let main: ProfileData = profileData(state);
+
+  function persist() {
+    if (!storage) return;
+    try {
+      if (profile === MAIN_PROFILE) storage.setItem(storageKey, JSON.stringify(state));
+      else {
+        storage.setItem(storageKey, JSON.stringify({ ...state, ...main }));
+        storage.setItem(profileKey(profile), JSON.stringify({ version: 2, ...profileData(state) }));
+      }
+      persistenceError = undefined;
+    } catch (error) {
+      persistenceError = storageFailure('Changes could not be saved to this device.', error);
+    }
+  }
+
   function update(next: AppPreferences) {
     if (next === state) return;
     state = next;
-    if (storage) {
+    if (profile === MAIN_PROFILE) main = profileData(state);
+    persist();
+    for (const listener of [...listeners]) listener();
+  }
+
+  /** Loads a profile's library and preferences; shared settings stay as they are. */
+  function switchProfile(id: string) {
+    if (id === profile) return;
+    let data: ProfileData;
+    if (id === MAIN_PROFILE) data = main;
+    else {
+      const fresh = defaults();
+      data = profileData(fresh);
       try {
-        storage.setItem(storageKey, JSON.stringify(state));
-        persistenceError = undefined;
-      } catch (error) {
-        persistenceError = storageFailure('Changes could not be saved to this device.', error);
+        const saved = storage?.getItem(profileKey(id));
+        if (saved) data = profileData(readPreferences({ ...JSON.parse(saved), version: 2 }, fresh));
+      } catch {
+        /* An unreadable profile starts empty. */
       }
     }
+    profile = id;
+    state = { ...state, ...data };
     for (const listener of [...listeners]) listener();
   }
 
@@ -402,6 +446,17 @@ export function createPreferencesStore(providedStorage?: PreferenceStorage) {
 
   return {
     getSnapshot: () => state,
+    getProfile: () => profile,
+    switchProfile,
+    /** Deletes the stored data of a profile that is not active. */
+    forgetProfile(id: string) {
+      if (id === MAIN_PROFILE || id === profile) return;
+      try {
+        storage?.removeItem(profileKey(id));
+      } catch {
+        /* Nothing else to clean up. */
+      }
+    },
     getPersistenceError: () => persistenceError,
     subscribe(listener: () => void) {
       listeners.add(listener);

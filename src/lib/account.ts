@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { mediaKey, preferencesStore } from "./store";
+import { MAIN_PROFILE, mediaKey, preferencesStore } from "./store";
 import {
   getAddonCollection,
   getLibrary,
@@ -30,6 +30,8 @@ export type AccountState = {
 
 type Persisted = {
   user?: AccountState["user"];
+  /** Vela profile whose library is synchronized with the account (absent: the main profile). */
+  profile?: string;
   lastSync?: SyncSummary;
   sync: SyncState;
 };
@@ -49,6 +51,12 @@ let state: AccountState = { status: "loading", syncing: false, user: persisted.u
 const listeners = new Set<() => void>();
 let applying = false;
 let knownKeys = new Set(Object.keys(preferencesStore.getSnapshot().library));
+let knownProfile = preferencesStore.getProfile();
+
+/** Only the profile that signed in synchronizes; other profiles stay local. */
+function ownsAccount(): boolean {
+  return preferencesStore.getProfile() === (persisted.profile ?? MAIN_PROFILE);
+}
 
 function save() {
   try {
@@ -67,7 +75,13 @@ function set(next: Partial<AccountState>) {
 preferencesStore.subscribe(() => {
   const library = preferencesStore.getSnapshot().library;
   const keys = new Set(Object.keys(library));
-  if (!applying && state.status === "signed-in") {
+  // Switching profiles replaces the whole library: that is not a removal.
+  if (preferencesStore.getProfile() !== knownProfile) {
+    knownProfile = preferencesStore.getProfile();
+    knownKeys = keys;
+    return;
+  }
+  if (!applying && state.status === "signed-in" && ownsAccount()) {
     for (const key of knownKeys) {
       if (keys.has(key)) continue;
       const [type, id] = JSON.parse(key) as [string, string];
@@ -125,9 +139,11 @@ export const account = {
   async signInWithKey(key: string, known?: StremioUser) {
     const user = known ?? (await getUser(key));
     await setSecret(secretName, key);
-    // A new account starts a new synchronization history.
-    if (persisted.user?.id !== user._id) persisted.sync = { synced: {}, removed: {} };
+    // A new account, or the same one linked to another profile, starts a new synchronization history.
+    if (persisted.user?.id !== user._id || (persisted.profile ?? MAIN_PROFILE) !== preferencesStore.getProfile())
+      persisted.sync = { synced: {}, removed: {} };
     persisted.user = userOf(user);
+    persisted.profile = preferencesStore.getProfile();
     save();
     set({ status: "signed-in", user: persisted.user, error: undefined });
     await account.sync();
@@ -149,7 +165,7 @@ export const account = {
 
   /** Pulls the account library, merges it with the local one and uploads local changes. */
   async sync(): Promise<SyncSummary | undefined> {
-    if (state.status !== "signed-in" || state.syncing) return undefined;
+    if (state.status !== "signed-in" || state.syncing || !ownsAccount()) return undefined;
     set({ syncing: true, error: undefined });
     try {
       const key = await authKey();
@@ -189,6 +205,11 @@ export const account = {
       await expire(error);
       throw error;
     }
+  },
+
+  /** Profile linked to the account, or undefined when signed out. */
+  profile(): string | undefined {
+    return state.status === "signed-in" ? (persisted.profile ?? MAIN_PROFILE) : undefined;
   },
 
   isInLibrary(type: string, id: string) {

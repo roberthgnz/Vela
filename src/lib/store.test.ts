@@ -231,4 +231,29 @@ describe('local preferences', () => {
     store.refreshAddon({ ...installedAddon, manifest: { ...installedAddon.manifest, id: 'other.addon', name: 'Other' } });
     expect(store.getSnapshot().addons.find((item) => item.manifestUrl === canonical)?.manifest.id).toBe('test.addon');
   });
+
+  it('keeps a library and preferences per profile without touching the main profile data', () => {
+    const storage = memoryStorage();
+    const store = createPreferencesStore(storage);
+    store.installAddon(installedAddon);
+    store.saveMedia(movie, '');
+    store.switchProfile('kids');
+    expect(store.getProfile()).toBe('kids');
+    expect(store.getSnapshot().library).toEqual({});
+    // Shared settings stay.
+    expect(store.getSnapshot().addons.some((item) => item.manifest.id === 'test.addon')).toBe(true);
+    store.saveMedia(series, '');
+    store.setPlayer({ subtitleLanguage: 'eng' });
+    const main = JSON.parse(storage.getItem('vela.preferences.v2')!);
+    expect(Object.keys(main.library)).toEqual([mediaKey(movie.type, movie.id)]);
+    expect(main.player.subtitleLanguage).toBe('spa');
+    expect(Object.keys(JSON.parse(storage.getItem('vela.profile.kids.v1')!).library)).toEqual([mediaKey('series', 'tt9')]);
+    store.switchProfile('main');
+    expect(Object.keys(store.getSnapshot().library)).toEqual([mediaKey(movie.type, movie.id)]);
+    store.switchProfile('kids');
+    expect(store.getSnapshot().player.subtitleLanguage).toBe('eng');
+    store.switchProfile('main');
+    store.forgetProfile('kids');
+    expect(storage.getItem('vela.profile.kids.v1')).toBeNull();
+  });
 });
