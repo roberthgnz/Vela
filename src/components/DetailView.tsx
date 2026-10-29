@@ -31,6 +31,7 @@ import type {
 import { episodeCode, isUpcoming, orderedEpisodes, videoProgress, watchedEpisodes } from "../lib/episodes";
 import { getMeta, getStreams } from "../lib/protocol";
 import { sourceHistory, sourceKey, useSourceMarks } from "../lib/sourceHistory";
+import { useTranslatedMeta } from "../lib/tmdb";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import {
   kindLabel,
@@ -139,7 +140,7 @@ export function DetailView({
     queryFn: ({ signal }) => getMeta(addon, initial.type, initial.id, signal),
     enabled: addon.manifest.id !== "saved",
   });
-  const meta = metadata.data || initial;
+  const { meta, translated } = useTranslatedMeta(metadata.data || initial);
   const entry = prefs.library[mediaKey(meta.type, meta.id)];
   const saved = Boolean(entry?.saved);
   const isSeries = meta.type === "series";
@@ -386,6 +387,7 @@ export function DetailView({
           )}
           <p className="provider-note">
             Información de {addon.manifest.name}
+            {translated ? " · traducción de TMDB" : ""}
           </p>
         </div>
         <aside className="detail-panel" ref={panel} aria-label={isSeries && !showSources ? "Episodios" : "Fuentes"}>

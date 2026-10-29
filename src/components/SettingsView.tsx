@@ -5,6 +5,7 @@ import {
   Download,
   ExternalLink,
   Captions,
+  Globe,
   Info,
   Keyboard,
   Languages,
@@ -24,6 +25,7 @@ import { openExternal, requestJson } from "../lib/transport";
 import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
 import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
+import { tmdb, useTmdbConfigured } from "../lib/tmdb";
 import { updates, useUpdates } from "../lib/updates";
 import { native } from "./WindowControls";
 
@@ -48,6 +50,7 @@ export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
 
 const sections = [
   { id: "account", label: "Cuenta", icon: User },
+  { id: "metadata", label: "Información", icon: Globe },
   { id: "subtitles", label: "Subtítulos", icon: Captions },
   { id: "audio", label: "Audio", icon: Languages },
   { id: "playback", label: "Reproducción", icon: Play },
@@ -184,6 +187,11 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-account" className="settings-group" aria-labelledby="settings-account-title">
             <h2 id="settings-account-title">Cuenta</h2>
             <AccountSection notify={notify} />
+          </section>
+
+          <section id="settings-metadata" className="settings-group" aria-labelledby="settings-metadata-title">
+            <h2 id="settings-metadata-title">Información</h2>
+            <MetadataSettings notify={notify} />
           </section>
 
           <section id="settings-subtitles" className="settings-group" aria-labelledby="settings-subtitles-title">
@@ -430,6 +438,10 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
                 description="Tu biblioteca se guarda localmente. Cada addon recibe las consultas que le haces; Vela no envía datos a otros servicios."
               />
               <Row
+                label="TMDB"
+                description="Las traducciones de títulos, sinopsis y episodios usan la API de TMDB, pero Vela no está respaldada ni certificada por TMDB."
+              />
+              <Row
                 label="Contenido de demostración"
                 description="Los tráileres de Open Cinema son de Blender Foundation, alojados por W3C, bajo Creative Commons BY 3.0."
               />
@@ -564,5 +576,125 @@ function LanguageSelect({
         ))}
       </select>
     </label>
+  );
+}
+
+const metadataLanguages = [
+  ["es-ES", "Español (España)"],
+  ["es-MX", "Español (Latinoamérica)"],
+  ["ca-ES", "Catalán"],
+  ["eu-ES", "Euskera"],
+  ["gl-ES", "Gallego"],
+  ["en-US", "Inglés"],
+  ["fr-FR", "Francés"],
+  ["de-DE", "Alemán"],
+  ["it-IT", "Italiano"],
+  ["pt-PT", "Portugués"],
+  ["pt-BR", "Portugués (Brasil)"],
+] as const;
+
+function MetadataSettings({ notify }: { notify: (message: string) => void }) {
+  const prefs = usePreferences();
+  const configured = useTmdbConfigured();
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    void tmdb.key();
+  }, []);
+  const save = useMutation({
+    mutationFn: () => tmdb.save(value),
+    onSuccess: () => {
+      setValue("");
+      notify("Clave de TMDB guardada. La información se mostrará traducida.");
+    },
+  });
+  return (
+    <div className="settings-card">
+      <Row label="Idioma de la información" htmlFor="metadata-language" description="Títulos, sinopsis, géneros y episodios.">
+        <label className="select">
+          <select
+            id="metadata-language"
+            value={prefs.metadataLanguage}
+            onChange={(event) => preferencesStore.setMetadataLanguage(event.target.value)}
+          >
+            {metadataLanguages.map(([code, label]) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
+            <option value="">Original del addon</option>
+          </select>
+        </label>
+      </Row>
+      <Row
+        label="Clave de TMDB"
+        htmlFor="tmdb-key"
+        stacked
+        description={
+          <>
+            Cinemeta solo ofrece la información en inglés. Con una clave gratuita de TMDB (la «clave de API», no el token de
+            lectura) Vela la traduce y usa Cinemeta cuando falta algo. Se guarda en el Administrador de credenciales de Windows y
+            solo se envía a TMDB.
+          </>
+        }
+      >
+        {configured ? (
+          <div className="input-group">
+            <span className="status ok">
+              <CheckCircle2 size={14} /> Clave guardada
+            </span>
+            <button
+              className="button subtle"
+              onClick={() =>
+                void tmdb
+                  .remove()
+                  .then(() => notify("Clave de TMDB eliminada."))
+                  .catch((error) => notify(errorMessage(error)))
+              }
+            >
+              Quitar
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="input-group">
+              <input
+                id="tmdb-key"
+                className="input"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="32 caracteres"
+                value={value}
+                aria-invalid={save.isError}
+                onChange={(event) => {
+                  setValue(event.target.value);
+                  save.reset();
+                }}
+                onKeyDown={(event) => event.key === "Enter" && value.trim() && save.mutate()}
+              />
+              <button className="button secondary" disabled={!value.trim() || save.isPending} onClick={() => save.mutate()}>
+                {save.isPending ? <Spinner /> : null} Guardar
+              </button>
+            </div>
+            <div className="field-status" aria-live="polite">
+              {save.isError ? (
+                <span className="status error">
+                  <XCircle size={14} /> {errorMessage(save.error)}
+                </span>
+              ) : (
+                <button
+                  className="link-button"
+                  onClick={() =>
+                    void openExternal("https://www.themoviedb.org/settings/api").catch((error) => notify(errorMessage(error)))
+                  }
+                >
+                  Obtener una clave en themoviedb.org <ExternalLink size={12} />
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </Row>
+    </div>
   );
 }

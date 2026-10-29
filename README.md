@@ -59,6 +59,7 @@ Las capturas usan los tráileres de Blender Foundation incluidos en Vela (CC BY 
 ## Funciones
 
 - Catálogos y búsqueda de Cinemeta y de los addons instalados; detalles, temporadas y episodios.
+- Información en el idioma elegido (español por defecto): Cinemeta solo ofrece inglés, así que con una clave gratuita de TMDB Vela traduce títulos, sinopsis, géneros y episodios del detalle y del reproductor.
 - Instalación, activación, desactivación y eliminación de addons por URL de manifiesto.
 - Fuentes y subtítulos de los addons instalados; los manifiestos instalados se actualizan al abrir Vela.
 - Subtítulos externos, de torrents e incrustados en el archivo (a través de Stremio Service): SRT, WebVTT y ASS/SSA, con detección de codificación (UTF‑8, UTF‑16, Windows‑1252) y de formato, duplicados eliminados y errores claros con archivos dañados. ASS/SSA con estilos mediante JASSUB (libass en WebAssembly). Idioma principal y secundario, selección automática, desfase, tamaño, opacidad y fondo.
@@ -135,6 +136,8 @@ Vela se distribuye bajo la [licencia MIT](LICENSE). Las dependencias y los recur
 ## Créditos
 
 Big Buck Bunny y Sintel son obras de Blender Foundation. Vela incluye ilustraciones propias y enlaces a sus tráileres, alojados por W3C; no incluye las películas completas. Los tráileres se distribuyen bajo [Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/). Véanse [Big Buck Bunny](https://peach.blender.org/) y [Sintel](https://durian.blender.org/). El addon de validación usa los torrents de muestra de WebTorrent de esas mismas obras.
+
+Las traducciones de títulos, sinopsis, géneros y episodios usan la [API de TMDB](https://www.themoviedb.org/) con la clave de cada usuario. Vela no está respaldada ni certificada por TMDB.
 
 Los subtítulos ASS/SSA se dibujan con [JASSUB](https://github.com/ThaUnknown/jassub) 2.5.18 (código MIT; incluye libass y bibliotecas con licencias ISC, FTL/GPL-2.0, LGPL-2.1 y otras, declaradas en su paquete). Su worker y sus archivos WebAssembly se distribuyen como archivos separados.
 

@@ -105,20 +105,22 @@ export async function openExternal(raw: string): Promise<void> {
   else window.open(url, '_blank', 'noopener,noreferrer');
 }
 
+export type SecretName = 'stremio-auth-key' | 'tmdb-api-key';
+
 const sessionFallback = new Map<string, string>();
 
 /** Reads a secret from the Windows credential store. Outside the desktop app it lives only in memory. */
-export async function getSecret(name: 'stremio-auth-key'): Promise<string | null> {
+export async function getSecret(name: SecretName): Promise<string | null> {
   if (!isTauri()) return sessionFallback.get(name) ?? null;
   try { return await invoke<string | null>('secret_get', { name }); } catch (error) { throw message(error); }
 }
 
-export async function setSecret(name: 'stremio-auth-key', value: string): Promise<void> {
+export async function setSecret(name: SecretName, value: string): Promise<void> {
   if (!isTauri()) { sessionFallback.set(name, value); return; }
   try { await invoke('secret_set', { name, value }); } catch (error) { throw message(error); }
 }
 
-export async function deleteSecret(name: 'stremio-auth-key'): Promise<void> {
+export async function deleteSecret(name: SecretName): Promise<void> {
   if (!isTauri()) { sessionFallback.delete(name); return; }
   try { await invoke('secret_delete', { name }); } catch (error) { throw message(error); }
 }

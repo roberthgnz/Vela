@@ -159,4 +159,6 @@ export type AppPreferences = {
   serviceUrl: string;
   externalPlayerPath: string;
   player: PlayerPreferences;
+  /** Language of titles and synopses (BCP 47, for example "es-ES"); empty keeps the addon's. */
+  metadataLanguage: string;
 };

@@ -2,7 +2,7 @@
 //! Only a fixed set of names can be read or written from the interface.
 
 const SERVICE: &str = "com.vela.desktop";
-const ALLOWED: [&str; 1] = ["stremio-auth-key"];
+const ALLOWED: [&str; 2] = ["stremio-auth-key", "tmdb-api-key"];
 
 fn checked(name: &str) -> Result<&str, String> {
     ALLOWED
@@ -75,6 +75,7 @@ mod tests {
     #[test]
     fn only_known_secret_names_are_accessible() {
         assert!(checked("stremio-auth-key").is_ok());
+        assert!(checked("tmdb-api-key").is_ok());
         assert!(checked("other").is_err());
         assert!(checked("").is_err());
     }

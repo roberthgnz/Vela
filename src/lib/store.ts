@@ -253,7 +253,12 @@ function defaults(): AppPreferences {
     serviceUrl: defaultServiceUrl,
     externalPlayerPath: '',
     player: { ...defaultPlayer },
+    metadataLanguage: 'es-ES',
   };
+}
+
+function metadataLanguage(value: unknown, fallback: string): string {
+  return typeof value === 'string' && (value === '' || /^[a-z]{2}(?:-[A-Z]{2})?$/.test(value)) ? value : fallback;
 }
 
 export function mediaKey(type: string, id: string): string {
@@ -284,6 +289,7 @@ function readPreferences(value: unknown, fallback: AppPreferences): AppPreferenc
     serviceUrl: serviceUrl(value.serviceUrl) ?? fallback.serviceUrl,
     externalPlayerPath: typeof value.externalPlayerPath === 'string' ? value.externalPlayerPath : '',
     player: player(value.player),
+    metadataLanguage: metadataLanguage(value.metadataLanguage, fallback.metadataLanguage),
   };
 }
 
@@ -491,6 +497,10 @@ export function createPreferencesStore(providedStorage?: PreferenceStorage) {
     setExternalPlayerPath(value: string) {
       const path = value.trim();
       if (path !== state.externalPlayerPath) update({ ...state, externalPlayerPath: path });
+    },
+    setMetadataLanguage(value: string) {
+      const next = metadataLanguage(value, state.metadataLanguage);
+      if (next !== state.metadataLanguage) update({ ...state, metadataLanguage: next });
     },
     setPlayer(value: Partial<PlayerPreferences>) {
       const next = player({ ...state.player, ...value });

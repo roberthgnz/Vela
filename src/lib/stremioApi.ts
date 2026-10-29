@@ -288,7 +288,8 @@ export function remoteFromEntry(
   return {
     ...base,
     _id: entry.meta.id,
-    name: entry.meta.name,
+    // Keep Stremio's name: Vela may show a translated one.
+    name: base?.name ?? entry.meta.name,
     type: entry.meta.type,
     poster: entry.meta.poster ?? base?.poster ?? null,
     posterShape: base?.posterShape ?? "poster",

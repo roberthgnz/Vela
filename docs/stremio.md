@@ -190,6 +190,10 @@ La versión 2 se guarda en `vela.preferences.v2`. Al arrancar, si no existe, se 
 
 Preferencias de reproducción (`player`): idiomas principal y secundario de subtítulos, activación automática, tamaño, opacidad y fondo; idioma preferido y alternativo de audio; saltos corto y largo; siguiente episodio y su cuenta atrás. Los valores se validan y acotan al leerlos.
 
+## Información traducida
+
+Cinemeta 3.0.14 solo devuelve inglés: ni `Accept-Language` ni un extra `language` cambian la respuesta (comprobado el 29 de octubre de 2026). El addon comunitario de TMDB declara solo identificadores `tmdb:` y su instancia pública respondía 504. Vela usa la API v3 de TMDB con la clave de cada usuario ([tmdb.ts](../src/lib/tmdb.ts)): `/find/{imdb}?external_source=imdb_id`, después `/movie/{id}` o `/tv/{id}` y `/tv/{id}/season/{n}` en el idioma de Ajustes › Información. Se traducen título, sinopsis, géneros y títulos y sinopsis de episodios del detalle y del reproductor; lo que TMDB no tiene (o los «Episodio N» sin traducir) se queda con el texto de Cinemeta. La clave se guarda en el Administrador de credenciales de Windows. Comprobado contra TMDB solo el rechazo de una clave inválida; la traducción real necesita una clave y está cubierta por pruebas con respuestas simuladas. Las tarjetas de los catálogos siguen mostrando el nombre del addon, y el nombre que se sincroniza con Stremio es el de Stremio.
+
 ## Actualizaciones
 
 Desde 0.3.2 se usa [tauri-plugin-updater](https://v2.tauri.app/plugin/updater/) 2.13.1 con comandos propios ([updater.rs](../src-tauri/src/updater.rs), [updates.ts](../src/lib/updates.ts)): `update_check` consulta `latest.json` de la última release de GitHub y `update_install` descarga, verifica la firma minisign con la clave pública de `tauri.conf.json`, ejecuta el instalador NSIS en modo pasivo y reinicia. La comprobación al arrancar solo ocurre en compilaciones de release y se puede desactivar. Ver «Actualización automática» en el README para la clave y el workflow.
