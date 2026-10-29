@@ -1,0 +1,95 @@
+name: Release
+
+# Builds the Windows installer and publishes it as a GitHub release.
+# - Push a tag `vX.Y.Z` that matches the version in package.json, or
+# - run the workflow by hand (Actions › Release › Run workflow): it tags the selected
+#   commit as `v<package.json version>`.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: "Create the release as a draft"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        # Stop at the first failing command (PowerShell would continue after a failing native tool).
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        run: npm install --global "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Resolve version and tag
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          cargo_version=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d '"' -f2)
+          tauri_version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "$version" != "$cargo_version" ] || [ "$version" != "$tauri_version" ]; then
+            echo "::error::Versions differ: package.json $version, Cargo.toml $cargo_version, tauri.conf.json $tauri_version"
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then tag="$GITHUB_REF_NAME"; else tag="v$version"; fi
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::Tag $tag does not match the app version v$version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: |
+          pnpm test
+          pnpm build
+          cargo test --locked --manifest-path src-tauri/Cargo.toml
+
+      - name: Build installer
+        run: pnpm package
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          DRAFT: ${{ inputs.draft && '--draft' || '' }}
+        run: |
+          installer="src-tauri/target/release/bundle/nsis/Vela_${VERSION}_x64-setup.exe"
+          test -f "$installer"
+          (cd "$(dirname "$installer")" && sha256sum "$(basename "$installer")") > "Vela_${VERSION}_x64-setup.exe.sha256"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$installer" "Vela_${VERSION}_x64-setup.exe.sha256" --clobber
+          else
+            gh release create "$TAG" "$installer" "Vela_${VERSION}_x64-setup.exe.sha256" \
+              --target "$GITHUB_SHA" --title "Vela $VERSION" --generate-notes $DRAFT
+          fi

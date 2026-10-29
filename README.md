@@ -24,7 +24,16 @@ cargo test --manifest-path src-tauri/Cargo.toml
 pnpm package
 ```
 
-El instalador se genera en `src-tauri/target/release/bundle/nsis/`. La aplicación empaquetada incluye su interfaz y no requiere Node ni el servidor Vite en el equipo del usuario. WebView2 es un requisito de ejecución.
+El instalador se genera en `src-tauri/target/release/bundle/nsis/`.
+
+### Versiones en GitHub
+
+- **CI** ([ci.yml](.github/workflows/ci.yml)): en cada push a `main` y en cada pull request comprueba tipos, compila la interfaz y ejecuta las pruebas unitarias y Playwright (Ubuntu), y `cargo fmt`, `clippy` y las pruebas Rust (Windows).
+- **Release** ([release.yml](.github/workflows/release.yml)): genera el instalador NSIS en Windows tras pasar las pruebas y lo publica en [Releases](https://github.com/roberthgnz/Vela/releases) con su suma SHA-256 y notas generadas a partir de los commits. Se lanza de dos formas:
+  - subiendo una etiqueta igual a la versión: actualiza la versión en `package.json`, `src-tauri/Cargo.toml` y `src-tauri/tauri.conf.json`, haz commit y ejecuta `git tag v0.3.0` y `git push origin v0.3.0`;
+  - o desde Actions › Release › Run workflow, que etiqueta el commit elegido como `v<versión>` (opcionalmente como borrador).
+
+El flujo falla si las tres versiones no coinciden o si la etiqueta no corresponde a la versión. Si la versión ya está publicada, sustituye los archivos adjuntos. El instalador no está firmado. La aplicación empaquetada incluye su interfaz y no requiere Node ni el servidor Vite en el equipo del usuario. WebView2 es un requisito de ejecución.
 
 `node dev/validation-addon.mjs` sirve en `http://127.0.0.1:7010/manifest.json` un addon local con fuentes de validación: torrents CC de Blender (con y sin `fileIdx`, con trackers, índice erróneo, hash sin pares), un MP4 que exige cabeceras, un MKV/HEVC, un MKV con dos pistas de audio y subtítulos SRT y ASS incrustados, subtítulos externos (Windows‑1252, ASS, duplicados y un archivo dañado) y una serie de tres episodios con `bingeGroup`. `node dev/make-validation-media.mjs` genera esos archivos sintéticos con FFmpeg en `.tmp/media/`. Su uso se describe en [docs/stremio.md](docs/stremio.md#validación-con-el-servicio-real).
 
