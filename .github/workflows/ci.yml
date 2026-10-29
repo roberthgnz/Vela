@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  interface:
+    name: Interface (types, unit and end-to-end tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Install pnpm
+        run: npm install --global "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7
+
+  desktop:
+    name: Desktop (Rust on Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --component clippy,rustfmt && rustup default stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      # tauri-build checks that the frontend bundle directory exists.
+      - name: Placeholder frontend
+        run: mkdir -p dist && echo '<!doctype html>' > dist/index.html
+      - run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+      - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml -- -D warnings
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
