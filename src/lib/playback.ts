@@ -1,5 +1,6 @@
 import type { Episode, MediaItem, ResolvedStream, Subtitle } from "./contracts";
 import {
+  type Probe,
   mediaCapabilities,
   prepareTorrent,
   probe,
@@ -24,6 +25,8 @@ export type PlaybackTarget = {
   transcodedBecause?: string[];
   /** Subtitle files shipped inside a torrent. */
   subtitles?: Subtitle[];
+  /** Tracks reported by Stremio Service, when the file was inspected. */
+  probe?: Probe;
 };
 
 const serviceHint =
@@ -85,7 +88,8 @@ export async function resolvePlayback(
     streamTags(stream).some((tag) => tag === "HEVC" || tag === "MKV");
   if (!suspicious) return target;
   try {
-    const problems = probeProblems(await probe(serviceUrl, playable), capabilities);
+    target.probe = await probe(serviceUrl, playable);
+    const problems = probeProblems(target.probe, capabilities);
     if (problems.length) {
       target.url = target.transcodeUrl;
       target.transcodedBecause = problems;

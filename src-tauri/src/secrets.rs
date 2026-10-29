@@ -9,13 +9,13 @@ fn checked(name: &str) -> Result<&str, String> {
         .iter()
         .find(|allowed| **allowed == name)
         .copied()
-        .ok_or_else(|| "Unknown secret.".to_owned())
+        .ok_or_else(|| "Secreto desconocido.".to_owned())
 }
 
 #[cfg(windows)]
 fn entry(name: &str) -> Result<keyring::Entry, String> {
     keyring::Entry::new(SERVICE, checked(name)?)
-        .map_err(|_| "The Windows credential store is unavailable.".to_owned())
+        .map_err(|_| "El Administrador de credenciales de Windows no está disponible.".to_owned())
 }
 
 #[cfg(windows)]
@@ -24,7 +24,7 @@ pub fn secret_get(name: String) -> Result<Option<String>, String> {
     match entry(&name)?.get_password() {
         Ok(value) => Ok(Some(value)),
         Err(keyring::Error::NoEntry) => Ok(None),
-        Err(_) => Err("The saved session could not be read.".to_owned()),
+        Err(_) => Err("No se pudo leer la sesión guardada.".to_owned()),
     }
 }
 
@@ -32,11 +32,11 @@ pub fn secret_get(name: String) -> Result<Option<String>, String> {
 #[tauri::command]
 pub fn secret_set(name: String, value: String) -> Result<(), String> {
     if value.is_empty() || value.len() > 4096 {
-        return Err("Invalid secret.".to_owned());
+        return Err("Secreto no válido.".to_owned());
     }
-    entry(&name)?
-        .set_password(&value)
-        .map_err(|_| "The session could not be saved in the Windows credential store.".to_owned())
+    entry(&name)?.set_password(&value).map_err(|_| {
+        "No se pudo guardar la sesión en el Administrador de credenciales de Windows.".to_owned()
+    })
 }
 
 #[cfg(windows)]
@@ -44,7 +44,7 @@ pub fn secret_set(name: String, value: String) -> Result<(), String> {
 pub fn secret_delete(name: String) -> Result<(), String> {
     match entry(&name)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(_) => Err("The saved session could not be removed.".to_owned()),
+        Err(_) => Err("No se pudo borrar la sesión guardada.".to_owned()),
     }
 }
 
@@ -59,7 +59,7 @@ pub fn secret_get(name: String) -> Result<Option<String>, String> {
 #[tauri::command]
 pub fn secret_set(name: String, _value: String) -> Result<(), String> {
     checked(&name)?;
-    Err("Secure session storage is available only on Windows.".to_owned())
+    Err("El almacenamiento seguro de la sesión solo está disponible en Windows.".to_owned())
 }
 
 #[cfg(not(windows))]

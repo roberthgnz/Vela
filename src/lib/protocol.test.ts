@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddonManifest, InstalledAddon, ResolvedStream } from './contracts';
-import { defaultAddons, getCatalog, getCatalogSources, getMeta, getStreams, getSubtitles, loadManifest, normalizeManifestUrl, supportsResource } from './protocol';
+import { nextCatalogSkip, defaultAddons, getCatalog, getCatalogSources, getMeta, getStreams, getSubtitles, loadManifest, normalizeManifestUrl, supportsResource } from './protocol';
 import { requestJson } from './transport';
 
 vi.mock('./transport', () => ({ requestJson: vi.fn() }));
@@ -54,7 +54,7 @@ describe('manifest installation', () => {
 
   it('does not disclose configured URLs in transport errors', async () => {
     request.mockRejectedValueOnce(new Error('Failed https://addon.example/private-token/manifest.json'));
-    await expect(loadManifest('https://addon.example/private-token/manifest.json')).rejects.toThrow('The add-on manifest could not be loaded.');
+    await expect(loadManifest('https://addon.example/private-token/manifest.json')).rejects.toThrow('No se pudo cargar el manifiesto del addon.');
   });
 });
 
@@ -143,7 +143,7 @@ describe('catalog protocol', () => {
 
   it('rejects metadata returned for a different title', async () => {
     request.mockResolvedValueOnce({ meta: { id: 'tt2', type: 'movie', name: 'Wrong title' } });
-    await expect(getMeta(addon(), 'movie', 'tt1')).rejects.toThrow('different title');
+    await expect(getMeta(addon(), 'movie', 'tt1')).rejects.toThrow('otro título');
   });
 });
 
@@ -159,14 +159,14 @@ describe('streams and subtitles', () => {
 
   it('distinguishes total add-on failure from a successful empty stream response', async () => {
     request.mockRejectedValueOnce(new Error('private token URL')).mockResolvedValueOnce({ streams: [] });
-    await expect(getStreams([addon()], 'movie', 'tt1')).rejects.toThrow('All 1 stream add-ons failed');
+    await expect(getStreams([addon()], 'movie', 'tt1')).rejects.toThrow('El addon de fuentes no ha respondido');
     expect(await getStreams([addon()], 'movie', 'tt1')).toEqual([]);
     expect(await getStreams([addon({ resources: ['meta'] })], 'movie', 'tt1')).toEqual([]);
   });
 
   it.each([{ url: 'file:///bad.mp4' }, { infoHash: 'bad' }, {}, { url: 'https://ok.example/a.mp4', subtitles: [{ id: '1', lang: 'eng', url: 'javascript:alert(1)' }] }])('rejects invalid stream source %j', async (value) => {
     request.mockResolvedValueOnce({ streams: [value] });
-    await expect(getStreams([addon()], 'movie', 'tt1')).rejects.toThrow('stream add-ons failed');
+    await expect(getStreams([addon()], 'movie', 'tt1')).rejects.toThrow('de fuentes no ha respondido');
   });
 
   it('retains torrent, YouTube and external stream source information', async () => {
@@ -246,5 +246,23 @@ describe('built-in add-ons', () => {
     const first = defaultAddons();
     first[0].manifest.name = 'Changed';
     expect(defaultAddons()[0].manifest.name).toBe('Open Cinema');
+  });
+});
+
+describe('catalog paging', () => {
+  const page = (from: number, count: number) => Array.from({ length: count }, (_, index) => ({ id: `tt${from + index}`, type: 'movie', name: `T${from + index}` }));
+
+  it('counts every received item as the next offset', () => {
+    expect(nextCatalogSkip([page(0, 100)], true)).toBe(100);
+    expect(nextCatalogSkip([page(0, 100), page(100, 37)], true)).toBe(137);
+    // Overlapping pages still advance while they bring new titles.
+    expect(nextCatalogSkip([page(0, 100), page(95, 100)], true)).toBe(200);
+  });
+
+  it('stops on empty pages, catalogs without skip, and addons that ignore skip', () => {
+    expect(nextCatalogSkip([page(0, 100), []], true)).toBeUndefined();
+    expect(nextCatalogSkip([page(0, 100)], false)).toBeUndefined();
+    // Regression: an addon returning the first page for every offset used to be asked forever.
+    expect(nextCatalogSkip([page(0, 100), page(0, 100)], true)).toBeUndefined();
   });
 });

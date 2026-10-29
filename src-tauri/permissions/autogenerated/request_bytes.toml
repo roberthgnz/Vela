@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-request-bytes"
+description = "Enables the request_bytes command without any pre-configured scope."
+commands.allow = ["request_bytes"]
+
+[[permission]]
+identifier = "deny-request-bytes"
+description = "Denies the request_bytes command without any pre-configured scope."
+commands.deny = ["request_bytes"]

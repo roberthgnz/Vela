@@ -4,7 +4,8 @@ import { ChevronLeft, ChevronRight, Puzzle, X } from "lucide-react";
 import type { CatalogSource, LibraryEntry, MediaItem } from "../lib/contracts";
 import { getCatalog, getCatalogSources } from "../lib/protocol";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
-import { clock, errorMessage, safeImage } from "../lib/utils";
+import { episodeCode } from "../lib/episodes";
+import { clock, errorMessage, motion, safeImage } from "../lib/utils";
 import { cardKeys, MediaCard, PosterSkeletons, type CardMenu } from "./MediaCard";
 import { EmptyState, ErrorState } from "./Primitives";
 
@@ -52,7 +53,7 @@ function Shelf({
   const page = (direction: number) =>
     track.current?.scrollBy({
       left: direction * track.current.clientWidth * 0.85,
-      behavior: "smooth",
+      behavior: motion(),
     });
   return (
     <section className={`shelf ${className}`} aria-label={title}>
@@ -145,7 +146,10 @@ function CatalogShelf({
 }
 
 function episodeLabel(entry: LibraryEntry): string {
-  const match = entry.progress?.videoId.match(/:(\d+):(\d+)$/);
+  const videoId = entry.progress?.videoId;
+  const episode = entry.meta.videos?.find((video) => video.id === videoId);
+  if (episode) return episodeCode(episode);
+  const match = videoId?.match(/:(\d+):(\d+)$/);
   return match ? `T${match[1]} · E${match[2]}` : "";
 }
 
@@ -157,7 +161,8 @@ function ContinueCard({
   onOpen: OpenMedia;
 }) {
   const progress = entry.progress!;
-  const percent = Math.min(100, (progress.seconds / progress.duration) * 100);
+  const upNext = progress.duration === 0;
+  const percent = upNext ? 0 : Math.min(100, (progress.seconds / progress.duration) * 100);
   const image = safeImage(entry.meta.background || entry.meta.poster);
   const remaining = Math.max(0, progress.duration - progress.seconds);
   return (
@@ -175,9 +180,9 @@ function ContinueCard({
         <span className="continue-text">
           <strong>{entry.meta.name}</strong>
           <small>
-            {[episodeLabel(entry), `Quedan ${clock(remaining)}`]
-              .filter(Boolean)
-              .join(" · ")}
+            {upNext
+              ? `Siguiente · ${episodeLabel(entry)}`
+              : [episodeLabel(entry), `Quedan ${clock(remaining)}`].filter(Boolean).join(" · ")}
           </small>
         </span>
         <span className="card-progress">
@@ -189,7 +194,7 @@ function ContinueCard({
         aria-label={`Quitar ${entry.meta.name} de seguir viendo`}
         title="Quitar de Seguir viendo"
         tabIndex={-1}
-        onClick={() => preferencesStore.removeMedia(entry.meta.type, entry.meta.id)}
+        onClick={() => preferencesStore.dismissProgress(entry.meta.type, entry.meta.id)}
       >
         <X size={13} />
       </button>
@@ -197,13 +202,12 @@ function ContinueCard({
   );
 }
 
+/** Titles in «Seguir viendo»: started and not finished, or pointing to the next episode. */
 export function inProgress(entry: LibraryEntry): boolean {
-  return Boolean(
-    entry.progress &&
-      entry.progress.duration > 0 &&
-      entry.progress.seconds > 5 &&
-      entry.progress.seconds < entry.progress.duration * 0.95,
-  );
+  const progress = entry.progress;
+  if (!progress) return false;
+  if (progress.duration === 0 && progress.seconds === 0) return entry.meta.type === "series";
+  return progress.duration > 0 && progress.seconds > 5 && progress.seconds < progress.duration * 0.95;
 }
 
 export function HomeView({

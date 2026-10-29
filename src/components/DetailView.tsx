@@ -5,6 +5,9 @@ import {
   ArrowLeft,
   Bookmark,
   BookmarkCheck,
+  Check,
+  CheckCheck,
+  Circle,
   Clipboard,
   ExternalLink,
   Globe,
@@ -24,6 +27,7 @@ import type {
   MediaItem,
   ResolvedStream,
 } from "../lib/contracts";
+import { episodeCode, isUpcoming, orderedEpisodes, videoProgress, watchedEpisodes } from "../lib/episodes";
 import { getMeta, getStreams } from "../lib/protocol";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import {
@@ -39,7 +43,7 @@ import {
   type StreamKind,
 } from "../lib/streams";
 import { openExternal } from "../lib/transport";
-import { clock, errorMessage, safeImage, yearOf } from "../lib/utils";
+import { addonHost, clock, errorMessage, motion, safeImage, yearOf } from "../lib/utils";
 import { typeLabel } from "./MediaCard";
 import {
   anchorFrom,
@@ -77,16 +81,17 @@ function formatDate(value?: string): string {
     : date.toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function upcoming(episode: Episode): boolean {
-  return Boolean(episode.released && new Date(episode.released).getTime() > Date.now());
-}
+const upcoming = (episode: Episode) => isUpcoming(episode);
 
 export function DetailView({
   meta: initial,
   addon,
   videoId: routeVideoId,
+  season: routeSeason,
   startSources,
   onVideoChange,
+  onSeasonChange,
+  onSourcesChange,
   onPlay,
   onAddons,
   notify,
@@ -94,8 +99,12 @@ export function DetailView({
   meta: MediaItem;
   addon: InstalledAddon;
   videoId?: string;
+  /** Season chosen in the episode list, kept in the history entry. */
+  season?: number;
   startSources?: boolean;
   onVideoChange: (videoId: string) => void;
+  onSeasonChange: (season: number) => void;
+  onSourcesChange: (visible: boolean) => void;
   onPlay: PlayHandler;
   onAddons: () => void;
   notify: (message: string) => void;
@@ -110,7 +119,7 @@ export function DetailView({
   });
   const meta = metadata.data || initial;
   const entry = prefs.library[mediaKey(meta.type, meta.id)];
-  const saved = Boolean(entry);
+  const saved = Boolean(entry?.saved);
   const isSeries = meta.type === "series";
   const episodes = meta.videos || [];
   const progressVideo = entry?.progress?.videoId;
@@ -120,7 +129,8 @@ export function DetailView({
   const seasons = [...new Set(episodes.map((video) => video.season ?? 1))].sort(
     (a, b) => (a === 0 ? 1 : b === 0 ? -1 : a - b),
   );
-  const [season, setSeason] = useState<number | undefined>(undefined);
+  const season = routeSeason;
+  const setSeason = onSeasonChange;
   const currentSeason =
     season !== undefined && seasons.includes(season)
       ? season
@@ -128,9 +138,9 @@ export function DetailView({
   const seasonEpisodes = episodes
     .filter((episode) => (episode.season ?? 1) === currentSeason)
     .sort((a, b) => (a.episode ?? 0) - (b.episode ?? 0));
-  const [showSources, setShowSources] = useState(
-    !isSeries || Boolean(startSources && (routeVideoId || progressVideo)),
-  );
+  // Whether the panel shows the sources of the selected episode is part of the history entry.
+  const showSources = !isSeries || Boolean(startSources && (routeVideoId || progressVideo));
+  const setShowSources = onSourcesChange;
   const selectedEpisode = isSeries
     ? episodes.find((item) => item.id === (routeVideoId || progressVideo))
     : undefined;
@@ -146,7 +156,7 @@ export function DetailView({
       const target = selectedEpisode || seasonEpisodes.find((item) => !upcoming(item)) || seasonEpisodes[0];
       if (target) chooseEpisode(target);
     }
-    panel.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    panel.current?.scrollIntoView({ block: "nearest", behavior: motion() });
     requestAnimationFrame(() =>
       panel.current?.querySelector<HTMLElement>(".source-row, .episode-row.selected, .episode-row")?.focus(),
     );
@@ -161,6 +171,15 @@ export function DetailView({
           disabled: addon.manifest.id === "saved",
           onSelect: () => void metadata.refetch(),
         },
+        ...(isSeries
+          ? []
+          : [
+              {
+                label: movieWatched ? "Marcar como no vista" : "Marcar como vista",
+                icon: <Check size={15} />,
+                onSelect: () => markWatched([meta.id], !movieWatched),
+              },
+            ]),
         {
           label: "Copiar identificador",
           icon: <Clipboard size={15} />,
@@ -185,11 +204,32 @@ export function DetailView({
       ],
       "Más acciones",
     );
+  const watched = useQuery({
+    queryKey: ["watched", meta.type, meta.id, entry?.remoteWatched, entry?.remoteWatchedAt, entry?.videos, episodes.map((item) => item.id).join()],
+    queryFn: () => watchedEpisodes(entry, episodes),
+    enabled: isSeries,
+    placeholderData: (previous) => previous,
+  });
+  const watchedIds = watched.data ?? new Set<string>();
+  const movieWatched = !isSeries && Boolean(entry?.watchedAt || entry?.videos?.[meta.id]?.watched);
+  const markWatched = (ids: string[], value: boolean) => {
+    preferencesStore.setWatched(meta, addon.manifestUrl, ids, value);
+    notify(
+      ids.length === 1
+        ? value
+          ? "Marcado como visto."
+          : "Marcado como no visto."
+        : `${ids.length} episodios marcados como ${value ? "vistos" : "no vistos"}.`,
+    );
+  };
   const resume =
-    entry?.progress && entry.progress.seconds > 5 && entry.progress.seconds < entry.progress.duration * 0.95
+    entry?.progress &&
+    ((entry.progress.seconds > 5 && entry.progress.seconds < entry.progress.duration * 0.95) ||
+      (isSeries && entry.progress.seconds === 0 && entry.progress.duration === 0))
       ? entry.progress
       : undefined;
   const resumeEpisode = resume && episodes.find((item) => item.id === resume.videoId);
+  const upNext = Boolean(resume && resume.seconds === 0);
   const facts = [
     typeLabel(meta.type),
     yearOf(meta),
@@ -214,6 +254,11 @@ export function DetailView({
                 {facts.map((fact) => (
                   <span key={fact}>{fact}</span>
                 ))}
+                {movieWatched && (
+                  <span className="watched-fact">
+                    <Check size={12} /> Vista
+                  </span>
+                )}
                 {meta.imdbRating && (
                   <span className="rating" title="Valoración IMDb">
                     <Star size={12} fill="currentColor" /> {meta.imdbRating}
@@ -238,12 +283,10 @@ export function DetailView({
                     }}
                   >
                     <Play size={14} fill="currentColor" />
-                    Continuar
+                    {upNext ? "Siguiente" : "Continuar"}
                     <span className="button-meta">
-                      {resumeEpisode
-                        ? `T${resumeEpisode.season ?? 1}·E${resumeEpisode.episode ?? 1} · `
-                        : ""}
-                      {clock(resume.seconds)}
+                      {resumeEpisode ? episodeCode(resumeEpisode) : ""}
+                      {upNext ? "" : `${resumeEpisode ? " · " : ""}${clock(resume.seconds)}`}
                     </span>
                   </button>
                 )}
@@ -327,12 +370,43 @@ export function DetailView({
               episodes={seasonEpisodes}
               loading={metadata.isPending}
               selectedId={selectedEpisode?.id}
-              progressId={progressVideo}
-              progressPercent={
-                entry?.progress?.duration ? (entry.progress.seconds / entry.progress.duration) * 100 : 0
-              }
+              progressOf={(id) => videoProgress(entry?.videos?.[id]) * 100}
+              watched={watchedIds}
               onSeason={setSeason}
               onChoose={chooseEpisode}
+              onMenu={(anchor, episode) => {
+                const isWatched = watchedIds.has(episode.id);
+                const ordered = orderedEpisodes(episodes).filter((item) => (item.season ?? 1) === (episode.season ?? 1));
+                const before = ordered.slice(0, ordered.findIndex((item) => item.id === episode.id) + 1);
+                menu.open(
+                  anchor,
+                  [
+                    { label: "Ver fuentes", icon: <Play size={15} />, onSelect: () => chooseEpisode(episode) },
+                    "separator",
+                    {
+                      label: isWatched ? "Marcar como no visto" : "Marcar como visto",
+                      icon: isWatched ? <Circle size={15} /> : <Check size={15} />,
+                      onSelect: () => markWatched([episode.id], !isWatched),
+                    },
+                    {
+                      label: "Marcar como vistos hasta aquí",
+                      icon: <CheckCheck size={15} />,
+                      disabled: before.every((item) => watchedIds.has(item.id)),
+                      onSelect: () => markWatched(before.map((item) => item.id), true),
+                    },
+                    {
+                      label:
+                        episode.season === 0
+                          ? "Marcar especiales como vistos"
+                          : `Marcar temporada ${episode.season ?? 1} como vista`,
+                      icon: <CheckCheck size={15} />,
+                      disabled: ordered.every((item) => watchedIds.has(item.id) || upcoming(item)),
+                      onSelect: () => markWatched(ordered.filter((item) => !upcoming(item)).map((item) => item.id), true),
+                    },
+                  ],
+                  `Episodio ${episodeCode(episode)}`,
+                );
+              }}
             />
           ) : (
             <SourcesPanel
@@ -359,20 +433,22 @@ function EpisodesPanel({
   episodes,
   loading,
   selectedId,
-  progressId,
-  progressPercent,
+  progressOf,
+  watched,
   onSeason,
   onChoose,
+  onMenu,
 }: {
   seasons: number[];
   season: number;
   episodes: Episode[];
   loading: boolean;
   selectedId?: string;
-  progressId?: string;
-  progressPercent: number;
+  progressOf: (id: string) => number;
+  watched: Set<string>;
   onSeason: (season: number) => void;
   onChoose: (episode: Episode) => void;
+  onMenu: (anchor: MenuAnchor, episode: Episode) => void;
 }) {
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -409,12 +485,24 @@ function EpisodesPanel({
         ) : episodes.length ? (
           episodes.map((episode) => {
             const future = upcoming(episode);
+            const seen = watched.has(episode.id);
+            const percent = progressOf(episode.id);
             return (
               <button
                 key={episode.id}
-                className={`episode-row ${selectedId === episode.id ? "selected" : ""} ${future ? "future" : ""}`}
+                className={`episode-row ${selectedId === episode.id ? "selected" : ""} ${future ? "future" : ""} ${seen ? "watched" : ""}`}
+                aria-label={`${episode.episode ?? 1}. ${episode.title || `Episodio ${episode.episode ?? 1}`}${seen ? ", visto" : ""}`}
                 onClick={() => onChoose(episode)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  onMenu({ x: event.clientX, y: event.clientY }, episode);
+                }}
                 onKeyDown={(event) => {
+                  if ((event.key === "F10" && event.shiftKey) || event.key === "ContextMenu") {
+                    event.preventDefault();
+                    onMenu(anchorFrom(event.currentTarget), episode);
+                    return;
+                  }
                   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
                   event.preventDefault();
                   const sibling =
@@ -430,9 +518,14 @@ function EpisodesPanel({
                   ) : (
                     <span>{episode.episode ?? "·"}</span>
                   )}
-                  {progressId === episode.id && progressPercent > 0 && (
+                  {percent > 0 && !seen && (
                     <span className="card-progress">
-                      <span style={{ width: `${Math.min(100, progressPercent)}%` }} />
+                      <span style={{ width: `${Math.min(100, percent)}%` }} />
+                    </span>
+                  )}
+                  {seen && (
+                    <span className="episode-watched" aria-hidden="true">
+                      <Check size={13} strokeWidth={2.5} />
                     </span>
                   )}
                 </span>
@@ -498,7 +591,15 @@ function SourcesPanel({
     onSettled: () => setActive(null),
   });
   const streams = sources.data || [];
-  const addonNames = [...new Set(streams.map((stream) => stream.addonName))];
+  // Several configured copies of one addon share its name; they are told apart by number.
+  const addonLabels = new Map<string, string>();
+  for (const url of new Set(streams.map((stream) => stream.addonUrl))) {
+    const name = streams.find((stream) => stream.addonUrl === url)!.addonName;
+    const copies = [...new Set(streams.filter((stream) => stream.addonName === name).map((stream) => stream.addonUrl))];
+    addonLabels.set(url, copies.length > 1 ? `${name} ${copies.indexOf(url) + 1}` : name);
+  }
+  const addonLabel = (stream: ResolvedStream) => addonLabels.get(stream.addonUrl) ?? stream.addonName;
+  const addonUrls = [...addonLabels.keys()];
   const languages = new Map<string, { label: string; count: number }>();
   for (const stream of streams)
     for (const language of streamLanguages(stream)) {
@@ -507,7 +608,7 @@ function SourcesPanel({
     }
   const visible = streams.filter(
     (stream) =>
-      (!addonFilter || stream.addonName === addonFilter) &&
+      (!addonFilter || stream.addonUrl === addonFilter) &&
       (!languageFilter || streamLanguages(stream).some((language) => language.flag === languageFilter)),
   );
   const start = (stream: ResolvedStream, mode: PlayMode, index: number) => {
@@ -577,17 +678,18 @@ function SourcesPanel({
           <RotateCw size={14} className={sources.isFetching && !sources.isPending ? "spin" : ""} />
         </button>
       </header>
-      {addonNames.length > 1 && (
+      {addonUrls.length > 1 && (
         <div className="chip-row" role="toolbar" aria-label="Filtrar por addon">
-          {["", ...addonNames].map((name) => (
+          {["", ...addonUrls].map((url) => (
             <button
-              key={name || "all"}
-              className={`chip ${addonFilter === name ? "selected" : ""}`}
-              aria-pressed={addonFilter === name}
-              onClick={() => setAddonFilter(name)}
+              key={url || "all"}
+              className={`chip ${addonFilter === url ? "selected" : ""}`}
+              aria-pressed={addonFilter === url}
+              title={url ? addonHost(url) : undefined}
+              onClick={() => setAddonFilter(url)}
             >
-              {name || "Todos"}
-              <span>{name ? streams.filter((stream) => stream.addonName === name).length : streams.length}</span>
+              {url ? addonLabels.get(url) : "Todos"}
+              <span>{url ? streams.filter((stream) => stream.addonUrl === url).length : streams.length}</span>
             </button>
           ))}
         </div>
@@ -721,7 +823,7 @@ function SourcesPanel({
                           </span>
                         )}
                         <span className="source-addon">
-                          {[stream.addonName, facts.provider].filter(Boolean).join(" · ")}
+                          {[addonLabel(stream), facts.provider].filter(Boolean).join(" · ")}
                         </span>
                       </span>
                     </span>

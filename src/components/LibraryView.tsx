@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { Library, List, LayoutGrid, Search, Trash2 } from "lucide-react";
 import type { LibraryEntry } from "../lib/contracts";
+import { useRouteState } from "../lib/navigation";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import { useUiSetting } from "../lib/ui";
 import { clock, yearOf } from "../lib/utils";
@@ -26,13 +26,15 @@ export function LibraryView({
   onMenu: CardMenu;
 }) {
   const prefs = usePreferences();
-  const [filter, setFilter] = useState<Filter>("all");
-  const [text, setText] = useState("");
+  const [filter, setFilter] = useRouteState<Filter>("filter", "all");
+  const [text, setText] = useRouteState<string>("text", "");
   const [sort, setSort] = useUiSetting("library.sort", "recent", sorts);
   const [view, setView] = useUiSetting("library.view", "grid", views);
-  const all = Object.values(prefs.library);
+  const everything = Object.values(prefs.library);
+  // «Seguir viendo» also lists titles played without saving them (Stremio's temporary items).
+  const all = everything.filter((entry) => entry.saved);
   const needle = text.trim().toLocaleLowerCase("es");
-  const entries = all
+  const entries = (filter === "continue" ? everything : all)
     .filter((entry) =>
       filter === "all"
         ? true
@@ -52,7 +54,7 @@ export function LibraryView({
     );
   const counts = {
     all: all.length,
-    continue: all.filter(inProgress).length,
+    continue: everything.filter(inProgress).length,
     movie: all.filter((entry) => entry.meta.type === "movie").length,
     series: all.filter((entry) => entry.meta.type === "series").length,
   };
@@ -127,10 +129,10 @@ export function LibraryView({
                   key={mediaKey(entry.meta.type, entry.meta.id)}
                   meta={entry.meta}
                   entry={entry}
-                  removeLabel
+                  removeLabel={entry.saved}
                   onOpen={() => onOpen(entry.meta, entry.addonUrl)}
                   onSources={() => onOpen(entry.meta, entry.addonUrl, true)}
-                  onSave={() => preferencesStore.removeMedia(entry.meta.type, entry.meta.id)}
+                  onSave={() => preferencesStore.toggleMedia(entry.meta, entry.addonUrl)}
                   onMenu={onMenu}
                 />
               ))}

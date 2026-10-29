@@ -19,6 +19,8 @@ export function typeLabel(type: string): string {
 /** Moves focus between sibling cards with the arrow keys. */
 export function cardKeys(event: KeyboardEvent<HTMLElement>) {
   if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+  // Alt+arrows navigate the history; modified keys are not card movement.
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
   const track = event.currentTarget.closest("[data-card-track]");
   if (!track) return;
   const cards = [...track.querySelectorAll<HTMLElement>("[data-card-focus]")];
@@ -63,6 +65,8 @@ export function MediaCard({
   removeLabel?: boolean;
 }) {
   const progress = progressOf(entry);
+  const saved = Boolean(entry?.saved);
+  const watched = Boolean(entry?.watchedAt);
   const year = yearOf(meta);
   const openMenu = (anchor: MenuAnchor) =>
     onMenu?.(
@@ -73,7 +77,7 @@ export function MediaCard({
           ? [{ label: "Ver fuentes", icon: <Play size={15} />, onSelect: onSources }]
           : []),
         "separator",
-        entry
+        saved
           ? {
               label: "Quitar de la biblioteca",
               icon: removeLabel ? <Trash2 size={15} /> : <BookmarkCheck size={15} />,
@@ -109,6 +113,12 @@ export function MediaCard({
         aria-label={`Ver ${meta.name}`}
       >
         <Artwork src={meta.poster} name={meta.name} className="poster" />
+        {watched && (
+          <span className="card-watched" title="Vista">
+            <Check size={12} strokeWidth={2.5} />
+            <span className="sr-only">Vista</span>
+          </span>
+        )}
         {progress > 0 && progress < 95 && (
           <span
             className="card-progress"
@@ -119,18 +129,18 @@ export function MediaCard({
         )}
       </button>
       <button
-        className={`card-save ${entry ? "saved" : ""}`}
+        className={`card-save ${saved ? "saved" : ""}`}
         aria-label={
-          entry
+          saved
             ? `Quitar ${meta.name} de mi biblioteca`
             : `Guardar ${meta.name} en mi biblioteca`
         }
-        title={entry ? "Quitar de la biblioteca" : "Añadir a la biblioteca"}
-        aria-pressed={Boolean(entry)}
+        title={saved ? "Quitar de la biblioteca" : "Añadir a la biblioteca"}
+        aria-pressed={saved}
         tabIndex={-1}
         onClick={onSave}
       >
-        {entry ? <Check size={14} /> : <Plus size={14} />}
+        {saved ? <Check size={14} /> : <Plus size={14} />}
       </button>
       <div className="card-text" aria-hidden="true">
         <span className="card-title" title={meta.name}>
