@@ -182,7 +182,15 @@ function media(value: unknown): MediaItem {
     director: optionalStrings(item.director, 'Directors'),
     videos: item.videos?.map(episode),
     trailers: trailers(item),
+    ...positiveNumber('tmdbId', item.moviedb_id),
+    ...positiveNumber('popularity', item.popularity),
   };
+}
+
+/** Optional numeric hints of catalog items; anything else is left out. */
+function positiveNumber<K extends string>(key: K, value: unknown): Partial<Record<K, number>> {
+  const number = typeof value === 'string' && value.trim() ? Number(value) : value;
+  return typeof number === 'number' && Number.isFinite(number) && number > 0 ? ({ [key]: number } as Record<K, number>) : {};
 }
 
 /** YouTube trailers, from `trailerStreams` (streams with ytId) or the older `trailers` list. */

@@ -17,7 +17,11 @@ export type ContentCategory = "all" | "sfw" | "nsfw";
 const storageKey = "vela.ratings.v1";
 const MAX_STORED = 4000;
 const TTL = 30 * 24 * 60 * 60_000;
-const CONCURRENCY = 4;
+/**
+ * Ratings are one request each with a TMDB id, and a request takes about a second; 32 at a time
+ * stays under TMDB's limit of about 50 requests per second.
+ */
+const CONCURRENCY = 32;
 const RETRY_AFTER = 10 * 60_000;
 
 type Stored = TitleRating & { at: number };
@@ -33,7 +37,7 @@ try {
   ratings = new Map();
 }
 
-const queue: { key: string; id: string; type: string }[] = [];
+const queue: { key: string; id: string; type: string; tmdbId?: number }[] = [];
 const queued = new Set<string>();
 const failed = new Map<string, number>();
 let running = 0;
@@ -67,7 +71,7 @@ async function pump() {
       try {
         const apiKey = await tmdb.key();
         if (!apiKey) return;
-        const rating = await lookupRating(next.id, next.type, (path, params = {}) =>
+        const rating = await lookupRating(next, (path, params = {}) =>
           requestJson(`https://api.themoviedb.org/3${path}?${new URLSearchParams({ ...params, api_key: apiKey })}`),
         );
         ratings.set(next.key, { ...rating, at: Date.now() });
@@ -84,13 +88,13 @@ async function pump() {
   }
 }
 
-function request(items: Pick<MediaItem, "type" | "id">[]) {
+function request(items: Pick<MediaItem, "type" | "id" | "tmdbId">[]) {
   const now = Date.now();
   for (const meta of items) {
     const key = keyOf(meta);
     if (!rateable(meta) || ratings.has(key) || queued.has(key) || now - (failed.get(key) ?? 0) < RETRY_AFTER) continue;
     queued.add(key);
-    queue.push({ key, id: meta.id, type: meta.type });
+    queue.push({ key, id: meta.id, type: meta.type, tmdbId: meta.tmdbId });
   }
   void pump();
 }

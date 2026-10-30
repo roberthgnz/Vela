@@ -21,18 +21,23 @@ describe('age ratings', () => {
     expect(pickAge([{ country: 'ES', certifications: [''] }])).toBeNull();
   });
 
-  it('looks up films and series by IMDb id', async () => {
+  it('looks up a title in one request with its TMDB id, or searches by IMDb id', async () => {
     const responses: Record<string, unknown> = {
-      '/find/tt1': { movie_results: [{ id: 5, adult: false }], tv_results: [] },
-      '/movie/5/release_dates': { results: [{ iso_3166_1: 'ES', release_dates: [{ certification: '18' }] }] },
+      '/movie/5': { adult: false, release_dates: { results: [{ iso_3166_1: 'ES', release_dates: [{ certification: '18' }] }] } },
       '/find/tt2': { movie_results: [], tv_results: [{ id: 9 }] },
-      '/tv/9/content_ratings': { results: [{ iso_3166_1: 'US', rating: 'TV-Y7' }] },
+      '/tv/9': { adult: true, content_ratings: { results: [{ iso_3166_1: 'US', rating: 'TV-Y7' }] } },
       '/find/tt3': { movie_results: [], tv_results: [] },
     };
-    const fetchJson = async (path: string) => responses[path];
-    expect(await lookupRating('tt1', 'movie', fetchJson)).toEqual({ adult: false, age: 18 });
-    expect(await lookupRating('tt2', 'series', fetchJson)).toEqual({ adult: false, age: 7 });
-    expect(await lookupRating('tt3', 'movie', fetchJson)).toEqual({ adult: false, age: null });
+    const paths: string[] = [];
+    const fetchJson = async (path: string, params?: Record<string, string>) => {
+      paths.push(`${path}${params?.append_to_response ? `+${params.append_to_response}` : ''}`);
+      return responses[path];
+    };
+    expect(await lookupRating({ id: 'tt1', type: 'movie', tmdbId: 5 }, fetchJson)).toEqual({ adult: false, age: 18 });
+    expect(paths).toEqual(['/movie/5+release_dates']);
+    expect(await lookupRating({ id: 'tt2', type: 'series' }, fetchJson)).toEqual({ adult: true, age: 7 });
+    expect(paths.slice(1)).toEqual(['/find/tt2', '/tv/9+content_ratings']);
+    expect(await lookupRating({ id: 'tt3', type: 'movie' }, fetchJson)).toEqual({ adult: false, age: null });
   });
 
   it('applies a profile limit', () => {

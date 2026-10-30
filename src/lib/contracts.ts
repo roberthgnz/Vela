@@ -28,6 +28,10 @@ export type MediaItem = {
   videos?: Episode[];
   /** YouTube trailers (`trailerStreams` / `trailers` in Cinemeta). */
   trailers?: { ytId: string; title?: string }[];
+  /** TMDB id (`moviedb_id` in Cinemeta): age ratings without searching TMDB first. */
+  tmdbId?: number;
+  /** Cinemeta's popularity score, used to merge its per-year catalogs. */
+  popularity?: number;
 };
 
 export type AddonCatalog = {

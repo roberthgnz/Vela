@@ -62,38 +62,42 @@ export function pickAge(byCountry: { country: string; certifications: string[] }
   return others.length ? Math.max(...others) : null;
 }
 
-type Find = { movie_results?: { id: number; adult?: boolean }[]; tv_results?: { id: number; adult?: boolean }[] };
+type Find = { movie_results?: { id: number }[]; tv_results?: { id: number }[] };
 type ReleaseDates = { results?: { iso_3166_1: string; release_dates?: { certification?: string }[] }[] };
 type ContentRatings = { results?: { iso_3166_1: string; rating?: string }[] };
+type Details = { adult?: boolean; release_dates?: ReleaseDates; content_ratings?: ContentRatings };
 
-/** Looks up a title by IMDb id. `fetchJson` receives TMDB URLs without the key (added by the caller). */
+/**
+ * Looks up a title's rating. With its TMDB id (Cinemeta's catalogs carry it) that is one request:
+ * the details with the ratings appended; otherwise TMDB is searched by IMDb id first.
+ * `fetchJson` receives TMDB paths without the key (added by the caller).
+ */
 export async function lookupRating(
-  imdbId: string,
-  type: string,
+  title: { id: string; type: string; tmdbId?: number },
   fetchJson: (path: string, params?: Record<string, string>) => Promise<unknown>,
 ): Promise<TitleRating> {
-  const found = (await fetchJson(`/find/${imdbId}`, { external_source: "imdb_id" })) as Find;
-  const series = type === "series";
-  const hit = (series ? found.tv_results : found.movie_results)?.[0] ?? (series ? found.movie_results : found.tv_results)?.[0];
-  if (!hit) return { adult: false, age: null };
-  const kind = found.tv_results?.[0] === hit ? "tv" : "movie";
-  if (kind === "movie") {
-    const dates = (await fetchJson(`/movie/${hit.id}/release_dates`)) as ReleaseDates;
-    return {
-      adult: Boolean(hit.adult),
-      age: pickAge(
-        (dates.results ?? []).map((item) => ({
+  let kind: "movie" | "tv" = title.type === "series" ? "tv" : "movie";
+  let id = title.tmdbId;
+  if (!id) {
+    const found = (await fetchJson(`/find/${title.id}`, { external_source: "imdb_id" })) as Find;
+    const preferred = kind === "tv" ? found.tv_results : found.movie_results;
+    const other = kind === "tv" ? found.movie_results : found.tv_results;
+    if (preferred?.[0]) id = preferred[0].id;
+    else if (other?.[0]) {
+      id = other[0].id;
+      kind = kind === "tv" ? "movie" : "tv";
+    } else return { adult: false, age: null };
+  }
+  const append = kind === "movie" ? "release_dates" : "content_ratings";
+  const details = (await fetchJson(`/${kind}/${id}`, { append_to_response: append })) as Details;
+  const byCountry =
+    kind === "movie"
+      ? (details.release_dates?.results ?? []).map((item) => ({
           country: item.iso_3166_1,
           certifications: (item.release_dates ?? []).map((date) => date.certification ?? ""),
-        })),
-      ),
-    };
-  }
-  const ratings = (await fetchJson(`/tv/${hit.id}/content_ratings`)) as ContentRatings;
-  return {
-    adult: Boolean(hit.adult),
-    age: pickAge((ratings.results ?? []).map((item) => ({ country: item.iso_3166_1, certifications: [item.rating ?? ""] }))),
-  };
+        }))
+      : (details.content_ratings?.results ?? []).map((item) => ({ country: item.iso_3166_1, certifications: [item.rating ?? ""] }));
+  return { adult: Boolean(details.adult), age: pickAge(byCountry) };
 }
 
 export type AgeLimit = { maxAge?: number; hideUnrated?: boolean };

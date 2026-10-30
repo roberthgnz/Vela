@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { LayoutGrid, Grid3X3, Puzzle } from "lucide-react";
 import { catalogTitle } from "../lib/catalogLayout";
@@ -9,6 +9,7 @@ import { useRouteState } from "../lib/navigation";
 import { browsable, catalogFilters, getCatalog, getCatalogSources, nextCatalogSkip } from "../lib/protocol";
 import { activeFilters, applySearchFilters, decades, noSearchFilters, type SearchFilters } from "../lib/searchFilters";
 import { useContentCategories, useContentFilter, type ContentCategory } from "../lib/contentFilter";
+import { CINEMETA_PAGE, decadeCatalogs, mergeByPopularity, type YearCatalogs } from "../lib/decadeCatalog";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import { useUiSetting } from "../lib/ui";
 import { errorMessage } from "../lib/utils";
@@ -28,6 +29,8 @@ function filterLabel(name: string, options: string[] = []): string {
 
 /** Pages loaded in a row while the filters hide every title, before waiting for «Cargar más». */
 const FILTERED_AUTOLOAD_PAGES = 12;
+/** Titles shown (and rated, when the profile or the filter needs it) at a time; more on scroll. */
+const BATCH = 60;
 
 export function DensityToggle({
   value,
@@ -217,9 +220,10 @@ export function BrowseView({
       </header>
       {source ? (
         <CatalogGrid
-          key={`${source.key}|${JSON.stringify(values)}`}
+          key={`${source.key}|${JSON.stringify(values)}|${decade}|${content}`}
           source={source}
           extra={values}
+          byYear={decadeCatalogs(getCatalogSources(prefs.addons, type), source, decade, values)}
           refine={refine}
           content={content}
           density={density}
@@ -245,6 +249,7 @@ export function BrowseView({
 function CatalogGrid({
   source,
   extra,
+  byYear,
   refine,
   content,
   density,
@@ -253,6 +258,8 @@ function CatalogGrid({
 }: {
   source: CatalogSource;
   extra: Record<string, string>;
+  /** For a decade of Cinemeta's popular catalog: its per-year catalogs, merged by popularity. */
+  byYear?: YearCatalogs;
   /** SFW/NSFW choice, from TMDB's age ratings. */
   content: ContentCategory;
   /** Year, rating and order chosen in Vela, applied to the titles loaded so far. */
@@ -263,14 +270,31 @@ function CatalogGrid({
 }) {
   const prefs = usePreferences();
   const sentinel = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(BATCH);
   const supportsSkip =
     source.catalog.extra?.some((extra) => extra.name === "skip") ||
     source.catalog.extraSupported?.includes("skip");
   const query = useInfiniteQuery({
-    queryKey: ["browse", source.key, extra],
+    queryKey: byYear ? ["browse-years", byYear.source.key, byYear.years] : ["browse", source.key, extra],
     initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) => getCatalog(source, { extra, skip: pageParam || undefined }, signal),
-    getNextPageParam: (_last, pages) => nextCatalogSkip(pages, Boolean(supportsSkip)),
+    queryFn: async ({ pageParam, signal }) => {
+      if (!byYear) return getCatalog(source, { extra, skip: pageParam || undefined }, signal);
+      // All the years at once; a year that fails only leaves a gap.
+      const years = await Promise.allSettled(
+        byYear.years.map((year) => getCatalog(byYear.source, { extra: { genre: year }, skip: pageParam || undefined }, signal)),
+      );
+      const pages = years.filter((year) => year.status === "fulfilled").map((year) => year.value);
+      if (!pages.length) throw (years[0] as PromiseRejectedResult).reason;
+      return mergeByPopularity(pages);
+    },
+    // With the years, another page may follow while they still fill a page between them (an
+    // empty page ends the list).
+    getNextPageParam: (last, pages, lastParam) =>
+      byYear
+        ? last.length >= CINEMETA_PAGE
+          ? lastParam + CINEMETA_PAGE
+          : undefined
+        : nextCatalogSkip(pages, Boolean(supportsSkip)),
   });
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
   const seen = new Set<string>();
@@ -281,23 +305,36 @@ function CatalogGrid({
     return true;
   });
   const refined = activeFilters(refine) > 0 ? applySearchFilters(loaded.map((meta) => ({ meta })), refine).map(({ meta }) => meta) : loaded;
-  const allowed = useContentFilter(refined, (meta) => meta, content);
+  // Titles are shown (and, when they need an age rating, rated) a batch at a time, in order, as
+  // the user scrolls: a decade brings hundreds of titles at once, and rating or drawing them all
+  // made the first ones wait for the rest.
+  const considered = refined.slice(0, shown);
+  const allowed = useContentFilter(considered, (meta) => meta, content);
+  const moreToShow = shown < refined.length;
   const items = allowed.visible;
   const refining = activeFilters(refine) > 0 || content !== "all" || allowed.limited;
   // While the filters hide (almost) everything, more pages load on their own, up to a limit.
   const autoLoad = !refining || items.length > 0 || (query.data?.pages.length ?? 0) < FILTERED_AUTOLOAD_PAGES;
+  const pending = allowed.pending > 0;
   useEffect(() => {
     const node = sentinel.current;
-    if (!node || !hasNextPage || !autoLoad) return;
+    if (!node || (!moreToShow && (!hasNextPage || !autoLoad))) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !isFetchingNextPage) void fetchNextPage();
+        // Waits for the ratings in flight before asking for more titles.
+        if (!entry.isIntersecting || pending || isFetchingNextPage) return;
+        if (moreToShow) setShown((value) => value + BATCH);
+        else void fetchNextPage();
       },
-      { rootMargin: "600px 0px" },
+      // The content scrolls inside #main, which clips: with the viewport as root, the margin never
+      // applied and the end of the list had to be on screen before anything more loaded.
+      { root: document.getElementById("main"), rootMargin: "600px 0px" },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [autoLoad, hasNextPage, isFetchingNextPage, fetchNextPage]);
+    // `shown` and the number of titles re-create the observer after each batch or page: it only
+    // reports changes, so while the end of the list stays in view nothing else would ask for more.
+  }, [autoLoad, hasNextPage, isFetchingNextPage, fetchNextPage, moreToShow, pending, shown, loaded.length]);
   if (query.isError && !items.length)
     return (
       <div className="page-body">
@@ -308,7 +345,7 @@ function CatalogGrid({
         />
       </div>
     );
-  if (query.isSuccess && loaded.length && !items.length && !hasNextPage && !allowed.pending)
+  if (query.isSuccess && loaded.length && !items.length && !hasNextPage && !pending && !moreToShow)
     return (
       <EmptyState
         title="Ningún título con estos filtros"
@@ -325,7 +362,7 @@ function CatalogGrid({
   return (
     <div className="page-body">
       <div className={`poster-grid ${density}`} data-card-track>
-        {query.isPending || (!items.length && allowed.pending) ? (
+        {query.isPending || (!items.length && (pending || moreToShow || query.isFetchingNextPage)) ? (
           <PosterSkeletons count={18} />
         ) : (
           items.map((meta) => (
@@ -341,15 +378,15 @@ function CatalogGrid({
           ))
         )}
       </div>
-      {query.hasNextPage && (
+      {(query.hasNextPage || moreToShow) && (
         <div className="grid-footer" ref={sentinel}>
           <button
             className="button subtle"
-            disabled={query.isFetchingNextPage}
-            onClick={() => void query.fetchNextPage()}
+            disabled={query.isFetchingNextPage || pending}
+            onClick={() => (moreToShow ? setShown((value) => value + BATCH) : void query.fetchNextPage())}
           >
-            {query.isFetchingNextPage ? <Spinner /> : null}
-            {query.isFetchingNextPage ? "Cargando" : "Cargar más"}
+            {query.isFetchingNextPage || pending ? <Spinner /> : null}
+            {pending ? "Comprobando clasificaciones" : query.isFetchingNextPage ? "Cargando" : "Cargar más"}
           </button>
         </div>
       )}
