@@ -8,6 +8,7 @@ import type { CatalogSource } from "../lib/contracts";
 import { useRouteState } from "../lib/navigation";
 import { browsable, catalogFilters, getCatalog, getCatalogSources, nextCatalogSkip } from "../lib/protocol";
 import { activeFilters, applySearchFilters, decades, noSearchFilters, type SearchFilters } from "../lib/searchFilters";
+import { useContentCategories, useContentFilter, type ContentCategory } from "../lib/contentFilter";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import { useUiSetting } from "../lib/ui";
 import { errorMessage } from "../lib/utils";
@@ -72,6 +73,9 @@ export function BrowseView({
   const [decade, setDecade] = useRouteState<string>("decade", "");
   const [minRating, setMinRating] = useRouteState<number>("rating", 0);
   const [order, setOrder] = useRouteState<string>("order", "relevance");
+  const categories = useContentCategories();
+  const [contentChoice, setContent] = useRouteState<string>("content", "all");
+  const content: ContentCategory = categories && (contentChoice === "sfw" || contentChoice === "nsfw") ? contentChoice : "all";
   const refine: SearchFilters = {
     ...noSearchFilters,
     decade,
@@ -180,13 +184,29 @@ export function BrowseView({
               <option value="rating">Mejor valorados</option>
             </select>
           </label>
-          {activeFilters(refine) > 0 && (
+          {categories && (
+            <label className="select">
+              <span className="select-label">Contenido</span>
+              <select
+                aria-label="Contenido"
+                title="Según la clasificación por edad de TMDB"
+                value={content}
+                onChange={(event) => setContent(event.target.value)}
+              >
+                <option value="all">Todo</option>
+                <option value="sfw">Apto (SFW)</option>
+                <option value="nsfw">Adultos (NSFW, +18)</option>
+              </select>
+            </label>
+          )}
+          {(activeFilters(refine) > 0 || content !== "all") && (
             <button
               className="link-button"
               onClick={() => {
                 setDecade("");
                 setMinRating(0);
                 setOrder("relevance");
+                setContent("all");
               }}
             >
               Quitar filtros
@@ -201,6 +221,7 @@ export function BrowseView({
           source={source}
           extra={values}
           refine={refine}
+          content={content}
           density={density}
           onOpen={onOpen}
           onMenu={onMenu}
@@ -225,12 +246,15 @@ function CatalogGrid({
   source,
   extra,
   refine,
+  content,
   density,
   onOpen,
   onMenu,
 }: {
   source: CatalogSource;
   extra: Record<string, string>;
+  /** SFW/NSFW choice, from TMDB's age ratings. */
+  content: ContentCategory;
   /** Year, rating and order chosen in Vela, applied to the titles loaded so far. */
   refine: SearchFilters;
   density: string;
@@ -256,8 +280,10 @@ function CatalogGrid({
     seen.add(key);
     return true;
   });
-  const refining = activeFilters(refine) > 0;
-  const items = refining ? applySearchFilters(loaded.map((meta) => ({ meta })), refine).map(({ meta }) => meta) : loaded;
+  const refined = activeFilters(refine) > 0 ? applySearchFilters(loaded.map((meta) => ({ meta })), refine).map(({ meta }) => meta) : loaded;
+  const allowed = useContentFilter(refined, (meta) => meta, content);
+  const items = allowed.visible;
+  const refining = activeFilters(refine) > 0 || content !== "all" || allowed.limited;
   // While the filters hide (almost) everything, more pages load on their own, up to a limit.
   const autoLoad = !refining || items.length > 0 || (query.data?.pages.length ?? 0) < FILTERED_AUTOLOAD_PAGES;
   useEffect(() => {
@@ -282,7 +308,7 @@ function CatalogGrid({
         />
       </div>
     );
-  if (query.isSuccess && loaded.length && !items.length && !hasNextPage)
+  if (query.isSuccess && loaded.length && !items.length && !hasNextPage && !allowed.pending)
     return (
       <EmptyState
         title="Ningún título con estos filtros"
@@ -299,7 +325,7 @@ function CatalogGrid({
   return (
     <div className="page-body">
       <div className={`poster-grid ${density}`} data-card-track>
-        {query.isPending ? (
+        {query.isPending || (!items.length && allowed.pending) ? (
           <PosterSkeletons count={18} />
         ) : (
           items.map((meta) => (

@@ -157,6 +157,7 @@ function manifest(value: unknown): AddonManifest | undefined {
   }
   const idPrefixes = strings(value.idPrefixes);
   if (idPrefixes) result.idPrefixes = idPrefixes;
+  if (record(value.behaviorHints) && value.behaviorHints.adult === true) result.behaviorHints = { adult: true };
   return result;
 }
 

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
-import { Lock, Plus } from "lucide-react";
+import { Lock, Plus, ShieldCheck } from "lucide-react";
 import { account, useAccount } from "../lib/account";
 import { PIN_LENGTH, validPin } from "../lib/pin";
-import { managementGuard, MAX_PROFILES, profileColors, profiles, useProfiles, type Profile } from "../lib/profiles";
+import { ageLimits, managementGuard, MAX_PROFILES, profileColors, profiles, useProfiles, type Profile } from "../lib/profiles";
+import { useTmdbConfigured } from "../lib/tmdb";
 import { MAIN_PROFILE } from "../lib/store";
 import { errorMessage } from "../lib/utils";
-import { Dialog, Spinner, useMenu } from "./Primitives";
+import { Dialog, Segmented, Spinner, Switch, useMenu } from "./Primitives";
 import { WindowControls } from "./WindowControls";
 
 export function ProfileAvatar({ profile, size = 28 }: { profile: Pick<Profile, "name" | "color" | "pin">; size?: number }) {
@@ -32,6 +33,10 @@ function arrows(event: KeyboardEvent<HTMLElement>) {
   const items = [...(event.currentTarget.parentElement?.querySelectorAll<HTMLElement>("[data-profile]") ?? [])];
   const index = items.indexOf(event.currentTarget);
   items[(index + (event.key === "ArrowRight" ? 1 : -1) + items.length) % items.length]?.focus();
+}
+
+function allowsAdultLabel(profile: Profile): string {
+  return profile.showAdult && !profile.kids ? "Adultos" : "";
 }
 
 /** A field for a PIN: digits only, hidden, submitted as soon as it is complete. */
@@ -298,6 +303,79 @@ function PinEditor({ profile, onClose, notify }: { profile: Profile; onClose: ()
   );
 }
 
+/** What a profile may see: adult content and an age limit from TMDB's ratings. */
+function ContentDialog({ profile, onClose }: { profile: Profile; onClose: () => void }) {
+  const live = useProfiles().profiles.find((item) => item.id === profile.id) ?? profile;
+  const configured = useTmdbConfigured();
+  const limit = live.maxAge === undefined ? "none" : String(live.maxAge);
+  return (
+    <Dialog title={`Contenido de ${live.name}`} onClose={onClose} className="compact-dialog wide content-dialog" hideClose>
+      <h2>Contenido de «{live.name}»</h2>
+      <div className="content-option">
+        <div>
+          <strong>Contenido para adultos</strong>
+          <p>
+            Addons que se declaran para adultos y títulos que TMDB marca como pornográficos.
+            {live.kids ? " Los perfiles infantiles nunca lo muestran." : ""}
+          </p>
+        </div>
+        <Switch
+          checked={Boolean(live.showAdult) && !live.kids}
+          label="Mostrar contenido para adultos"
+          disabled={live.kids}
+          onChange={() => profiles.update(live.id, { showAdult: !live.showAdult })}
+        />
+      </div>
+      <div className="content-option column">
+        <div>
+          <strong>Edad máxima</strong>
+          <p>
+            Oculta en Inicio, Explorar y la búsqueda los títulos clasificados para más edad, y no deja abrirlos. Usa la
+            clasificación de España en TMDB (o la de EE. UU. si no hay).
+          </p>
+        </div>
+        <Segmented
+          label="Edad máxima"
+          value={limit}
+          onChange={(value) => profiles.update(live.id, { maxAge: value === "none" ? null : Number(value) })}
+          options={[
+            { value: "none", label: <span className="segment-text">Sin límite</span>, title: "Sin límite" },
+            ...ageLimits.map((age) => ({
+              value: String(age),
+              label: <span className="segment-text">{age === 18 ? "+18" : `Hasta ${age}`}</span>,
+              title: age === 18 ? "Todo salvo contenido para adultos" : `Títulos para ${age} años o menos`,
+              disabled: !configured,
+            })),
+          ]}
+        />
+        {!configured && <p className="status">Necesita una clave de TMDB (Ajustes › Información).</p>}
+      </div>
+      {live.maxAge !== undefined && (
+        <div className="content-option">
+          <div>
+            <strong>Títulos sin clasificar</strong>
+            <p>Muchos títulos no tienen clasificación en ningún país. Ocultarlos es más seguro para niños.</p>
+          </div>
+          <Switch
+            checked={Boolean(live.hideUnrated)}
+            label="Ocultar títulos sin clasificar"
+            onChange={() => profiles.update(live.id, { hideUnrated: !live.hideUnrated })}
+          />
+        </div>
+      )}
+      <p className="settings-note">
+        Para que nadie cambie estos límites, pon un PIN al perfil «Principal»: desde un perfil infantil hará falta para
+        administrar los perfiles.
+      </p>
+      <div className="form-actions">
+        <button className="button primary" data-autofocus onClick={onClose}>
+          Hecho
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
 /** Settings › Perfiles. */
 export function ProfileSettings({ notify }: { notify: (message: string) => void }) {
   const state = useProfiles();
@@ -310,6 +388,7 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
   const [error, setError] = useState("");
   const [removing, setRemoving] = useState<Profile | null>(null);
   const [editingPin, setEditingPin] = useState<Profile | null>(null);
+  const [editingContent, setEditingContent] = useState<Profile | null>(null);
   const guard = managementGuard(state);
   const [unlocked, setUnlocked] = useState(false);
   const rename = (profile: Profile, value: string) => {
@@ -409,6 +488,8 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
               profile.id === active ? "En uso" : "",
               profile.kids ? "Infantil" : "",
               profile.pin ? "Con PIN" : "",
+              profile.maxAge !== undefined ? (profile.maxAge === 18 ? "+18" : `Hasta ${profile.maxAge}`) : "",
+              allowsAdultLabel(profile),
               linked === profile.id && accountState.user ? `Cuenta de Stremio` : "",
             ]
               .filter(Boolean)
@@ -432,6 +513,14 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
               onClick={(event) => pinMenu(profile, event.currentTarget)}
             >
               <Lock size={12} /> PIN
+            </button>
+            <button
+              className={`chip ${profile.maxAge !== undefined ? "selected" : ""}`}
+              aria-haspopup="dialog"
+              title="Contenido para adultos y edad máxima"
+              onClick={() => setEditingContent(profile)}
+            >
+              <ShieldCheck size={12} /> Contenido
             </button>
             {profile.id !== active && (
               <button
@@ -490,6 +579,7 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
       {menu.element}
       {gate.element}
       {editingPin && <PinEditor profile={editingPin} notify={notify} onClose={() => setEditingPin(null)} />}
+      {editingContent && <ContentDialog profile={editingContent} onClose={() => setEditingContent(null)} />}
       {removing && (
         <Dialog title="Eliminar perfil" onClose={() => setRemoving(null)} className="compact-dialog" hideClose>
           <h2>¿Eliminar «{removing.name}»?</h2>

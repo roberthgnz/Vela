@@ -51,6 +51,8 @@ export type AddonManifest = {
   types: string[];
   idPrefixes?: string[];
   catalogs: AddonCatalog[];
+  /** `adult`: the addon publishes adult content (Stremio hides such addons unless allowed). */
+  behaviorHints?: { adult?: boolean };
 };
 
 export type InstalledAddon = {

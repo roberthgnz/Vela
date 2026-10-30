@@ -12,8 +12,25 @@ import { MAIN_PROFILE, preferencesStore } from "./store";
 /**
  * `kids`: Home, Explorar and search show only children's catalogs.
  * `pin`: the profile asks for its PIN before opening, and before its PIN is changed or it is deleted.
+ * `showAdult`: addons and titles marked for adults are shown (never in a child's profile).
+ * `maxAge`: titles rated for older viewers are hidden (TMDB ratings); `hideUnrated` also hides
+ * titles no country rates.
  */
-export type Profile = { id: string; name: string; color: string; kids?: boolean; pin?: PinHash };
+export type Profile = {
+  id: string;
+  name: string;
+  color: string;
+  kids?: boolean;
+  pin?: PinHash;
+  showAdult?: boolean;
+  maxAge?: number;
+  hideUnrated?: boolean;
+};
+
+/** Age limits offered for a profile. */
+export const ageLimits = [7, 12, 16, 18] as const;
+
+type ContentChange = { showAdult?: boolean; maxAge?: number | null; hideUnrated?: boolean };
 type Saved = { profiles: Profile[]; last?: string };
 
 const storageKey = "vela.profiles.v1";
@@ -134,7 +151,7 @@ export const profiles = {
     save({ ...saved, profiles: [...saved.profiles, profile] });
     return profile;
   },
-  update(id: string, change: Partial<Pick<Profile, "name" | "color" | "kids">>) {
+  update(id: string, change: Partial<Pick<Profile, "name" | "color" | "kids">> & ContentChange) {
     const name = change.name === undefined ? undefined : clean(change.name);
     if (name === "") throw new Error("Escribe un nombre para el perfil.");
     if (name && saved.profiles.some((profile) => profile.id !== id && profile.name.toLocaleLowerCase("es") === name.toLocaleLowerCase("es")))
@@ -149,6 +166,11 @@ export const profiles = {
               ...(change.color ? { color: change.color } : {}),
               // The main profile keeps the install's original data and settings; it is never a child's.
               ...(change.kids !== undefined && id !== MAIN_PROFILE ? { kids: change.kids } : {}),
+              ...(change.showAdult !== undefined ? { showAdult: change.showAdult } : {}),
+              ...(change.hideUnrated !== undefined ? { hideUnrated: change.hideUnrated } : {}),
+              ...(change.maxAge === undefined
+                ? {}
+                : { maxAge: ageLimits.some((age) => age === change.maxAge) ? (change.maxAge as number) : undefined }),
             }
           : profile,
       ),

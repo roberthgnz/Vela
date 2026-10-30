@@ -5,6 +5,7 @@ import type { InstalledAddon, MediaItem } from "../lib/contracts";
 import { getCatalog, getCatalogSources } from "../lib/protocol";
 import { activeFilters, applySearchFilters, decades, noSearchFilters, type SearchFilters } from "../lib/searchFilters";
 import { searchHistory, useSearchHistory } from "../lib/searchHistory";
+import { useContentCategories, useContentFilter, type ContentCategory } from "../lib/contentFilter";
 import { useKidsMode } from "../lib/profiles";
 import { mediaKey, usePreferences } from "../lib/store";
 import { errorMessage, yearOf } from "../lib/utils";
@@ -92,7 +93,14 @@ export function SearchPalette({
   );
   const [filters, setFilters] = useState<SearchFilters>(noSearchFilters);
   const filter = (change: Partial<SearchFilters>) => setFilters((current) => ({ ...current, ...change }));
-  const filtered = query.data ? applySearchFilters(query.data, filters) : undefined;
+  const categories = useContentCategories();
+  const [content, setContent] = useState<ContentCategory>("all");
+  const allowed = useContentFilter(
+    query.data ? applySearchFilters(query.data, filters) : [],
+    ({ meta }) => meta,
+    categories ? content : "all",
+  );
+  const filtered = query.data ? allowed.visible : undefined;
   const groups = filtered
     ? (["movie", "series"] as const)
         .map((type) => ({ type, items: filtered.filter(({ meta }) => meta.type === type) }))
@@ -176,8 +184,28 @@ export function SearchPalette({
           <option value="newest">Más recientes</option>
           <option value="oldest">Más antiguos</option>
         </select>
-        {activeFilters(filters) > 0 && (
-          <button className="link-button palette-clear" onClick={() => setFilters(noSearchFilters)}>
+        {categories && (
+          <select
+            className="palette-select"
+            aria-label="Contenido"
+            title="Según la clasificación por edad de TMDB"
+            value={content}
+            data-active={content !== "all" || undefined}
+            onChange={(event) => setContent(event.target.value as ContentCategory)}
+          >
+            <option value="all">Todo el contenido</option>
+            <option value="sfw">Apto (SFW)</option>
+            <option value="nsfw">Adultos (NSFW, +18)</option>
+          </select>
+        )}
+        {(activeFilters(filters) > 0 || content !== "all") && (
+          <button
+            className="link-button palette-clear"
+            onClick={() => {
+              setFilters(noSearchFilters);
+              setContent("all");
+            }}
+          >
             Quitar filtros
           </button>
         )}
@@ -229,14 +257,25 @@ export function SearchPalette({
                 </section>
               ))
             ) : (
-              query.data?.length && activeFilters(filters) ? (
+              allowed.pending ? (
+                <div className="palette-item skeleton-row" aria-hidden="true">
+                  <span className="skeleton thumb" />
+                  <span className="skeleton skeleton-line" />
+                </div>
+              ) : query.data?.length && (activeFilters(filters) || content !== "all" || allowed.limited) ? (
                 <EmptyState
                   compact
                   icon={<Search size={18} />}
                   title="Ningún resultado con estos filtros"
                   description={`Hay ${query.data.length} resultados para «${search}» sin filtros.`}
                   action={
-                    <button className="button secondary small" onClick={() => setFilters(noSearchFilters)}>
+                    <button
+                      className="button secondary small"
+                      onClick={() => {
+                        setFilters(noSearchFilters);
+                        setContent("all");
+                      }}
+                    >
                       Quitar filtros
                     </button>
                   }

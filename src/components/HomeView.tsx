@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useContentFilter } from "../lib/contentFilter";
 import { ChevronLeft, ChevronRight, Puzzle, X } from "lucide-react";
 import type { CatalogSource, LibraryEntry, MediaItem } from "../lib/contracts";
 import { homeRows } from "../lib/catalogLayout";
@@ -116,7 +117,8 @@ function CatalogShelf({
     queryKey: ["catalog", source.key, ""],
     queryFn: ({ signal }) => getCatalog(source, {}, signal),
   });
-  if (query.isSuccess && !query.data.length) return null;
+  const content = useContentFilter(query.data ?? [], (meta) => meta);
+  if (query.isSuccess && !content.visible.length && !content.pending) return null;
   return (
     <Shelf
       title={title}
@@ -124,7 +126,7 @@ function CatalogShelf({
       onBrowse={onBrowse}
       ready={query.isSuccess}
     >
-      {query.isPending ? (
+      {query.isPending || (!content.visible.length && content.pending) ? (
         <PosterSkeletons count={10} />
       ) : query.isError ? (
         <ErrorState
@@ -132,7 +134,7 @@ function CatalogShelf({
           retry={() => void query.refetch()}
         />
       ) : (
-        query.data.slice(0, 24).map((meta) => (
+        content.visible.slice(0, 24).map((meta) => (
           <MediaCard
             key={mediaKey(meta.type, meta.id)}
             meta={meta}

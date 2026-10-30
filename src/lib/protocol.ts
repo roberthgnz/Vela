@@ -143,6 +143,9 @@ function manifest(value: unknown): AddonManifest {
       };
     }),
     catalogs: Array.isArray(item.catalogs) ? item.catalogs.map(catalog) : [],
+    ...(item.behaviorHints && typeof item.behaviorHints === 'object' && (item.behaviorHints as { adult?: unknown }).adult === true
+      ? { behaviorHints: { adult: true } }
+      : {}),
   };
 }
 
@@ -307,8 +310,15 @@ export function supportsResource(addon: InstalledAddon, resource: string, type: 
   });
 }
 
+let addonAllowed: (addon: InstalledAddon) => boolean = () => true;
+
+/** Leaves out addons the active profile may not see (adult addons); set by the content filter. */
+export function setAddonFilter(allowed: (addon: InstalledAddon) => boolean) {
+  addonAllowed = allowed;
+}
+
 export function getCatalogSources(addons: InstalledAddon[], type?: string): CatalogSource[] {
-  return addons.filter((addon) => addon.enabled).flatMap((addon) => addon.manifest.catalogs
+  return addons.filter((addon) => addon.enabled && addonAllowed(addon)).flatMap((addon) => addon.manifest.catalogs
     .filter((catalog) => type === undefined || catalog.type === type)
     .map((catalog) => ({ key: JSON.stringify([addon.manifestUrl, catalog.type, catalog.id]), addon, catalog })));
 }
@@ -403,7 +413,7 @@ async function collect<T>(addons: InstalledAddon[], resource: string, type: stri
 }
 
 export async function getStreams(addons: InstalledAddon[], type: string, videoId: string, signal?: AbortSignal): Promise<ResolvedStream[]> {
-  return collect(addons, 'stream', type, videoId, async (addon) => {
+  return collect(addons.filter((addon) => addonAllowed(addon)), 'stream', type, videoId, async (addon) => {
     const response = builtin(addon) ? { streams: openCinemaStreams(videoId) } : await requestJson(resourceUrl(addon, 'stream', type, videoId), signal);
     const streams = record(response, 'Stream response').streams;
     if (!Array.isArray(streams)) throw new Error('Streams must be an array.');

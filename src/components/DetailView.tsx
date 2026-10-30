@@ -14,6 +14,7 @@ import {
   Download as DownloadIcon,
   ExternalLink,
   Globe,
+  Lock,
   Magnet,
   MonitorPlay,
   MoreHorizontal,
@@ -31,6 +32,7 @@ import type {
   ResolvedStream,
 } from "../lib/contracts";
 import { episodeCode, isUpcoming, orderedEpisodes, videoProgress, watchedEpisodes } from "../lib/episodes";
+import { useTitleAllowed } from "../lib/contentFilter";
 import { genreTarget, type GenreTarget } from "../lib/genres";
 import { useKidsMode } from "../lib/profiles";
 import { getCatalogSources, getMeta, getStreams } from "../lib/protocol";
@@ -297,6 +299,26 @@ export function DetailView({
       : "",
   ].filter(Boolean);
   const long = (meta.description?.length || 0) > 360;
+  // Titles above the profile's age limit (or for adults) cannot be opened, even from a link.
+  const access = useTitleAllowed(initial);
+  if (access !== "allowed")
+    return (
+      <section className="detail" aria-label={meta.name} role="region">
+        <div className="page-body">
+          {access === "pending" ? (
+            <div className="detail-checking" role="status">
+              <Spinner /> Comprobando la clasificación por edad…
+            </div>
+          ) : (
+            <EmptyState
+              icon={<Lock size={20} />}
+              title="No disponible en este perfil"
+              description="La clasificación por edad de este título supera el límite del perfil, o es contenido para adultos."
+            />
+          )}
+        </div>
+      </section>
+    );
   return (
     <section className="detail" aria-label={meta.name} role="region">
       <div className="detail-backdrop" aria-hidden="true">

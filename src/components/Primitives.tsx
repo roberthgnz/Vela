@@ -174,10 +174,12 @@ export function Switch({
   checked,
   label,
   onChange,
+  disabled,
 }: {
   checked: boolean;
   label: string;
   onChange: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -186,6 +188,7 @@ export function Switch({
       aria-checked={checked}
       aria-label={label}
       title={label}
+      disabled={disabled}
       onClick={onChange}
     >
       <span />
@@ -201,7 +204,7 @@ export function Segmented<T extends string>({
 }: {
   label: string;
   value: T;
-  options: { value: T; label: ReactNode; title?: string }[];
+  options: { value: T; label: ReactNode; title?: string; disabled?: boolean }[];
   onChange: (value: T) => void;
 }) {
   return (
@@ -213,15 +216,17 @@ export function Segmented<T extends string>({
           aria-checked={option.value === value}
           title={option.title}
           aria-label={option.title}
+          disabled={option.disabled}
           tabIndex={option.value === value ? 0 : -1}
           onClick={() => onChange(option.value)}
           onKeyDown={(event) => {
-            const index = options.findIndex((item) => item.value === value);
+            const enabled = options.filter((item) => !item.disabled);
+            const index = enabled.findIndex((item) => item.value === value);
             const step =
               event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-            if (!step) return;
+            if (!step || !enabled.length) return;
             event.preventDefault();
-            const next = options[(index + step + options.length) % options.length];
+            const next = enabled[(index + step + enabled.length) % enabled.length];
             onChange(next.value);
             const buttons =
               event.currentTarget.parentElement?.querySelectorAll("button");
