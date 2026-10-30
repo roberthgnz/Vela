@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   ArrowLeft,
   Captions,
@@ -80,6 +80,16 @@ type Track = {
 };
 
 type Status = "loading" | "buffering" | "playing" | "paused" | "ended";
+
+/** Playback speeds offered in the speed menu and stepped through with < and >. */
+const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
+/** Whether a key press belongs to a field where the user types. */
+function typing(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
+  return target instanceof HTMLInputElement && !["range", "checkbox", "radio", "button"].includes(target.type);
+}
 
 type NativeAudioTracks = EventTarget & {
   length: number;
@@ -887,27 +897,45 @@ export function Player({
     if (video.current) video.current.playbackRate = value;
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement;
-    const onRange = target instanceof HTMLInputElement && target.type === "range";
-    const inPanel = Boolean(target.closest(".player-popover"));
+  // YouTube-style shortcuts. They work wherever the focus is while the player is open (after a
+  // click on the video the focus is on the dialog, not inside the player); on the seek and volume
+  // sliders the arrows keep their player meaning instead of moving the slider by a hair.
+  const onKeyDown = (event: globalThis.KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (event.ctrlKey || event.altKey || event.metaKey || typing(target)) return;
+    const inPanel = Boolean(target?.closest?.(".player-popover"));
     const key = event.key.toLowerCase();
+    const element = video.current;
     let handled = true;
     if (key === "escape") {
       if (popover) setPopover(null);
       else if (fullscreen) toggleFullscreen();
       else close();
     } else if (inPanel && (key === " " || key === "enter" || key.startsWith("arrow"))) handled = false;
-    else if (key === " " || key === "k") {
-      if (target instanceof HTMLButtonElement && key === " ") handled = false;
-      else toggle();
-    } else if (!onRange && key === "arrowleft") seekBy(-settings.seekShort);
-    else if (!onRange && key === "arrowright") seekBy(settings.seekShort);
+    else if (key === "enter") handled = false;
+    else if (key === " " || key === "k") toggle();
+    else if (key === "arrowleft") seekBy(-settings.seekShort);
+    else if (key === "arrowright") seekBy(settings.seekShort);
     else if (key === "j") seekBy(-settings.seekLong);
     else if (key === "l") seekBy(settings.seekLong);
-    else if (!onRange && key === "arrowup") changeVolume(volume + 0.05);
-    else if (!onRange && key === "arrowdown") changeVolume(volume - 0.05);
-    else if (key === "m") setMuted((value) => !value);
+    else if (key === "arrowup") changeVolume((muted ? 0 : volume) + 0.05);
+    else if (key === "arrowdown") changeVolume((muted ? 0 : volume) - 0.05);
+    else if (key === "m") {
+      showFlash(muted ? `Volumen ${Math.round(volume * 100)} %` : "Silenciado");
+      setMuted((value) => !value);
+    } else if (key === "home" && element) {
+      element.currentTime = 0;
+      showFlash("Inicio");
+    } else if (key === "end" && element && Number.isFinite(element.duration)) element.currentTime = Math.max(0, element.duration - 1);
+    else if ((key === "," || key === ".") && element?.paused) {
+      // Frame by frame while paused (about 24 frames per second).
+      element.currentTime = Math.max(0, element.currentTime + (key === "," ? -1 : 1) / 24);
+    } else if (key === "<" || key === ">") {
+      const index = speeds.findIndex((value) => value >= rate);
+      const next = speeds[Math.max(0, Math.min(speeds.length - 1, (index < 0 ? speeds.length - 1 : index) + (key === "<" ? -1 : 1)))];
+      changeRate(next);
+      showFlash(`Velocidad ${next.toLocaleString("es")}×`);
+    }
     else if (key === "f") toggleFullscreen();
     else if (key === "c") cycleSubtitles();
     else if (key === "g") changeDelay(delay - (event.shiftKey ? 1 : 0.1));
@@ -928,6 +956,14 @@ export function Player({
       wake();
     }
   };
+  const keys = useRef(onKeyDown);
+  keys.current = onKeyDown;
+  useEffect(() => {
+    // Capture phase: the player's keys win over the app's while it is open.
+    const listener = (event: globalThis.KeyboardEvent) => keys.current(event);
+    window.addEventListener("keydown", listener, true);
+    return () => window.removeEventListener("keydown", listener, true);
+  }, []);
 
   const percent = duration ? (time / duration) * 100 : 0;
   const quality = streamQuality(playing.stream);
@@ -968,7 +1004,6 @@ export function Player({
         data-status={status}
         onMouseMove={wake}
         onKeyDownCapture={() => wake()}
-        onKeyDown={onKeyDown}
       >
         <video
           ref={mount}
@@ -1442,7 +1477,7 @@ function SpeedPanel({
       <section>
         <h3>Velocidad</h3>
         <div role="radiogroup" aria-label="Velocidad de reproducción">
-          {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((value) => (
+          {speeds.map((value) => (
             <Option key={value} checked={rate === value} label={value === 1 ? "Normal" : `${value}×`} onSelect={() => onChange(value)} />
           ))}
         </div>
