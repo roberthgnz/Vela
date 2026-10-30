@@ -19,12 +19,12 @@ import {
 } from "lucide-react";
 import type Hls from "hls.js";
 import type JASSUB from "jassub";
-import type { Episode, MediaItem, ResolvedStream, Subtitle } from "../lib/contracts";
+import type { Episode, MediaItem, PlayerPreferences, ResolvedStream, Subtitle } from "../lib/contracts";
 import { episodeCode, nextEpisode } from "../lib/episodes";
 import { externalPlayerName, playExternally } from "../lib/externalPlayback";
 import { languageLabel, normalizeLanguage, pickByLanguage } from "../lib/languages";
 import { getSubtitles } from "../lib/protocol";
-import { CREDITS_THRESHOLD, preferencesStore, usePreferences, WATCHED_THRESHOLD } from "../lib/store";
+import { CREDITS_THRESHOLD, preferencesStore, subtitleColors, subtitleSizes, usePreferences, WATCHED_THRESHOLD } from "../lib/store";
 import {
   embeddedAssUrl,
   embeddedSubtitlePlaylist,
@@ -41,7 +41,7 @@ import { activeCues, decodeSubtitle, dedupeSubtitles, parseSubtitle, syncCandida
 import { requestBytes, requestRange, requestText } from "../lib/transport";
 import { readMkvChapters, type Chapter } from "../lib/mkvChapters";
 import { activeSegment, skipMarks, skipSegments, useSeriesMarks, type SeriesMarks } from "../lib/skipSegments";
-import { clock, errorMessage } from "../lib/utils";
+import { clock, errorMessage, safeImage } from "../lib/utils";
 import { Dialog } from "./Primitives";
 import { native, setFullscreen, useWindowState, WindowControls } from "./WindowControls";
 
@@ -153,6 +153,55 @@ async function createAssRenderer(video: HTMLVideoElement, content: string, timeO
   return renderer;
 }
 
+/**
+ * The title's art while a source loads: its backdrop, dimmed, with the logo (or the name) pulsing.
+ * The same cover is shown while Vela prepares the source and until the video starts.
+ */
+function CoverArt({ meta }: { meta: MediaItem }) {
+  const [logoFailed, setLogoFailed] = useState(false);
+  const background = safeImage(meta.background) ?? safeImage(meta.poster);
+  const logo = logoFailed ? undefined : safeImage(meta.logo);
+  return (
+    <>
+      {background && <img className="player-cover-art" src={background} alt="" />}
+      {logo ? (
+        <img className="player-cover-logo" src={logo} alt={meta.name} onError={() => setLogoFailed(true)} />
+      ) : (
+        <strong className="player-cover-name">{meta.name}</strong>
+      )}
+    </>
+  );
+}
+
+function episodeText(episode?: Episode): string {
+  return episode ? `${episodeCode(episode)}${episode.title ? ` · ${episode.title}` : ""}` : "";
+}
+
+/** The player while Vela resolves the source (torrent metadata, probing): only its cover. */
+export function PreparingPlayer({ meta, episode, onClose }: { meta: MediaItem; episode?: Episode; onClose: () => void }) {
+  const { fullscreen } = useWindowState();
+  return (
+    <Dialog title={`Preparando ${meta.name}`} onClose={onClose} className="player-dialog preparing" hideClose>
+      <div className="player" data-status="loading">
+        <div className="player-loading cover" role="status">
+          <CoverArt meta={meta} />
+          <span>Preparando la fuente…</span>
+        </div>
+        <div className="player-top" data-tauri-drag-region>
+          <button className="player-icon" aria-label="Volver" title="Volver (Esc)" onClick={onClose}>
+            <ArrowLeft size={20} />
+          </button>
+          <div className="player-title" data-tauri-drag-region>
+            <strong data-tauri-drag-region>{meta.name}</strong>
+            {episode && <span data-tauri-drag-region>{episodeText(episode)}</span>}
+          </div>
+          {!fullscreen && <WindowControls onError={() => undefined} />}
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
 export function Player({
   playing,
   onClose,
@@ -237,9 +286,7 @@ export function Player({
   const usingHls = hlsPattern.test(source);
   const next = useMemo(() => nextEpisode(playing.meta, playing.videoId), [playing.meta, playing.videoId]);
 
-  const episodeLine = playing.episode
-    ? `${episodeCode(playing.episode)}${playing.episode.title ? ` · ${playing.episode.title}` : ""}`
-    : "";
+  const episodeLine = episodeText(playing.episode);
 
   const showFlash = useCallback((value: string) => {
     setFlash(value);
@@ -541,8 +588,8 @@ export function Player({
       setShown([]);
       if (hls.current) hls.current.subtitleTrack = track?.origin === "hls" ? track.index : -1;
       setSubtitleKey(track?.key ?? "");
+      setSubtitleBusy(Boolean(track));
       if (!track) return;
-      setSubtitleBusy(true);
       try {
         let raw: string | undefined;
         if (track.origin === "file" && track.subtitle) {
@@ -569,8 +616,12 @@ export function Player({
                 } catch {
                   return; // Segments without cues are normal.
                 }
-                if (!controller.signal.aborted)
-                  setCues([...collected].sort((a, b) => a.start - b.start || a.end - b.end));
+                if (controller.signal.aborted || !collected.length) return;
+                setCues([...collected].sort((a, b) => a.start - b.start || a.end - b.end));
+                // The rest of the track keeps arriving in the background (the converter extracts
+                // it segment by segment, across the whole file); the button stops spinning as soon
+                // as there is something to show.
+                setSubtitleBusy(false);
               },
               video.current?.currentTime ?? 0,
               controller.signal,
@@ -594,7 +645,7 @@ export function Player({
         setSubtitleKey("");
         setNotice(`No se pudieron cargar los subtítulos. ${errorMessage(cause)}`);
       } finally {
-        setSubtitleBusy(false);
+        if (loading.current === controller) setSubtitleBusy(false);
       }
     },
     [clearRenderer, converting, delay, playing.serviceUrl, playing.transcodeUrl],
@@ -899,6 +950,7 @@ export function Player({
     "--subtitle-scale": settings.subtitleSize / 100,
     "--subtitle-opacity": settings.subtitleOpacity,
     "--subtitle-background": settings.subtitleBackground,
+    "--subtitle-color": settings.subtitleColor,
   } as CSSProperties;
   const busy = status === "loading" || status === "buffering";
   const activeSubtitle = subtitleTracks.find((track) => track.key === subtitleKey);
@@ -1023,8 +1075,8 @@ export function Player({
           {!fullscreen && <WindowControls onError={setNotice} />}
         </div>
         {busy && !error && (
-          <div className="player-loading" role="status">
-            <LoaderCircle className="spin" size={34} strokeWidth={1.5} />
+          <div className={`player-loading${status === "loading" ? " cover" : ""}`} role="status">
+            {status === "loading" ? <CoverArt meta={playing.meta} /> : <LoaderCircle className="spin" size={34} strokeWidth={1.5} />}
             <span>
               {status === "buffering"
                 ? "Cargando más vídeo…"
@@ -1152,6 +1204,8 @@ export function Player({
             onAudio={(track) => chooseAudio(track)}
             onSubtitle={(track) => void chooseSubtitle(track)}
             onDelay={changeDelay}
+            look={settings}
+            onLook={(value) => preferencesStore.setPlayer(value)}
           />
         )}
         {popover?.kind === "speed" && (
@@ -1434,6 +1488,8 @@ function TrackPanel({
   onAudio,
   onSubtitle,
   onDelay,
+  look,
+  onLook,
 }: {
   right: number;
   audio: Track[];
@@ -1447,8 +1503,16 @@ function TrackPanel({
   onAudio: (track: Track) => void;
   onSubtitle: (track: Track | null) => void;
   onDelay: (value: number) => void;
+  look: PlayerPreferences;
+  onLook: (value: Partial<PlayerPreferences>) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Steps through the preset sizes; a size set elsewhere moves to the nearest preset.
+  const resize = (step: number) => {
+    const sizes: number[] = [...subtitleSizes];
+    const next = step > 0 ? sizes.find((size) => size > look.subtitleSize) : sizes.findLast((size) => size < look.subtitleSize);
+    if (next !== undefined) onLook({ subtitleSize: next });
+  };
   const selected = subtitles.find((track) => track.key === subtitleKey);
   const langOf = (track: Track) => track.lang || "und";
   const selectedLang = selected ? langOf(selected) : undefined;
@@ -1579,6 +1643,63 @@ function TrackPanel({
               </div>
             </div>
           )}
+        </section>
+        <section className="track-look">
+          <h3>Estilo</h3>
+          <div className="track-look-row">
+            <span id="subtitle-size">Tamaño</span>
+            <div className="stepper" role="group" aria-labelledby="subtitle-size">
+              <button
+                className="button small subtle"
+                aria-label="Subtítulos más pequeños"
+                disabled={look.subtitleSize <= subtitleSizes[0]}
+                onClick={() => resize(-1)}
+              >
+                A−
+              </button>
+              <output aria-live="polite">{look.subtitleSize} %</output>
+              <button
+                className="button small subtle"
+                aria-label="Subtítulos más grandes"
+                disabled={look.subtitleSize >= subtitleSizes[subtitleSizes.length - 1]}
+                onClick={() => resize(1)}
+              >
+                A+
+              </button>
+            </div>
+          </div>
+          <div className="track-look-row">
+            <span id="subtitle-color">Color</span>
+            <div className="track-swatches" role="group" aria-labelledby="subtitle-color">
+              {subtitleColors.map((color) => (
+                <button
+                  key={color.value}
+                  className="track-swatch"
+                  aria-label={color.label}
+                  title={color.label}
+                  aria-pressed={look.subtitleColor === color.value}
+                  style={{ "--swatch": color.value } as CSSProperties}
+                  onClick={() => onLook({ subtitleColor: color.value })}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="track-look-row">
+            <span id="subtitle-background">Fondo</span>
+            <div className="track-choices" role="group" aria-labelledby="subtitle-background">
+              {[0, 0.5, 0.75, 1].map((value) => (
+                <button
+                  key={value}
+                  className="button small subtle"
+                  aria-pressed={look.subtitleBackground === value}
+                  title={value ? `Fondo al ${value * 100} %` : "Sin fondo"}
+                  onClick={() => onLook({ subtitleBackground: value })}
+                >
+                  {value ? `${value * 100} %` : "No"}
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
       </div>
     </div>

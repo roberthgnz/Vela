@@ -2761,7 +2761,7 @@ kbd {
   padding: 2px 10px;
   border-radius: var(--radius-sm);
   background: rgb(0 0 0 / calc(var(--subtitle-background, 0.6) * 100%));
-  color: rgb(255 255 255 / calc(var(--subtitle-opacity, 1) * 100%));
+  color: color-mix(in srgb, var(--subtitle-color, #fff) calc(var(--subtitle-opacity, 1) * 100%), transparent);
   font: 500 calc(clamp(18px, 2.4vw, 34px) * var(--subtitle-scale, 1)) / 1.3 var(--font);
   text-shadow:
     0 0 3px rgb(0 0 0 / calc(var(--subtitle-opacity, 1) * 90%)),
@@ -2778,6 +2778,47 @@ kbd {
 }
 .player-loading {
   z-index: 2;
+}
+/* The cover hides the black video until it plays; the top bar stays above it. */
+.player-loading.cover {
+  z-index: 1;
+  isolation: isolate;
+  gap: 18px;
+  background: #000;
+}
+.player-cover-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.38;
+}
+.player-cover-logo {
+  max-width: min(440px, 42vw);
+  max-height: min(170px, 22vh);
+  object-fit: contain;
+  filter: drop-shadow(0 2px 12px rgb(0 0 0 / 60%));
+  animation: cover-pulse 2s ease-in-out infinite;
+}
+.player-cover-name {
+  max-width: 60vw;
+  color: #fff;
+  font: 600 34px/1.2 var(--font-display);
+  text-align: center;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 60%);
+  animation: cover-pulse 2s ease-in-out infinite;
+}
+@keyframes cover-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+/* The player replaces the preparing cover in place: only the cover fades in. */
+.player-dialog[open]:not(.preparing),
+.player-dialog:not(.preparing)::backdrop {
+  animation: none;
 }
 .player-slow {
   display: grid;
@@ -2902,11 +2943,15 @@ kbd {
   background: rgb(255 255 255 / 35%);
   pointer-events: none;
 }
+/* Two flex columns rather than a grid: a grid row grows with the longest list and spills past the
+   panel's max-height, while flex items stretch to the clamped height and scroll inside it. */
 .track-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   width: min(560px, calc(100% - 24px));
+}
+.track-panel > * {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .track-side {
   display: flex;
@@ -2932,8 +2977,11 @@ kbd {
 }
 @media (max-width: 720px) {
   .track-panel {
-    grid-template-columns: minmax(0, 1fr);
+    flex-direction: column;
     overflow-y: auto;
+  }
+  .track-panel > * {
+    flex: none;
   }
 }
 .player-popover h3 {
@@ -3000,6 +3048,63 @@ kbd {
 }
 .track-sync-toggle {
   margin-top: 8px;
+}
+.track-look {
+  gap: 6px;
+  padding: 0 10px;
+}
+.track-look h3 {
+  padding: 0;
+}
+.track-look-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.track-look .stepper,
+.track-choices,
+.track-swatches {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.track-look output {
+  min-width: 46px;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.track-choices .button[aria-pressed="true"] {
+  background: rgb(255 255 255 / 14%);
+  color: var(--fg);
+}
+.track-swatch {
+  width: 22px;
+  height: 22px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--swatch) content-box;
+  padding: 2px;
+}
+.track-swatch[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+.track-swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.color-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: -1px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 25%);
 }
 .track-sync p {
   margin: 8px 0 4px;
@@ -3224,20 +3329,6 @@ kbd {
 }
 .source-mark.failed {
   color: #e59a8a;
-}
-.opening-status {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 14px;
-  border-radius: 999px;
-  background: var(--surface);
-  box-shadow: var(--shadow-pop);
-  transform: translateX(-50%);
 }
 
 /* Trailer */

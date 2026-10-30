@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import type { PlayerPreferences } from "../lib/contracts";
 import { languageLabel, preferredLanguageOptions } from "../lib/languages";
-import { preferencesStore, usePreferences } from "../lib/store";
+import { preferencesStore, subtitleColors, subtitleSizes, usePreferences } from "../lib/store";
 import {
   ensureService,
   isLocalService,
@@ -250,7 +250,24 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
                   label="Tamaño de los subtítulos"
                   value={String(prefs.player.subtitleSize)}
                   onChange={(value) => setPlayer({ subtitleSize: Number(value) })}
-                  options={[75, 100, 125, 150, 200].map((value) => ({ value: String(value), label: <span className="segment-text">{value} %</span>, title: `${value} %` }))}
+                  options={subtitleSizes.map((value) => ({ value: String(value), label: <span className="segment-text">{value} %</span>, title: `${value} %` }))}
+                />
+              </Row>
+              <Row label="Color">
+                <Segmented
+                  label="Color de los subtítulos"
+                  value={prefs.player.subtitleColor}
+                  onChange={(value) => setPlayer({ subtitleColor: value })}
+                  options={subtitleColors.map((color) => ({
+                    value: color.value,
+                    label: (
+                      <span className="segment-text">
+                        <span className="color-dot" style={{ background: color.value }} />
+                        {color.label}
+                      </span>
+                    ),
+                    title: color.label,
+                  }))}
                 />
               </Row>
               <Row label="Opacidad del texto">
@@ -277,6 +294,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
                 "--subtitle-scale": prefs.player.subtitleSize / 100,
                 "--subtitle-opacity": prefs.player.subtitleOpacity,
                 "--subtitle-background": prefs.player.subtitleBackground,
+                "--subtitle-color": prefs.player.subtitleColor,
               } as CSSProperties}>
                 <div className="player-subtitle bottom">
                   <span>Así se verán los subtítulos</span>

@@ -144,6 +144,8 @@ export type PlayerPreferences = {
   subtitleSize: number;
   subtitleOpacity: number;
   subtitleBackground: number;
+  /** Text colour, one of `subtitleColors`. */
+  subtitleColor: string;
   audioLanguage: string;
   audioSecondary: string;
   /** Seconds for arrow keys, and for J/L and the skip buttons. */

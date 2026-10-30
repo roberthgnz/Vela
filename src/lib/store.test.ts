@@ -180,6 +180,10 @@ describe('local preferences', () => {
     expect(storage.getItem('vela.preferences.v1')).toBe(v1);
     const restored = createPreferencesStore(storage).getSnapshot();
     expect(restored.player).toMatchObject({ subtitleLanguage: 'spa', seekLong: 600 });
+    store.setPlayer({ subtitleColor: '#ffe45c' });
+    expect(store.getSnapshot().player.subtitleColor).toBe('#ffe45c');
+    store.setPlayer({ subtitleColor: 'red; content: x' });
+    expect(store.getSnapshot().player.subtitleColor).toBe('#ffffff');
     expect(restored.library).toEqual(store.getSnapshot().library);
   });
 

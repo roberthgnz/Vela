@@ -39,7 +39,7 @@ import { LibraryView } from "./components/LibraryView";
 import { DownloadsView } from "./components/DownloadsView";
 import { downloads, downloadsAvailable, type Download } from "./lib/downloads";
 import type { CardMenu } from "./components/MediaCard";
-import { Player, type Playing } from "./components/Player";
+import { Player, PreparingPlayer, type Playing } from "./components/Player";
 import { Dialog, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
@@ -86,6 +86,10 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [installRequest, setInstallRequest] = useState(0);
   const [playing, setPlaying] = useState<Playing | null>(null);
+  /** Title whose source is being prepared: the player opens on its cover right away. */
+  const [preparing, setPreparing] = useState<{ meta: MediaItem; episode?: Episode } | null>(null);
+  /** Increases with every preparation; a result whose number is stale was cancelled. */
+  const preparation = useRef(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastId = useRef(0);
 
@@ -151,8 +155,10 @@ export default function App() {
     stream: ResolvedStream,
     mode: PlayMode,
     episode?: Episode,
+    token = ++preparation.current,
   ) => {
     if (stream.externalUrl || stream.ytId) {
+      setPreparing(null);
       await openExternal(
         stream.externalUrl || `https://www.youtube.com/watch?v=${encodeURIComponent(stream.ytId!)}`,
       );
@@ -160,6 +166,7 @@ export default function App() {
       return;
     }
     sourceHistory.mark(meta.type, meta.id, videoId, stream, "opened");
+    if (mode !== "external") setPreparing({ meta, episode });
     let target: Awaited<ReturnType<typeof resolvePlayback>>;
     try {
       target = await resolvePlayback(meta, stream, prefs.serviceUrl, {
@@ -168,8 +175,11 @@ export default function App() {
       });
     } catch (error) {
       sourceHistory.mark(meta.type, meta.id, videoId, stream, "failed", errorMessage(error));
+      if (token !== preparation.current) return;
+      setPreparing(null);
       throw error;
     }
+    if (token !== preparation.current) return;
     const entry = preferencesStore.getSnapshot().library[mediaKey(meta.type, meta.id)];
     const saved = entry?.videos?.[videoId] ?? (entry?.progress?.videoId === videoId ? entry.progress : undefined);
     const resume = saved && saved.duration > 0 && saved.seconds < saved.duration * CREDITS_THRESHOLD ? saved.seconds : 0;
@@ -188,6 +198,7 @@ export default function App() {
       notify(launch.ipc ? `Abierto en ${externalPlayerName(launch)}. Vela guardará el progreso al cerrarlo.` : "Fuente abierta en el reproductor externo.");
       return;
     }
+    setPreparing(null);
     setPlaying({
       meta,
       addonUrl,
@@ -236,7 +247,6 @@ export default function App() {
    * episode it looks for the same release (`bingeGroup`). Without a usable source it opens the
    * sources of the episode instead.
    */
-  const [opening, setOpening] = useState<string | null>(null);
   const resumeTitle = async (meta: MediaItem, addonUrl: string) => {
     const entry = preferencesStore.getSnapshot().library[mediaKey(meta.type, meta.id)];
     const full = entry?.meta.videos?.length ? { ...meta, videos: meta.videos ?? entry.meta.videos } : meta;
@@ -245,18 +255,28 @@ export default function App() {
     const showSources = () => go({ name: "detail", meta: full, addonUrl, videoId, sources: true });
     if (!videoId || !last) return showSources();
     const episode = full.videos?.find((video) => video.id === videoId);
-    setOpening(meta.name);
+    const token = ++preparation.current;
+    setPreparing({ meta: full, episode });
     try {
       let stream = last.videoId === videoId ? last.stream : undefined;
       if (!stream) stream = pickNextStream(await getStreams(preferencesStore.getSnapshot().addons, meta.type, videoId), last.stream);
-      if (!stream) return showSources();
-      await startPlayback(full, addonUrl, videoId, stream, "internal", episode);
+      if (token !== preparation.current) return;
+      if (!stream) {
+        setPreparing(null);
+        return showSources();
+      }
+      await startPlayback(full, addonUrl, videoId, stream, "internal", episode, token);
     } catch (error) {
+      if (token !== preparation.current) return;
+      setPreparing(null);
       notify(errorMessage(error), "error");
       showSources();
-    } finally {
-      setOpening(null);
     }
+  };
+
+  const cancelPreparing = () => {
+    preparation.current++;
+    setPreparing(null);
   };
 
   /**
@@ -264,8 +284,11 @@ export default function App() {
    * addon and stream name). Without a match, the episode's sources are shown instead.
    */
   const playNext = async (current: Playing, episode: Episode) => {
+    const token = ++preparation.current;
+    setPreparing({ meta: current.meta, episode });
     setPlaying(null);
     const showSources = () => {
+      setPreparing(null);
       go({ name: "detail", meta: current.meta, addonUrl: current.addonUrl, videoId: episode.id, sources: true });
       notify(`Elige una fuente para ${episodeCode(episode)}.`);
     };
@@ -277,10 +300,12 @@ export default function App() {
           : route,
       );
       const streams = await getStreams(preferencesStore.getSnapshot().addons, current.meta.type, episode.id);
+      if (token !== preparation.current) return;
       const match = pickNextStream(streams, current.stream);
       if (!match) return showSources();
-      await startPlayback(current.meta, current.addonUrl, episode.id, match, "internal", episode);
+      await startPlayback(current.meta, current.addonUrl, episode.id, match, "internal", episode, token);
     } catch (error) {
+      if (token !== preparation.current) return;
       notify(errorMessage(error), "error");
       showSources();
     }
@@ -616,10 +641,8 @@ export default function App() {
           }}
         />
       )}
-      {opening && (
-        <div className="opening-status" role="status">
-          <RefreshCw size={14} className="spin" /> Abriendo {opening}…
-        </div>
+      {preparing && !playing && (
+        <PreparingPlayer meta={preparing.meta} episode={preparing.episode} onClose={cancelPreparing} />
       )}
       <div className="toasts" aria-live="polite">
         {toasts.map((toast) => (

@@ -225,6 +225,7 @@ export const defaultPlayer: PlayerPreferences = {
   subtitleSize: 100,
   subtitleOpacity: 1,
   subtitleBackground: 0.5,
+  subtitleColor: '#ffffff',
   audioLanguage: '',
   audioSecondary: '',
   seekShort: 5,
@@ -242,13 +243,26 @@ const ranges: Partial<Record<keyof PlayerPreferences, [number, number]>> = {
   nextCountdown: [0, 60],
 };
 
+/** Subtitle text colours offered in the player and in Ajustes. */
+export const subtitleColors = [
+  { value: '#ffffff', label: 'Blanco' },
+  { value: '#ffe45c', label: 'Amarillo' },
+  { value: '#7fe3ff', label: 'Cian' },
+  { value: '#a6f28b', label: 'Verde' },
+] as const;
+
+/** Subtitle sizes (percent of the default) offered in the player and in Ajustes. */
+export const subtitleSizes = [75, 100, 125, 150, 200] as const;
+
 function player(value: unknown): PlayerPreferences {
   const result = { ...defaultPlayer };
   if (!record(value)) return result;
   for (const key of Object.keys(defaultPlayer) as (keyof PlayerPreferences)[]) {
     const item = value[key];
     const fallback = defaultPlayer[key];
-    if (typeof fallback === 'boolean' && typeof item === 'boolean') (result[key] as boolean) = item;
+    if (key === 'subtitleColor') {
+      if (subtitleColors.some((color) => color.value === item)) result.subtitleColor = item as string;
+    } else if (typeof fallback === 'boolean' && typeof item === 'boolean') (result[key] as boolean) = item;
     else if (typeof fallback === 'string' && typeof item === 'string') (result[key] as string) = item ? normalizeLanguage(item) : '';
     else if (typeof fallback === 'number' && typeof item === 'number' && Number.isFinite(item)) {
       const [min, max] = ranges[key] ?? [0, Number.MAX_SAFE_INTEGER];
