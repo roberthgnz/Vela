@@ -1508,12 +1508,43 @@ kbd {
   flex-wrap: wrap;
   gap: 6px;
 }
-.genres span {
+.genres span,
+.genre-link {
   padding: 2px 8px;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   color: var(--fg-2);
   font-size: 11.5px;
+}
+.genre-link {
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+.genre-link:hover,
+.genre-link:focus-visible {
+  border-color: var(--accent);
+  background: rgb(255 255 255 / 6%);
+  color: var(--fg);
+  outline: none;
+}
+.person-link {
+  border-radius: 3px;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.12s, color 0.12s;
+}
+.person-link:hover,
+.person-link:focus-visible {
+  color: var(--fg);
+  text-decoration-color: var(--accent);
+  outline: none;
+}
+.person-link:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
 }
 .detail-actions {
   display: flex;
@@ -1825,6 +1856,72 @@ kbd {
 }
 .palette-field input::-webkit-search-cancel-button {
   display: none;
+}
+.palette-forget {
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.palette-recent {
+  position: relative;
+}
+.palette-recent .palette-item {
+  padding-right: 40px;
+}
+.palette-remove {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  color: var(--faint);
+  opacity: 0;
+  transform: translateY(-50%);
+}
+.palette-recent:hover .palette-remove,
+.palette-recent:focus-within .palette-remove {
+  opacity: 1;
+}
+.palette-remove:hover,
+.palette-remove:focus-visible {
+  color: var(--fg);
+}
+.palette-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.palette-types {
+  display: flex;
+  gap: 4px;
+  margin-right: 4px;
+}
+.palette-select {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 13px;
+  background: transparent;
+  color: var(--fg-2);
+  font-size: 12px;
+}
+.palette-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.palette-select[data-active] {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+.palette-select option {
+  background: var(--surface);
+  color: var(--fg);
+}
+.palette-clear {
+  margin-left: auto;
+  font-size: 12px;
 }
 .palette-body {
   flex: 1;
@@ -2519,6 +2616,32 @@ kbd {
   transform: translate(-50%, -50%);
   pointer-events: none;
   animation: fade 0.12s;
+}
+.player-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: rgb(15 16 18 / 62%);
+  color: #fff;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: player-pulse 0.65s var(--ease) forwards;
+}
+@keyframes player-pulse {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.25);
+  }
 }
 .player-resume {
   position: absolute;
@@ -3405,6 +3528,66 @@ kbd {
   font-family: var(--font-display);
   font-weight: 600;
   line-height: 1;
+}
+.profile-avatar {
+  position: relative;
+}
+.profile-lock {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.pin-dialog {
+  width: 340px;
+  text-align: center;
+}
+.pin-dialog .profile-avatar {
+  margin: 0 auto 12px;
+}
+.pin-dialog p {
+  color: var(--muted);
+}
+.pin-dialog .form-actions {
+  justify-content: center;
+}
+.pin-dialog .settings-note {
+  margin-top: 4px;
+  font-size: 11.5px;
+}
+.pin-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.pin-input {
+  width: 150px;
+  height: 46px;
+  font-size: 24px;
+  letter-spacing: 0.6em;
+  text-align: center;
+  text-indent: 0.6em;
+}
+.pin-dialog .form-error {
+  min-height: 1.4em;
+  margin: 8px 0 0;
+}
+.profile-guard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--fg-2);
+}
+.profile-guard span {
+  flex: 1;
 }
 .profile-avatar.add {
   background: transparent;

@@ -7,6 +7,7 @@ import { kidsCatalog } from "../lib/tmdbCatalogs";
 import type { CatalogSource } from "../lib/contracts";
 import { useRouteState } from "../lib/navigation";
 import { browsable, catalogFilters, getCatalog, getCatalogSources, nextCatalogSkip } from "../lib/protocol";
+import { activeFilters, applySearchFilters, decades, noSearchFilters, type SearchFilters } from "../lib/searchFilters";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import { useUiSetting } from "../lib/ui";
 import { errorMessage } from "../lib/utils";
@@ -18,9 +19,14 @@ const densities = ["comfortable", "compact"] as const;
 
 const filterNames: Record<string, string> = { genre: "Género", year: "Año", sort: "Orden", language: "Idioma", country: "País" };
 
-function filterLabel(name: string): string {
+function filterLabel(name: string, options: string[] = []): string {
+  // Cinemeta's «by year» catalogs offer years through their `genre` extra.
+  if (options.length && options.every((option) => /^\d{4}$/.test(option))) return "Año";
   return filterNames[name] ?? name.charAt(0).toLocaleUpperCase("es") + name.slice(1);
 }
+
+/** Pages loaded in a row while the filters hide every title, before waiting for «Cargar más». */
+const FILTERED_AUTOLOAD_PAGES = 12;
 
 export function DensityToggle({
   value,
@@ -63,6 +69,15 @@ export function BrowseView({
   const [sourceKey, setSourceKey] = useRouteState<string>("catalog", "");
   const [filterState, setFilterState] = useRouteState<string>("filters", "{}");
   const [density, setDensity] = useUiSetting("density", "comfortable", densities);
+  const [decade, setDecade] = useRouteState<string>("decade", "");
+  const [minRating, setMinRating] = useRouteState<number>("rating", 0);
+  const [order, setOrder] = useRouteState<string>("order", "relevance");
+  const refine: SearchFilters = {
+    ...noSearchFilters,
+    decade,
+    rating: minRating,
+    sort: (["relevance", "newest", "oldest", "rating"] as const).find((value) => value === order) ?? "relevance",
+  };
   const source = sources.find((item) => item.key === sourceKey) || sources[0];
   const filters = source ? catalogFilters(source.catalog) : [];
   const chosen = (() => {
@@ -108,9 +123,9 @@ export function BrowseView({
           )}
           {filters.map((filter) => (
             <label className="select" key={filter.name}>
-              <span className="select-label">{filterLabel(filter.name)}</span>
+              <span className="select-label">{filterLabel(filter.name, filter.options)}</span>
               <select
-                aria-label={filterLabel(filter.name)}
+                aria-label={filterLabel(filter.name, filter.options)}
                 value={values[filter.name] ?? ""}
                 onChange={(event) => {
                   setFilterState(JSON.stringify({ ...values, [filter.name]: event.target.value }));
@@ -126,6 +141,57 @@ export function BrowseView({
               </select>
             </label>
           ))}
+          {!filters.some((filter) => filterLabel(filter.name, filter.options) === "Año") && (
+            <label className="select">
+              <span className="select-label">Año</span>
+              <select aria-label="Año" value={decade} onChange={(event) => setDecade(event.target.value)}>
+                <option value="">Todos</option>
+                {decades.map((value) => (
+                  <option key={value} value={value}>
+                    Años {value.slice(2)}
+                  </option>
+                ))}
+                <option value="older">Antes de 1980</option>
+              </select>
+            </label>
+          )}
+          <label className="select">
+            <span className="select-label">Valoración</span>
+            <select aria-label="Valoración" value={String(minRating)} onChange={(event) => setMinRating(Number(event.target.value))}>
+              <option value="0">Todas</option>
+              {[6, 7, 8].map((value) => (
+                <option key={value} value={value}>
+                  ★ {value} o más
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="select">
+            <span className="select-label">Orden</span>
+            <select
+              aria-label="Orden"
+              title="Ordena los títulos ya cargados del catálogo"
+              value={refine.sort}
+              onChange={(event) => setOrder(event.target.value)}
+            >
+              <option value="relevance">Del catálogo</option>
+              <option value="newest">Más recientes</option>
+              <option value="oldest">Más antiguos</option>
+              <option value="rating">Mejor valorados</option>
+            </select>
+          </label>
+          {activeFilters(refine) > 0 && (
+            <button
+              className="link-button"
+              onClick={() => {
+                setDecade("");
+                setMinRating(0);
+                setOrder("relevance");
+              }}
+            >
+              Quitar filtros
+            </button>
+          )}
           <DensityToggle value={density} onChange={setDensity} />
         </div>
       </header>
@@ -134,6 +200,7 @@ export function BrowseView({
           key={`${source.key}|${JSON.stringify(values)}`}
           source={source}
           extra={values}
+          refine={refine}
           density={density}
           onOpen={onOpen}
           onMenu={onMenu}
@@ -157,12 +224,15 @@ export function BrowseView({
 function CatalogGrid({
   source,
   extra,
+  refine,
   density,
   onOpen,
   onMenu,
 }: {
   source: CatalogSource;
   extra: Record<string, string>;
+  /** Year, rating and order chosen in Vela, applied to the titles loaded so far. */
+  refine: SearchFilters;
   density: string;
   onOpen: OpenMedia;
   onMenu: CardMenu;
@@ -179,9 +249,20 @@ function CatalogGrid({
     getNextPageParam: (_last, pages) => nextCatalogSkip(pages, Boolean(supportsSkip)),
   });
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  const seen = new Set<string>();
+  const loaded = (query.data?.pages.flat() || []).filter((meta) => {
+    const key = mediaKey(meta.type, meta.id);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const refining = activeFilters(refine) > 0;
+  const items = refining ? applySearchFilters(loaded.map((meta) => ({ meta })), refine).map(({ meta }) => meta) : loaded;
+  // While the filters hide (almost) everything, more pages load on their own, up to a limit.
+  const autoLoad = !refining || items.length > 0 || (query.data?.pages.length ?? 0) < FILTERED_AUTOLOAD_PAGES;
   useEffect(() => {
     const node = sentinel.current;
-    if (!node || !hasNextPage) return;
+    if (!node || !hasNextPage || !autoLoad) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !isFetchingNextPage) void fetchNextPage();
@@ -190,14 +271,7 @@ function CatalogGrid({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-  const seen = new Set<string>();
-  const items = (query.data?.pages.flat() || []).filter((meta) => {
-    const key = mediaKey(meta.type, meta.id);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  }, [autoLoad, hasNextPage, isFetchingNextPage, fetchNextPage]);
   if (query.isError && !items.length)
     return (
       <div className="page-body">
@@ -208,7 +282,14 @@ function CatalogGrid({
         />
       </div>
     );
-  if (query.isSuccess && !items.length)
+  if (query.isSuccess && loaded.length && !items.length && !hasNextPage)
+    return (
+      <EmptyState
+        title="Ningún título con estos filtros"
+        description={`Ninguno de los ${loaded.length} títulos del catálogo cumple el año o la valoración elegidos.`}
+      />
+    );
+  if (query.isSuccess && !loaded.length)
     return (
       <EmptyState
         title="Sin títulos"

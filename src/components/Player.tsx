@@ -272,6 +272,8 @@ export function Player({
   const [idle, setIdle] = useState(false);
   const [hover, setHover] = useState<{ x: number; time: number } | null>(null);
   const [flash, setFlash] = useState("");
+  /** Big play or pause icon in the centre when playback is toggled; `id` restarts its animation. */
+  const [pulse, setPulse] = useState<{ kind: "play" | "pause"; id: number } | null>(null);
   const [resumed, setResumed] = useState(false);
   const [source, setSource] = useState(playing.url);
   const [probe, setProbe] = useState<Probe | undefined>(playing.probe);
@@ -825,8 +827,12 @@ export function Player({
   const toggle = () => {
     const element = video.current;
     if (!element) return;
-    if (element.paused || element.ended) void element.play().catch(() => setNotice("Pulsa reproducir para iniciar el vídeo."));
+    const kind = element.paused || element.ended ? "play" : "pause";
+    if (kind === "play") void element.play().catch(() => setNotice("Pulsa reproducir para iniciar el vídeo."));
     else element.pause();
+    const id = Date.now();
+    setPulse({ kind, id });
+    setTimeout(() => setPulse((current) => (current?.id === id ? null : current)), 700);
   };
   const seekBy = (seconds: number) => {
     const element = video.current;
@@ -1119,6 +1125,11 @@ export function Player({
           </div>
         )}
         {flash && <div className="player-flash" aria-live="polite">{flash}</div>}
+        {pulse && (
+          <div className="player-pulse" key={pulse.id} aria-hidden="true">
+            {pulse.kind === "play" ? <Play size={34} fill="currentColor" /> : <Pause size={34} fill="currentColor" />}
+          </div>
+        )}
         {notice && !error && (
           <div className="player-notice" role="status">
             <span>{notice}</span>

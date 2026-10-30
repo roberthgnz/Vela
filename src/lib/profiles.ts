@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { createAttempts, hashPin, isPinHash, verifyPin, type PinHash } from "./pin";
 import { sourceHistory, sourcesKey } from "./sourceHistory";
 import { MAIN_PROFILE, preferencesStore } from "./store";
 
@@ -8,8 +9,11 @@ import { MAIN_PROFILE, preferencesStore } from "./store";
  * external player and the TMDB key are shared. The main profile keeps the data Vela already had.
  */
 
-/** `kids`: Home, Explorar and search show only children's catalogs. */
-export type Profile = { id: string; name: string; color: string; kids?: boolean };
+/**
+ * `kids`: Home, Explorar and search show only children's catalogs.
+ * `pin`: the profile asks for its PIN before opening, and before its PIN is changed or it is deleted.
+ */
+export type Profile = { id: string; name: string; color: string; kids?: boolean; pin?: PinHash };
 type Saved = { profiles: Profile[]; last?: string };
 
 const storageKey = "vela.profiles.v1";
@@ -20,9 +24,9 @@ export const profileColors = ["#d6ef91", "#8ec5ff", "#f5a97f", "#c6a0f6", "#8bd5
 function read(): Saved {
   try {
     const value = JSON.parse(localStorage.getItem(storageKey) ?? "null") as Saved | null;
-    const profiles = (value?.profiles ?? []).filter(
-      (profile) => profile && typeof profile.id === "string" && typeof profile.name === "string" && profile.name.trim(),
-    );
+    const profiles = (value?.profiles ?? [])
+      .filter((profile) => profile && typeof profile.id === "string" && typeof profile.name === "string" && profile.name.trim())
+      .map(({ pin, ...profile }) => (isPinHash(pin) ? { ...profile, pin } : profile));
     if (profiles.some((profile) => profile.id === MAIN_PROFILE)) return { profiles, last: value?.last };
     return { profiles: [{ id: MAIN_PROFILE, name: "Principal", color: profileColors[0] }, ...profiles], last: value?.last };
   } catch {
@@ -32,7 +36,8 @@ function read(): Saved {
 
 let saved: Saved = typeof localStorage === "undefined" ? { profiles: [] } : read();
 /** Whether a profile has been chosen in this session (the picker shows until then). */
-let chosen = saved.profiles.length <= 1;
+let chosen = saved.profiles.length <= 1 && !saved.profiles[0]?.pin;
+const attempts = createAttempts();
 let snapshot = { ...saved, active: preferencesStore.getProfile(), chosen };
 const listeners = new Set<() => void>();
 
@@ -55,6 +60,27 @@ function clean(name: string): string {
   return name.trim().replace(/\s+/g, " ").slice(0, 24);
 }
 
+function activate(id: string) {
+  preferencesStore.switchProfile(id);
+  sourceHistory.switchProfile(id);
+  chosen = true;
+  save({ ...saved, last: id });
+}
+
+/** Rejects unless `pin` opens profile `id` (profiles without a PIN always pass). */
+async function check(id: string, pin: string) {
+  const profile = saved.profiles.find((item) => item.id === id);
+  if (!profile?.pin) return;
+  const wait = attempts.wait(id);
+  if (wait) throw new Error(`Demasiados intentos. Espera ${Math.ceil(wait / 1000)} s.`);
+  if (!(await verifyPin(pin, profile.pin))) {
+    attempts.fail(id);
+    const locked = attempts.wait(id);
+    throw new Error(locked ? `PIN incorrecto. Espera ${Math.ceil(locked / 1000)} s.` : "PIN incorrecto.");
+  }
+  attempts.succeed(id);
+}
+
 export const profiles = {
   subscribe(listener: () => void) {
     listeners.add(listener);
@@ -63,13 +89,40 @@ export const profiles = {
     };
   },
   getSnapshot: () => snapshot,
-  /** Activates a profile and loads its data. */
+  /** Activates a profile and loads its data. Profiles with a PIN open with `unlock`. */
   select(id: string) {
+    const profile = saved.profiles.find((item) => item.id === id);
+    if (!profile) return;
+    if (profile.pin) throw new Error(`«${profile.name}» tiene PIN.`);
+    activate(id);
+  },
+  locked(id: string): boolean {
+    return Boolean(saved.profiles.find((profile) => profile.id === id)?.pin);
+  },
+  /** Opens a profile after checking its PIN. */
+  async unlock(id: string, pin: string) {
     if (!saved.profiles.some((profile) => profile.id === id)) return;
-    preferencesStore.switchProfile(id);
-    sourceHistory.switchProfile(id);
-    chosen = true;
-    save({ ...saved, last: id });
+    await check(id, pin);
+    activate(id);
+  },
+  /** Checks a profile's PIN without opening it (to manage that profile). */
+  verify: check,
+  /**
+   * Sets, changes (`pin`) or removes (`null`) a profile's PIN. A profile that already has one
+   * needs it (`current`) first.
+   */
+  async setPin(id: string, pin: string | null, current = "") {
+    if (!saved.profiles.some((profile) => profile.id === id)) return;
+    await check(id, current);
+    const value = pin === null ? undefined : await hashPin(pin);
+    save({
+      ...saved,
+      profiles: saved.profiles.map((profile) => {
+        if (profile.id !== id) return profile;
+        const { pin: _old, ...rest } = profile;
+        return value ? { ...rest, pin: value } : rest;
+      }),
+    });
   },
   create(name: string, color = profileColors[saved.profiles.length % profileColors.length]): Profile {
     const value = clean(name);
@@ -101,9 +154,13 @@ export const profiles = {
       ),
     });
   },
-  /** Deletes a profile and its data. The main profile and the active one cannot be deleted. */
-  remove(id: string) {
+  /**
+   * Deletes a profile and its data. The main profile and the active one cannot be deleted; one
+   * with a PIN needs it.
+   */
+  async remove(id: string, pin = "") {
     if (id === MAIN_PROFILE || id === preferencesStore.getProfile()) return;
+    await check(id, pin);
     preferencesStore.forgetProfile(id);
     try {
       localStorage.removeItem(sourcesKey(id));
@@ -121,10 +178,20 @@ export const profiles = {
 
 /** Without a picker (one profile), the last profile used is restored. */
 if (chosen && saved.last && saved.last !== MAIN_PROFILE && saved.profiles.some((profile) => profile.id === saved.last))
-  profiles.select(saved.last);
+  activate(saved.last);
 
 export function useProfiles() {
   return useSyncExternalStore(profiles.subscribe, profiles.getSnapshot, profiles.getSnapshot);
+}
+
+/**
+ * The profile whose PIN guards profile management: with a child's profile open, the main
+ * profile's PIN (when it has one), so the child cannot turn the restriction off.
+ */
+export function managementGuard(state: { profiles: Profile[]; active: string }): Profile | undefined {
+  const active = state.profiles.find((profile) => profile.id === state.active);
+  const main = state.profiles.find((profile) => profile.id === MAIN_PROFILE);
+  return active?.kids && main?.pin ? main : undefined;
 }
 
 /** Whether the active profile is a child's. */

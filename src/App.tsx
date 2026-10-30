@@ -44,7 +44,7 @@ import { Dialog, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
 import { UpdateNotice } from "./components/UpdateNotice";
-import { ProfileAvatar, ProfilePicker } from "./components/Profiles";
+import { openProfile, ProfileAvatar, ProfilePicker, usePinGate } from "./components/Profiles";
 import { profiles, useProfiles } from "./lib/profiles";
 import { native, WindowControls } from "./components/WindowControls";
 import { sourceHistory } from "./lib/sourceHistory";
@@ -76,6 +76,7 @@ export default function App() {
   const accountState = useAccount();
   const nav = useNavigation();
   const menu = useMenu();
+  const pinGate = usePinGate((message) => notify(message, "error"));
   const content = useRef<HTMLElement>(null);
   const scrolls = useRef(new Map<number, number>());
   /** Accessible name of the focused control in each history entry, restored when going back. */
@@ -83,6 +84,8 @@ export default function App() {
   const restoring = useRef(false);
   const [sidebar, setSidebar] = useUiSetting("sidebar", "expanded", ["expanded", "collapsed"] as const);
   const [searchOpen, setSearchOpen] = useState(false);
+  /** Text the palette starts with when it is opened to search for something specific. */
+  const [searchText, setSearchText] = useState("");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [installRequest, setInstallRequest] = useState(0);
   const [playing, setPlaying] = useState<Playing | null>(null);
@@ -514,7 +517,7 @@ export default function App() {
                     label: profile.name,
                     icon: <ProfileAvatar profile={profile} size={16} />,
                     checked: profile.id === profileState.active,
-                    onSelect: () => profiles.select(profile.id),
+                    onSelect: () => openProfile(pinGate, profile),
                   })),
                   "separator" as const,
                   { label: "Administrar perfiles", icon: <Users size={15} />, onSelect: () => openSettings("profiles") },
@@ -598,6 +601,16 @@ export default function App() {
             onPlay={onPlay}
             onResume={() => void resumeTitle(route.meta, route.addonUrl)}
             onAddons={() => section("addons")}
+            onGenre={(type, target) =>
+              go({
+                name: type === "movie" ? "movies" : "series",
+                state: { catalog: target.source.key, filters: JSON.stringify({ genre: target.value }) },
+              })
+            }
+            onPerson={(name) => {
+              setSearchText(name);
+              setSearchOpen(true);
+            }}
             notify={notify}
           />
         )}
@@ -605,7 +618,11 @@ export default function App() {
       </RouteStateProvider>
       {searchOpen && (
         <SearchPalette
-          onClose={() => setSearchOpen(false)}
+          initialQuery={searchText}
+          onClose={() => {
+            setSearchOpen(false);
+            setSearchText("");
+          }}
           onOpen={(meta, addon) => openMedia(meta, addon.manifestUrl)}
           commands={commands}
         />
@@ -634,13 +651,9 @@ export default function App() {
       {menu.element}
       <UpdateNotice />
       {!profileState.chosen && (
-        <ProfilePicker
-          onManage={() => {
-            profiles.select(profileState.last ?? profileState.active);
-            openSettings("profiles");
-          }}
-        />
+        <ProfilePicker onManage={() => openSettings("profiles")} />
       )}
+      {pinGate.element}
       {preparing && !playing && (
         <PreparingPlayer meta={preparing.meta} episode={preparing.episode} onClose={cancelPreparing} />
       )}

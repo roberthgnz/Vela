@@ -31,7 +31,10 @@ import type {
   ResolvedStream,
 } from "../lib/contracts";
 import { episodeCode, isUpcoming, orderedEpisodes, videoProgress, watchedEpisodes } from "../lib/episodes";
-import { getMeta, getStreams } from "../lib/protocol";
+import { genreTarget, type GenreTarget } from "../lib/genres";
+import { useKidsMode } from "../lib/profiles";
+import { getCatalogSources, getMeta, getStreams } from "../lib/protocol";
+import { kidsCatalog } from "../lib/tmdbCatalogs";
 import { sourceHistory, sourceKey, useSourceMarks } from "../lib/sourceHistory";
 import { useTranslatedMeta } from "../lib/tmdb";
 import { useRouteState } from "../lib/navigation";
@@ -115,6 +118,18 @@ function relativeTime(at: number): string {
   return `el ${new Date(at).toLocaleDateString("es", { day: "numeric", month: "short" })}`;
 }
 
+/** Names in the credits; each one searches for that person's titles. */
+function People({ names, onPerson }: { names: string[]; onPerson: (name: string) => void }) {
+  return names.map((name, index) => (
+    <span key={name}>
+      {index > 0 && ", "}
+      <button className="person-link" title={`Buscar títulos de ${name}`} onClick={() => onPerson(name)}>
+        {name}
+      </button>
+    </span>
+  ));
+}
+
 export function DetailView({
   meta: initial,
   addon,
@@ -127,6 +142,8 @@ export function DetailView({
   onPlay,
   onResume,
   onAddons,
+  onGenre,
+  onPerson,
   notify,
 }: {
   meta: MediaItem;
@@ -141,9 +158,14 @@ export function DetailView({
   onSourcesChange: (visible: boolean) => void;
   onPlay: PlayHandler;
   onAddons: () => void;
+  /** Opens the catalog filtered by a genre. */
+  onGenre: (type: "movie" | "series", target: GenreTarget) => void;
+  /** Searches the titles of a person (Cinemeta's search also matches cast and crew). */
+  onPerson: (name: string) => void;
   notify: (message: string) => void;
 }) {
   const prefs = usePreferences();
+  const kids = useKidsMode();
   const menu = useMenu();
   const panel = useRef<HTMLElement>(null);
   const metadata = useQuery({
@@ -303,9 +325,27 @@ export function DetailView({
               </div>
               {meta.genres?.length ? (
                 <div className="genres">
-                  {meta.genres.slice(0, 5).map((genre) => (
-                    <span key={genre}>{genre}</span>
-                  ))}
+                  {meta.genres.slice(0, 5).map((genre) => {
+                    const type = meta.type === "movie" || meta.type === "series" ? meta.type : undefined;
+                    const target = type
+                      ? genreTarget(
+                          getCatalogSources(prefs.addons, type).filter((source) => !kids || kidsCatalog(source)),
+                          genre,
+                        )
+                      : undefined;
+                    return type && target ? (
+                      <button
+                        key={genre}
+                        className="genre-link"
+                        title={`Ver ${type === "movie" ? "películas" : "series"} de ${genre}`}
+                        onClick={() => onGenre(type, target)}
+                      >
+                        {genre}
+                      </button>
+                    ) : (
+                      <span key={genre}>{genre}</span>
+                    );
+                  })}
                 </div>
               ) : null}
               <div className="detail-actions">
@@ -392,13 +432,17 @@ export function DetailView({
               {meta.director?.length ? (
                 <div>
                   <dt>Dirección</dt>
-                  <dd>{meta.director.join(", ")}</dd>
+                  <dd>
+                    <People names={meta.director} onPerson={onPerson} />
+                  </dd>
                 </div>
               ) : null}
               {meta.cast?.length ? (
                 <div>
                   <dt>Reparto</dt>
-                  <dd>{meta.cast.slice(0, 8).join(", ")}</dd>
+                  <dd>
+                    <People names={meta.cast.slice(0, 8)} onPerson={onPerson} />
+                  </dd>
                 </div>
               ) : null}
             </dl>

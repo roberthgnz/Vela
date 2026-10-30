@@ -1,8 +1,10 @@
 import { useDeferredValue, useState, type KeyboardEvent, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { CornerDownLeft, Search } from "lucide-react";
+import { CornerDownLeft, History, Search, X } from "lucide-react";
 import type { InstalledAddon, MediaItem } from "../lib/contracts";
 import { getCatalog, getCatalogSources } from "../lib/protocol";
+import { activeFilters, applySearchFilters, decades, noSearchFilters, type SearchFilters } from "../lib/searchFilters";
+import { searchHistory, useSearchHistory } from "../lib/searchHistory";
 import { useKidsMode } from "../lib/profiles";
 import { mediaKey, usePreferences } from "../lib/store";
 import { errorMessage, yearOf } from "../lib/utils";
@@ -35,13 +37,17 @@ export function SearchPalette({
   onClose,
   onOpen,
   commands,
+  initialQuery = "",
 }: {
+  /** Text to search for as soon as the palette opens (a person from the credits, for example). */
+  initialQuery?: string;
   onClose: () => void;
   onOpen: (meta: MediaItem, addon: InstalledAddon) => void;
   commands: Command[];
 }) {
   const prefs = usePreferences();
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialQuery);
+  const recent = useSearchHistory();
   const search = useDeferredValue(input.trim());
   // A children's profile does not search: addon search results cannot be filtered by age.
   const kids = useKidsMode();
@@ -84,13 +90,16 @@ export function SearchPalette({
   const matchingCommands = commands.filter(
     (command) => !needle || command.label.toLocaleLowerCase("es").includes(needle),
   );
-  const groups = query.data
+  const [filters, setFilters] = useState<SearchFilters>(noSearchFilters);
+  const filter = (change: Partial<SearchFilters>) => setFilters((current) => ({ ...current, ...change }));
+  const filtered = query.data ? applySearchFilters(query.data, filters) : undefined;
+  const groups = filtered
     ? (["movie", "series"] as const)
-        .map((type) => ({ type, items: query.data.filter(({ meta }) => meta.type === type) }))
+        .map((type) => ({ type, items: filtered.filter(({ meta }) => meta.type === type) }))
         .concat([
           {
             type: "other" as never,
-            items: query.data.filter(({ meta }) => meta.type !== "movie" && meta.type !== "series"),
+            items: filtered.filter(({ meta }) => meta.type !== "movie" && meta.type !== "series"),
           },
         ])
         .filter((group) => group.items.length)
@@ -122,6 +131,57 @@ export function SearchPalette({
         {query.isFetching && <Spinner />}
         <kbd>Esc</kbd>
       </div>
+      <div className="palette-filters" role="group" aria-label="Filtros de búsqueda">
+        <div className="palette-types" role="group" aria-label="Tipo">
+          {(
+            [
+              ["all", "Todo"],
+              ["movie", "Películas"],
+              ["series", "Series"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              className={`chip ${filters.type === value ? "selected" : ""}`}
+              aria-pressed={filters.type === value}
+              onClick={() => filter({ type: value })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <select
+          className="palette-select"
+          aria-label="Año"
+          value={filters.decade}
+          data-active={Boolean(filters.decade) || undefined}
+          onChange={(event) => filter({ decade: event.target.value })}
+        >
+          <option value="">Cualquier año</option>
+          {decades.map((decade) => (
+            <option key={decade} value={decade}>
+              Años {decade.slice(2)}
+            </option>
+          ))}
+          <option value="older">Antes de 1980</option>
+        </select>
+        <select
+          className="palette-select"
+          aria-label="Orden"
+          value={filters.sort}
+          data-active={filters.sort !== "relevance" || undefined}
+          onChange={(event) => filter({ sort: event.target.value as SearchFilters["sort"] })}
+        >
+          <option value="relevance">Más relevantes</option>
+          <option value="newest">Más recientes</option>
+          <option value="oldest">Más antiguos</option>
+        </select>
+        {activeFilters(filters) > 0 && (
+          <button className="link-button palette-clear" onClick={() => setFilters(noSearchFilters)}>
+            Quitar filtros
+          </button>
+        )}
+      </div>
       <div className="palette-body" aria-busy={query.isFetching} data-stale={query.isPlaceholderData || undefined}>
         {search.length >= 2 && (
           <>
@@ -149,6 +209,7 @@ export function SearchPalette({
                       aria-label={`Ver ${meta.name}`}
                       onKeyDown={moveFocus}
                       onClick={() => {
+                        searchHistory.add(search);
                         onClose();
                         onOpen(meta, addon);
                       }}
@@ -168,18 +229,71 @@ export function SearchPalette({
                 </section>
               ))
             ) : (
-              <EmptyState
-                compact
-                icon={<Search size={18} />}
-                title="No encontramos resultados"
-                description={
-                  sources.length
-                    ? `Ningún catálogo devuelve resultados para «${search}».`
-                    : "No hay ningún catálogo activo con búsqueda."
-                }
-              />
+              query.data?.length && activeFilters(filters) ? (
+                <EmptyState
+                  compact
+                  icon={<Search size={18} />}
+                  title="Ningún resultado con estos filtros"
+                  description={`Hay ${query.data.length} resultados para «${search}» sin filtros.`}
+                  action={
+                    <button className="button secondary small" onClick={() => setFilters(noSearchFilters)}>
+                      Quitar filtros
+                    </button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  compact
+                  icon={<Search size={18} />}
+                  title="No encontramos resultados"
+                  description={
+                    sources.length
+                      ? `Ningún catálogo devuelve resultados para «${search}».`
+                      : "No hay ningún catálogo activo con búsqueda."
+                  }
+                />
+              )
             )}
           </>
+        )}
+        {!input.trim() && recent.length > 0 && (
+          <section aria-label="Búsquedas recientes">
+            <h3 className="palette-group">
+              Recientes
+              <button className="link-button palette-forget" onClick={() => searchHistory.clear()}>
+                Borrar historial
+              </button>
+            </h3>
+            {recent.map((text) => (
+              <div className="palette-recent" key={text}>
+                <button
+                  className="palette-item command"
+                  data-palette-item
+                  aria-label={`Buscar ${text}`}
+                  onKeyDown={moveFocus}
+                  onClick={(event) => {
+                    setInput(text);
+                    event.currentTarget.closest(".palette")?.querySelector<HTMLElement>("input")?.focus();
+                  }}
+                >
+                  <span className="palette-icon">
+                    <History size={15} />
+                  </span>
+                  <span className="palette-text">
+                    <strong>{text}</strong>
+                  </span>
+                </button>
+                <button
+                  className="icon-button palette-remove"
+                  aria-label={`Quitar «${text}» del historial`}
+                  title="Quitar del historial"
+                  onClick={() => searchHistory.remove(text)}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </section>
         )}
         {matchingCommands.length > 0 && (
           <section aria-label="Comandos">
