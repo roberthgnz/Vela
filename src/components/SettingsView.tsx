@@ -172,19 +172,35 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
     notify("Exportación de la biblioteca preparada.");
   };
   const [current, setCurrent] = useState<string>(sections[0].id);
+  // The current section is the last one whose title has scrolled past the top of the content (or
+  // the last one, at the very bottom). An IntersectionObserver only reports the sections that
+  // changed, so after a jump it kept the section above highlighted.
   useEffect(() => {
-    const nodes = sections
-      .map(({ id }) => document.getElementById(`settings-${id}`))
-      .filter((node): node is HTMLElement => Boolean(node));
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length) setCurrent(visible[0].target.id.replace("settings-", ""));
-      },
-      { rootMargin: "-80px 0px -60% 0px" },
-    );
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
+    const scroller = document.getElementById("main");
+    if (!scroller) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const nodes = sections
+        .map(({ id }) => document.getElementById(`settings-${id}`))
+        .filter((node): node is HTMLElement => Boolean(node));
+      const top = scroller.getBoundingClientRect().top + 120;
+      const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
+      const passed = nodes.filter((node) => node.getBoundingClientRect().top <= top);
+      const node = atEnd ? nodes.at(-1) : (passed.at(-1) ?? nodes[0]);
+      if (node) setCurrent(node.id.replace("settings-", ""));
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    scroller.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      scroller.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
   }, []);
   const count = Object.values(prefs.library).filter((entry) => entry.saved).length;
   const withProgress = Object.values(prefs.library).filter((entry) => entry.progress || entry.videos).length;

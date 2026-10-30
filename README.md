@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/home.png" alt="Inicio de Vela con «Seguir viendo» y un catálogo" width="860">
+  <img src="docs/screenshots/home.jpg" alt="Inicio de Vela con una recomendación destacada, «Seguir viendo» y un catálogo" width="860">
 </p>
 
 ## Interfaz
@@ -42,17 +42,16 @@
     <td align="center">Reproductor integrado</td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/settings.png" alt="Ajustes de subtítulos con vista previa"></td>
-    <td width="50%" valign="top">
-      <p>Ventana sin marco con barra de título propia, barra lateral plegable, historial atrás/adelante y paleta de búsqueda (<kbd>Ctrl</kbd> <kbd>K</kbd>). Al volver atrás se recuperan filtros, temporada, scroll y foco.</p>
-      <p>Todo se maneja con el teclado: <kbd>F1</kbd> muestra la lista de atajos.</p>
-    </td>
+    <td width="50%"><img src="docs/screenshots/search.jpg" alt="Paleta de búsqueda con filtros por tipo, año, orden y contenido"></td>
+    <td width="50%"><img src="docs/screenshots/settings.png" alt="Ajustes de subtítulos con color, fondo y vista previa"></td>
   </tr>
   <tr>
+    <td align="center">Búsqueda con filtros e historial (<kbd>Ctrl</kbd> <kbd>K</kbd>)</td>
     <td align="center">Ajustes agrupados por tareas</td>
-    <td></td>
   </tr>
 </table>
+
+Ventana sin marco con barra de título propia, barra lateral plegable e historial atrás/adelante: al volver atrás se recuperan filtros, temporada, scroll y foco. Todo se maneja con el teclado, también el reproductor con los atajos de YouTube; <kbd>F1</kbd> muestra la lista.
 
 Las capturas usan los tráileres de Blender Foundation incluidos en Vela (CC BY 3.0).
 

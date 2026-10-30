@@ -2062,8 +2062,10 @@ kbd {
   color: var(--fg);
 }
 .palette-clear {
+  width: 26px;
+  height: 26px;
   margin-left: auto;
-  font-size: 12px;
+  color: var(--muted);
 }
 .palette-body {
   flex: 1;

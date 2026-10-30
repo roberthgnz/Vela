@@ -200,13 +200,15 @@ export function SearchPalette({
         )}
         {(activeFilters(filters) > 0 || content !== "all") && (
           <button
-            className="link-button palette-clear"
+            className="icon-button palette-clear"
+            aria-label="Quitar filtros"
+            title="Quitar filtros"
             onClick={() => {
               setFilters(noSearchFilters);
               setContent("all");
             }}
           >
-            Quitar filtros
+            <X size={14} />
           </button>
         )}
       </div>
