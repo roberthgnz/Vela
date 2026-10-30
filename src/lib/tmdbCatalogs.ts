@@ -103,20 +103,53 @@ export async function currentTmdbContext(): Promise<TmdbContext> {
   if (!context) throw new Error("Los catálogos de TMDB necesitan una clave de TMDB (Ajustes › Información).");
   return context;
 }
+/** TMDB ids never change their IMDb id: the lookups are kept between sessions (bounded). */
+const imdbStorageKey = "vela.tmdb.imdb.v1";
+const maxImdbCache = 4000;
 const imdbCache = new Map<string, string | null>();
 const tmdbIdCache = new Map<string, number | null>();
+let imdbLoaded = false;
+let imdbSaveTimer: ReturnType<typeof setTimeout> | undefined;
+
+function loadImdbCache() {
+  if (imdbLoaded) return;
+  imdbLoaded = true;
+  try {
+    const saved = JSON.parse(globalThis.localStorage?.getItem(imdbStorageKey) ?? "null") as [string, string | null][] | null;
+    if (Array.isArray(saved))
+      for (const [key, value] of saved) if (typeof key === "string" && (value === null || /^tt\d+$/.test(value))) imdbCache.set(key, value);
+  } catch {
+    /* The cache only saves requests. */
+  }
+}
+
+function saveImdbCache() {
+  if (typeof localStorage === "undefined" || imdbSaveTimer) return;
+  imdbSaveTimer = setTimeout(() => {
+    imdbSaveTimer = undefined;
+    try {
+      localStorage.setItem(imdbStorageKey, JSON.stringify([...imdbCache].slice(-maxImdbCache)));
+    } catch {
+      /* Full storage: lookups are repeated next time. */
+    }
+  }, 2000);
+}
 
 function url(path: string, params: Record<string, string>, context: TmdbContext): string {
   const language = context.language || "es-ES";
   return `${API}${path}?${new URLSearchParams({ language, ...params, api_key: context.apiKey })}`;
 }
 
+/** A TMDB API URL with the context's key and language. */
+export const tmdbUrl = url;
+
 export function region(language: string): string {
   return /-([A-Z]{2})$/.exec(language)?.[1] ?? "US";
 }
 
-async function imdbId(kind: "movie" | "tv", id: number, context: TmdbContext): Promise<string | null> {
+export async function imdbId(kind: "movie" | "tv", id: number, context: TmdbContext): Promise<string | null> {
   const key = `${kind}:${id}`;
+  loadImdbCache();
   if (imdbCache.has(key)) return imdbCache.get(key)!;
   const fetchJson = context.fetchJson ?? requestJson;
   let value: string | null = null;
@@ -127,6 +160,7 @@ async function imdbId(kind: "movie" | "tv", id: number, context: TmdbContext): P
     return null; // Not cached: a network error should not hide the title for good.
   }
   imdbCache.set(key, value);
+  saveImdbCache();
   return value;
 }
 
@@ -154,7 +188,7 @@ async function items(results: Result[], kind: "movie" | "tv", context: TmdbConte
   });
 }
 
-async function tmdbId(type: string, imdb: string, context: TmdbContext): Promise<number | null> {
+export async function tmdbId(type: string, imdb: string, context: TmdbContext): Promise<number | null> {
   const key = `${type}:${imdb}`;
   if (tmdbIdCache.has(key)) return tmdbIdCache.get(key)!;
   const fetchJson = context.fetchJson ?? requestJson;

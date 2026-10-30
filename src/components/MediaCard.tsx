@@ -1,6 +1,7 @@
 import type { KeyboardEvent, MouseEvent } from "react";
-import { Bookmark, BookmarkCheck, Check, Info, Play, Plus, Trash2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, Info, Play, Plus, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import type { LibraryEntry, MediaItem } from "../lib/contracts";
+import { taste } from "../lib/taste";
 import { clock, yearOf } from "../lib/utils";
 import { Artwork, type MenuAnchor, type MenuItem } from "./Primitives";
 
@@ -47,6 +48,20 @@ export function cardKeys(event: KeyboardEvent<HTMLElement>) {
   cards[next].scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
+/** «Me gusta» and «No me gusta», which teach the recommendations; selecting the current one clears it. */
+export function ratingItems(meta: MediaItem): MenuItem[] {
+  const current = taste.rating(meta.type, meta.id);
+  return [
+    { label: "Me gusta", icon: <ThumbsUp size={15} />, checked: current === "like", onSelect: () => taste.rate(meta, current === "like" ? null : "like") },
+    {
+      label: "No me gusta",
+      icon: <ThumbsDown size={15} />,
+      checked: current === "dislike",
+      onSelect: () => taste.rate(meta, current === "dislike" ? null : "dislike"),
+    },
+  ];
+}
+
 export function MediaCard({
   meta,
   entry,
@@ -55,6 +70,9 @@ export function MediaCard({
   onSources,
   onMenu,
   removeLabel,
+  match,
+  reason,
+  extraMenu,
 }: {
   meta: MediaItem;
   entry?: LibraryEntry;
@@ -63,11 +81,18 @@ export function MediaCard({
   onSources?: () => void;
   onMenu?: CardMenu;
   removeLabel?: boolean;
+  /** Recommendation match, 0–100. */
+  match?: number;
+  /** Why it is recommended, shown on hover. */
+  reason?: string;
+  /** More menu items, after the library ones. */
+  extraMenu?: MenuItem[];
 }) {
   const progress = progressOf(entry);
   const saved = Boolean(entry?.saved);
   const watched = Boolean(entry?.watchedAt);
   const year = yearOf(meta);
+  const details = [year, meta.imdbRating && `★ ${meta.imdbRating}`].filter(Boolean).join(" · ");
   const openMenu = (anchor: MenuAnchor) =>
     onMenu?.(
       anchor,
@@ -85,6 +110,9 @@ export function MediaCard({
               onSelect: onSave,
             }
           : { label: "Añadir a la biblioteca", icon: <Bookmark size={15} />, onSelect: onSave },
+        "separator",
+        ...ratingItems(meta),
+        ...(extraMenu ?? []),
       ],
       meta.name,
     );
@@ -111,6 +139,7 @@ export function MediaCard({
           cardKeys(event);
         }}
         aria-label={`Ver ${meta.name}`}
+        title={reason}
       >
         <Artwork src={meta.poster} name={meta.name} className="poster" />
         {watched && (
@@ -147,9 +176,9 @@ export function MediaCard({
           {meta.name}
         </span>
         <span className="card-meta">
-          {[year, meta.imdbRating && `★ ${meta.imdbRating}`]
-            .filter(Boolean)
-            .join(" · ") || typeLabel(meta.type)}
+          {match !== undefined && <span className="card-match">{match} %</span>}
+          {match !== undefined && details && " · "}
+          {details || (match === undefined && typeLabel(meta.type))}
         </span>
       </div>
     </article>

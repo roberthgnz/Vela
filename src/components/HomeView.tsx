@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useContentFilter } from "../lib/contentFilter";
-import { ChevronLeft, ChevronRight, Puzzle, X } from "lucide-react";
+import { useContentFilter, useTitleAllowed } from "../lib/contentFilter";
+import { Check, ChevronLeft, ChevronRight, EyeOff, Info, Play, Plus, Puzzle, ThumbsUp, X } from "lucide-react";
 import type { CatalogSource, LibraryEntry, MediaItem } from "../lib/contracts";
 import { homeRows } from "../lib/catalogLayout";
 import { useKidsMode } from "../lib/profiles";
@@ -9,9 +9,12 @@ import { kidsCatalog } from "../lib/tmdbCatalogs";
 import { getCatalog, getCatalogSources } from "../lib/protocol";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
 import { episodeCode } from "../lib/episodes";
+import { COLD_LIKES, useForYou } from "../lib/forYou";
+import { reasonText, type Row, type Scored } from "../lib/recommend";
+import { taste, useTaste } from "../lib/taste";
 import { clock, errorMessage, motion, safeImage } from "../lib/utils";
-import { cardKeys, MediaCard, PosterSkeletons, type CardMenu } from "./MediaCard";
-import { EmptyState, ErrorState } from "./Primitives";
+import { cardKeys, MediaCard, PosterSkeletons, typeLabel, type CardMenu } from "./MediaCard";
+import { Artwork, EmptyState, ErrorState } from "./Primitives";
 
 export type OpenMedia = (meta: MediaItem, addonUrl: string, sources?: boolean) => void;
 
@@ -214,6 +217,201 @@ function ContinueCard({
   );
 }
 
+/** The billboard, only for a title the profile may see. */
+function AllowedHero({ item, onOpen }: { item: Scored; onOpen: OpenMedia }) {
+  const allowed = useTitleAllowed(item.item);
+  return allowed === "allowed" ? <ForYouHero item={item} onOpen={onOpen} /> : allowed === "pending" ? <HeroSkeleton /> : null;
+}
+
+/** The billboard: the title the recommendations rate highest today, with what to do about it. */
+function ForYouHero({ item, onOpen }: { item: Scored; onOpen: OpenMedia }) {
+  const prefs = usePreferences();
+  const ratings = useTaste().ratings;
+  const { item: meta, addonUrl } = item;
+  const liked = ratings[item.key]?.value === "like";
+  const saved = Boolean(prefs.library[item.key]?.saved);
+  const image = safeImage(meta.background);
+  // Many titles have no logo image; the name is shown instead when it fails to load.
+  const [logoFailed, setLogoFailed] = useState<string>();
+  const logo = logoFailed === meta.logo ? undefined : safeImage(meta.logo);
+  return (
+    <section className="for-you-hero" aria-label={`Destacado: ${meta.name}`}>
+      {image && (
+        <div className="for-you-hero-art" aria-hidden="true">
+          <img src={image} alt="" draggable={false} />
+        </div>
+      )}
+      <div className="for-you-hero-body">
+        {logo ? (
+          <h2 className="for-you-logo">
+            <img src={logo} alt={meta.name} draggable={false} onError={() => setLogoFailed(meta.logo)} />
+          </h2>
+        ) : (
+          <h2 className="for-you-title">{meta.name}</h2>
+        )}
+        <div className="facts for-you-facts">
+          <span className="for-you-match">{item.match} % de coincidencia</span>
+          {item.year && <span>{item.year}</span>}
+          <span>{typeLabel(meta.type)}</span>
+          {meta.imdbRating && <span>★ {meta.imdbRating}</span>}
+        </div>
+        {meta.description && <p className="for-you-description">{meta.description}</p>}
+        <p className="for-you-reason">{reasonText(item.reason)}</p>
+        <div className="for-you-actions">
+          <button className="button primary" onClick={() => onOpen(meta, addonUrl, true)}>
+            <Play size={15} /> Ver ahora
+          </button>
+          <button className="button secondary" onClick={() => onOpen(meta, addonUrl)}>
+            <Info size={15} /> Más información
+          </button>
+          <button
+            className={`for-you-icon ${saved ? "on" : ""}`}
+            aria-pressed={saved}
+            title={saved ? "Quitar de la biblioteca" : "Añadir a la biblioteca"}
+            aria-label={saved ? `Quitar ${meta.name} de la biblioteca` : `Añadir ${meta.name} a la biblioteca`}
+            onClick={() => preferencesStore.toggleMedia(meta, addonUrl)}
+          >
+            {saved ? <Check size={16} /> : <Plus size={16} />}
+          </button>
+          <button
+            className={`for-you-icon ${liked ? "on" : ""}`}
+            aria-pressed={liked}
+            title={liked ? "Quitar «Me gusta»" : "Me gusta"}
+            aria-label={`Me gusta ${meta.name}`}
+            onClick={() => taste.rate(meta, liked ? null : "like")}
+          >
+            <ThumbsUp size={16} />
+          </button>
+          <button
+            className="for-you-icon"
+            title="No me interesa"
+            aria-label={`No me interesa ${meta.name}`}
+            onClick={() => taste.hide(meta.type, meta.id)}
+          >
+            <EyeOff size={16} />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HeroSkeleton() {
+  return (
+    <div className="for-you-hero" aria-hidden="true">
+      <div className="for-you-hero-body">
+        <div className="skeleton for-you-skeleton-title" />
+        <div className="skeleton skeleton-line" />
+        <div className="skeleton skeleton-line" />
+      </div>
+    </div>
+  );
+}
+
+function ForYouShelf({ row, onOpen, onMenu }: { row: Row; onOpen: OpenMedia; onMenu: CardMenu }) {
+  const prefs = usePreferences();
+  // The profile's age limit applies to recommendations as to any catalog.
+  const content = useContentFilter(row.items, (item) => item.item);
+  if (content.visible.length < 4 && !content.pending) return null;
+  return (
+    <Shelf title={row.title} subtitle={row.subtitle} ready>
+      {!content.visible.length && <PosterSkeletons count={10} />}
+      {content.visible.map((item) => (
+        <MediaCard
+          key={item.key}
+          meta={item.item}
+          entry={prefs.library[item.key]}
+          match={item.match}
+          reason={reasonText(item.reason)}
+          onOpen={() => onOpen(item.item, item.addonUrl)}
+          onSources={() => onOpen(item.item, item.addonUrl, true)}
+          onSave={() => preferencesStore.toggleMedia(item.item, item.addonUrl)}
+          onMenu={onMenu}
+          extraMenu={[{ label: "No me interesa", icon: <EyeOff size={15} />, onSelect: () => taste.hide(item.item.type, item.item.id) }]}
+        />
+      ))}
+    </Shelf>
+  );
+}
+
+/** Recommendation rows shown before the first catalog; the rest go between catalogs. */
+const LEADING_ROWS = 3;
+
+/**
+ * Cold start: before anything was watched or saved, Home asks for a few titles the user likes
+ * from what is popular now. Recommendations appear from the first «Me gusta» and sharpen with each.
+ */
+function ColdStart({ liked: count, onOpen }: { liked: number; onOpen: OpenMedia }) {
+  const prefs = usePreferences();
+  const ratings = useTaste().ratings;
+  const popular = getCatalogSources(prefs.addons).filter(
+    (source) => source.addon.manifest.id === "com.linvo.cinemeta" && source.catalog.id === "top",
+  );
+  const movieSource = popular.find((source) => source.catalog.type === "movie");
+  const seriesSource = popular.find((source) => source.catalog.type === "series");
+  // The same queries as Home's own «populares» rows: no extra requests.
+  const movies = useQuery({
+    queryKey: ["catalog", movieSource?.key ?? "", ""],
+    queryFn: ({ signal }) => getCatalog(movieSource!, {}, signal),
+    enabled: Boolean(movieSource),
+  });
+  const series = useQuery({
+    queryKey: ["catalog", seriesSource?.key ?? "", ""],
+    queryFn: ({ signal }) => getCatalog(seriesSource!, {}, signal),
+    enabled: Boolean(seriesSource),
+  });
+  // Movies and series alternate, so both kinds of taste can be told.
+  const mixed = Array.from({ length: 15 }, (_, index) => [movies.data?.[index], series.data?.[index]])
+    .flat()
+    .filter((meta): meta is MediaItem => Boolean(meta?.poster));
+  const content = useContentFilter(mixed, (meta) => meta);
+  const addonUrl = popular[0]?.addon.manifestUrl;
+  if (!addonUrl || (!content.visible.length && !movies.isPending && !content.pending)) return null;
+  return (
+    <Shelf
+      title="¿Qué te gusta?"
+      subtitle={
+        count
+          ? `${count} de ${COLD_LIKES}`
+          : `Marca ${COLD_LIKES} que te gusten`
+      }
+      ready={!movies.isPending}
+    >
+      {!content.visible.length && <PosterSkeletons count={10} />}
+      {content.visible.map((meta) => {
+        const liked = ratings[mediaKey(meta.type, meta.id)]?.value === "like";
+        return (
+          <article className="media-card" key={mediaKey(meta.type, meta.id)}>
+            <button
+              className={`poster-button taste-pick ${liked ? "on" : ""}`}
+              data-card-focus
+              aria-pressed={liked}
+              aria-label={`Me gusta ${meta.name}`}
+              onClick={() => taste.rate(meta, liked ? null : "like")}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                onOpen(meta, addonUrl);
+              }}
+              onKeyDown={cardKeys}
+            >
+              <Artwork src={meta.poster} name={meta.name} className="poster" />
+              <span className="taste-pick-mark" aria-hidden="true">
+                {liked ? <Check size={22} strokeWidth={2.5} /> : <ThumbsUp size={20} />}
+              </span>
+            </button>
+            <div className="card-text" aria-hidden="true">
+              <span className="card-title" title={meta.name}>
+                {meta.name}
+              </span>
+              <span className="card-meta">{typeLabel(meta.type)}</span>
+            </div>
+          </article>
+        );
+      })}
+    </Shelf>
+  );
+}
+
 /** Titles in «Seguir viendo»: started and not finished, or pointing to the next episode. */
 export function inProgress(entry: LibraryEntry): boolean {
   const progress = entry.progress;
@@ -243,9 +441,36 @@ export function HomeView({
     .filter(inProgress)
     .sort((a, b) => (b.progress?.updatedAt || 0) - (a.progress?.updatedAt || 0))
     .slice(0, 12);
+  const forYou = useForYou();
+  const tasteState = useTaste();
+  const hidden = Object.keys(tasteState.hidden).length;
+  // The billboard stays for the whole visit unless it is turned down: saving or liking it reshapes
+  // the recommendations, and the title should not jump away from under the pointer.
+  const heroRef = useRef<{ profile: string; item?: Scored }>(undefined);
+  const profile = preferencesStore.getProfile();
+  const kept = heroRef.current?.profile === profile ? heroRef.current.item : undefined;
+  const rejected = kept && (tasteState.hidden[kept.key] || tasteState.ratings[kept.key]?.value === "dislike");
+  if (!kept || rejected) heroRef.current = { profile, item: forYou.page?.hero };
+  const hero = heroRef.current?.item;
+  const recommended = forYou.page?.rows ?? [];
+  const later = recommended.slice(LEADING_ROWS);
+  // What a visit shows: the billboard and the first cards of each row (the rest needs scrolling).
+  useEffect(() => {
+    if (!forYou.page) return;
+    const shown = [hero?.key, ...forYou.page.rows.flatMap((row) => row.items.slice(0, 6).map((item) => item.key))];
+    taste.markSeen(shown.filter((key): key is string => Boolean(key)));
+  }, [forYou.page, hero?.key]);
+  const openRecommended: OpenMedia = (meta, addonUrl, sources) => {
+    taste.opened(meta.type, meta.id);
+    onOpen(meta, addonUrl, sources);
+  };
+  const recommendedShelf = (row: Row) => <ForYouShelf key={row.id} row={row} onOpen={openRecommended} onMenu={onMenu} />;
   return (
     <div className="page home-page">
       <h1 className="sr-only">Inicio</h1>
+      {/* A new profile is asked first; the billboard follows as soon as there is a recommendation. */}
+      {forYou.cold && <ColdStart liked={forYou.liked} onOpen={onOpen} />}
+      {hero ? <AllowedHero item={hero} onOpen={openRecommended} /> : forYou.loading && <HeroSkeleton />}
       {continuing.length > 0 && (
         <Shelf title="Seguir viendo" ready className="continue-shelf">
           {continuing.map((entry) => (
@@ -258,16 +483,34 @@ export function HomeView({
           ))}
         </Shelf>
       )}
-      {visible.map(({ source, title, browse }) => (
-        <CatalogShelf
-          key={source.key}
-          source={source}
-          title={title}
-          onOpen={onOpen}
-          onBrowse={browse ? () => onBrowse(browse, source.key) : undefined}
-          onMenu={onMenu}
-        />
+      {forYou.loading && !recommended.length && (
+        <Shelf title="Elegidos para ti" ready={false}>
+          <PosterSkeletons count={10} />
+        </Shelf>
+      )}
+      {recommended.slice(0, LEADING_ROWS).map(recommendedShelf)}
+      {visible.map(({ source, title, browse }, index) => (
+        <Fragment key={source.key}>
+          <CatalogShelf
+            source={source}
+            title={title}
+            onOpen={onOpen}
+            onBrowse={browse ? () => onBrowse(browse, source.key) : undefined}
+            onMenu={onMenu}
+          />
+          {/* One more recommendation row after every second catalog. */}
+          {index % 2 === 1 && later[(index - 1) / 2] && recommendedShelf(later[(index - 1) / 2])}
+        </Fragment>
       ))}
+      {later.slice(Math.floor(visible.length / 2)).map(recommendedShelf)}
+      {hidden > 0 && (
+        <p className="for-you-footer">
+          Has ocultado {hidden === 1 ? "1 título" : `${hidden} títulos`} de tus recomendaciones.{" "}
+          <button className="link-button" onClick={() => taste.clearHidden()}>
+            Volver a mostrarlos
+          </button>
+        </p>
+      )}
       {!rows.length && kids && (
         <EmptyState
           icon={<Puzzle size={20} />}
