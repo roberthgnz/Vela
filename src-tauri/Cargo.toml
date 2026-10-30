@@ -1,6 +1,6 @@
 [package]
 name = "vela"
-version = "0.4.3"
+version = "0.4.4"
 description = "Desktop client compatible with Stremio addons"
 authors = ["Vela contributors"]
 license = "MIT"
