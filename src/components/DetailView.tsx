@@ -569,17 +569,64 @@ function TrailerDialog({
   notify: (message: string) => void;
 }) {
   const current = trailers[index];
+  const frame = useRef<HTMLIFrameElement>(null);
+  // YouTube's embed stays black for a few seconds while its player starts: the video's thumbnail
+  // and a spinner cover it until the player reports that it plays (or is waiting for a click).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(false);
+    const origin = "https://www.youtube-nocookie.com";
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== origin || event.source !== frame.current?.contentWindow) return;
+      let data: { event?: string; info?: unknown } | undefined;
+      try {
+        data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+      } catch {
+        return;
+      }
+      const state =
+        data?.event === "onStateChange"
+          ? data.info
+          : data?.event === "infoDelivery" && data.info && typeof data.info === "object"
+            ? (data.info as { playerState?: unknown }).playerState
+            : undefined;
+      // 1 playing, 2 paused, 5 cued (autoplay blocked: the user has to press play).
+      if (state === 1 || state === 2 || state === 5 || data?.event === "onError") setReady(true);
+    };
+    window.addEventListener("message", onMessage);
+    const fallback = setTimeout(() => setReady(true), 12_000);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      clearTimeout(fallback);
+    };
+  }, [current.ytId]);
   return (
     <Dialog title={`Tráiler de ${title}`} onClose={onClose} className="trailer-dialog" hideClose>
       <div className="trailer-frame">
         <iframe
           key={current.ytId}
-          src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(current.ytId)}?autoplay=1&rel=0&modestbranding=1`}
+          ref={frame}
+          src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(current.ytId)}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`}
           title={`Tráiler de ${title}`}
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
           referrerPolicy="strict-origin-when-cross-origin"
           allowFullScreen
+          onLoad={(event) =>
+            // Subscribes to the player's events (the IFrame API's «listening» handshake).
+            event.currentTarget.contentWindow?.postMessage(
+              JSON.stringify({ event: "listening", id: current.ytId, channel: "widget" }),
+              "https://www.youtube-nocookie.com",
+            )
+          }
         />
+        {!ready && (
+          <div className="trailer-loading" role="status">
+            <img src={`https://i.ytimg.com/vi/${encodeURIComponent(current.ytId)}/hqdefault.jpg`} alt="" />
+            <span>
+              <Spinner /> Cargando tráiler…
+            </span>
+          </div>
+        )}
       </div>
       <div className="trailer-bar">
         {trailers.length > 1 && (
