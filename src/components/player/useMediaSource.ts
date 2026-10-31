@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type Hls from "hls.js";
+import { t } from "../../lib/i18n";
 import { normalizeLanguage } from "../../lib/languages";
 import { probe as probeMedia, type Probe } from "../../lib/streamingServer";
 import { hlsPattern, numbered, trackName, type Playing, type Track } from "./shared";
@@ -55,7 +56,7 @@ export function useMediaSource(options: {
           .then(({ default: HlsPlayer }) => {
             if (destroyed) return;
             if (!HlsPlayer.isSupported()) {
-              callbacks.current.onError("Este formato necesita un reproductor externo.");
+              callbacks.current.onError(t("player.hls.needsExternal"));
               return;
             }
             const instance = new HlsPlayer({ maxBufferLength: 30, backBufferLength: 30 });
@@ -95,8 +96,8 @@ export function useMediaSource(options: {
               if (data.fatal)
                 callbacks.current.onError(
                   data.type === HlsPlayer.ErrorTypes.NETWORK_ERROR
-                    ? "La lista HLS o sus segmentos no responden. Puede que el servidor exija cabeceras o bloquee la petición."
-                    : "No se ha podido decodificar esta lista HLS en el reproductor integrado.",
+                    ? t("player.hls.network")
+                    : t("player.hls.decode"),
                 );
             });
             instance.loadSource(source);
@@ -106,7 +107,7 @@ export function useMediaSource(options: {
               hls.current = null;
             };
           })
-          .catch(() => callbacks.current.onError("No se ha podido cargar el reproductor HLS."));
+          .catch(() => callbacks.current.onError(t("player.hls.loadFailed")));
       } else element.src = source;
       return () => {
         destroyed = true;

@@ -1,4 +1,5 @@
 import type { MediaItem } from "./contracts";
+import { t } from "./i18n";
 
 export function safeImage(value?: string): string | undefined {
   if (!value) return undefined;
@@ -14,9 +15,9 @@ export function safeImage(value?: string): string | undefined {
 export function addonHost(value: string): string {
   try {
     const url = new URL(value);
-    return url.protocol === "vela:" ? "Incluido con Vela" : url.hostname;
+    return url.protocol === "vela:" ? t("lib.utils.includedWithVela") : url.hostname;
   } catch {
-    return "Addon";
+    return t("lib.utils.addon");
   }
 }
 
@@ -35,10 +36,10 @@ export function clock(seconds: number): string {
 export function errorMessage(error: unknown): string {
   // Without a connection every addon "fails"; say what actually happened.
   if (typeof navigator !== "undefined" && navigator.onLine === false)
-    return "No hay conexión a internet. Vela lo intentará de nuevo cuando vuelvas a estar en línea.";
+    return t("errors.offline");
   return error instanceof Error
     ? error.message
-    : "No hemos podido completar la solicitud. Inténtalo de nuevo.";
+    : t("errors.generic");
 }
 
 export function sourceTitle(value?: string): string {
@@ -48,7 +49,7 @@ export function sourceTitle(value?: string): string {
       .split("\n")
       .filter(Boolean)
       .slice(0, 3)
-      .join(" · ") || "Fuente de vídeo"
+      .join(" · ") || t("lib.utils.videoSource")
   );
 }
 

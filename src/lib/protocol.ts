@@ -12,6 +12,7 @@ import type {
 import { OPEN_CINEMA_URL, openCinemaFilms, openCinemaManifest, openCinemaStreams } from './open-cinema';
 import { currentTmdbContext, TMDB_CATALOGS_URL, tmdbCatalog, tmdbCatalogsManifest } from './tmdbCatalogs';
 import { requestJson } from './transport';
+import { plural, t } from './i18n';
 
 const CINEMETA_URL = 'https://v3-cinemeta.strem.io/manifest.json';
 const genres = ['Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Family', 'Fantasy', 'History', 'Horror', 'Mystery', 'Romance', 'Sci-Fi', 'Sport', 'Thriller', 'War', 'Western'];
@@ -276,12 +277,12 @@ export function isTmdbCatalogs(addon: Pick<InstalledAddon, 'manifestUrl' | 'mani
 export function normalizeManifestUrl(value: string): string {
   let raw = value.trim().replace(/^stremio:\/\//i, 'https://');
   if (raw === OPEN_CINEMA_URL || raw === TMDB_CATALOGS_URL) return raw;
-  if (!raw) throw new Error('Escribe la dirección del manifiesto del addon.');
+  if (!raw) throw new Error(t('errors.manifestRequired'));
   if (!/^[a-z][a-z\d+.-]*:/i.test(raw)) raw = `https://${raw}`;
   const valid = httpUrl(raw, 'Add-on address');
   const url = new URL(valid);
   if (!url.pathname.endsWith('/manifest.json')) {
-    if (url.pathname.endsWith('.json')) throw new Error('La dirección del addon debe terminar en /manifest.json.');
+    if (url.pathname.endsWith('.json')) throw new Error(t('errors.manifestSuffix'));
     url.pathname = `${url.pathname.replace(/\/$/, '')}/manifest.json`;
   }
   url.hash = '';
@@ -302,7 +303,7 @@ export async function loadManifest(value: string, signal?: AbortSignal): Promise
   if (manifestUrl === TMDB_CATALOGS_URL) return { manifestUrl, manifest: structuredClone(tmdbCatalogsManifest), enabled: true, installedAt: Date.now() };
   let response: unknown;
   try { response = await requestJson(manifestUrl, signal); }
-  catch (error) { abort(error, signal); throw new Error('No se pudo cargar el manifiesto del addon. Comprueba la dirección y la conexión.'); }
+  catch (error) { abort(error, signal); throw new Error(t('errors.manifestLoad')); }
   signal?.throwIfAborted();
   return { manifestUrl, manifest: manifest(response), enabled: true, installedAt: Date.now() };
 }
@@ -385,27 +386,27 @@ export async function getCatalog(source: CatalogSource, options: { search?: stri
   }
   let response: unknown;
   try { response = await requestJson(resourceUrl(addon, 'catalog', catalog.type, catalog.id, extra), signal); }
-  catch (error) { abort(error, signal); throw new Error(`${addon.manifest.name} no ha podido cargar este catálogo. Inténtalo de nuevo cuando el addon esté disponible.`); }
+  catch (error) { abort(error, signal); throw new Error(t('errors.catalogLoad', { addon: addon.manifest.name })); }
   signal?.throwIfAborted();
   const metas = record(response, 'Catalog response').metas;
-  if (!Array.isArray(metas)) throw new Error('El addon devolvió un catálogo no válido.');
+  if (!Array.isArray(metas)) throw new Error(t('errors.catalogInvalid'));
   return metas.map(media);
 }
 
 export async function getMeta(addon: InstalledAddon, type: string, id: string, signal?: AbortSignal): Promise<MediaItem> {
   signal?.throwIfAborted();
-  if (!supportsResource(addon, 'meta', type, id)) throw new Error('Este addon no ofrece información de este título.');
+  if (!supportsResource(addon, 'meta', type, id)) throw new Error(t('errors.metaUnsupported'));
   if (builtin(addon)) {
     const item = openCinemaFilms.find((item) => item.id === id && item.type === type);
-    if (!item) throw new Error('Esta película no está en Open Cinema.');
+    if (!item) throw new Error(t('errors.notInOpenCinema'));
     return structuredClone(item);
   }
   let response: unknown;
   try { response = await requestJson(resourceUrl(addon, 'meta', type, id), signal); }
-  catch (error) { abort(error, signal); throw new Error(`${addon.manifest.name} no ha podido cargar este título. Inténtalo de nuevo cuando el addon esté disponible.`); }
+  catch (error) { abort(error, signal); throw new Error(t('errors.metaLoad', { addon: addon.manifest.name })); }
   signal?.throwIfAborted();
   const item = media(record(response, 'Metadata response').meta);
-  if (item.id !== id || item.type !== type) throw new Error('El addon devolvió la información de otro título.');
+  if (item.id !== id || item.type !== type) throw new Error(t('errors.metaMismatch'));
   return item;
 }
 
@@ -416,7 +417,7 @@ async function collect<T>(addons: InstalledAddon[], resource: string, type: stri
   signal?.throwIfAborted();
   for (const result of results) if (result.status === 'rejected') abort(result.reason, signal);
   const successful = results.filter((result) => result.status === 'fulfilled');
-  if (results.length && !successful.length) throw new Error(`${results.length === 1 ? 'El addon' : `Los ${results.length} addons`} de ${resource === 'stream' ? 'fuentes' : 'subtítulos'} no ${results.length === 1 ? 'ha' : 'han'} respondido. Comprueba la conexión o su configuración e inténtalo de nuevo.`);
+  if (results.length && !successful.length) throw new Error(resource === 'stream' ? plural(results.length, 'errors.streamAddonsDown.one', 'errors.streamAddonsDown.other') : plural(results.length, 'errors.subtitleAddonsDown.one', 'errors.subtitleAddonsDown.other'));
   return successful.flatMap((result) => result.value);
 }
 

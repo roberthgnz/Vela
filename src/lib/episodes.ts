@@ -1,8 +1,9 @@
 import type { Episode, LibraryEntry, MediaItem, ResolvedStream, VideoState } from "./contracts";
 import { bitfieldOrder, decodeWatched } from "./watched";
+import { t } from "./i18n";
 
 export function episodeCode(episode: Pick<Episode, "season" | "episode">): string {
-  return `T${episode.season ?? 1} · E${episode.episode ?? 1}`;
+  return t("lib.episodes.code", { season: episode.season ?? 1, episode: episode.episode ?? 1 });
 }
 
 export function isUpcoming(episode: Pick<Episode, "released">, now = Date.now()): boolean {

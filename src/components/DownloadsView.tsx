@@ -2,23 +2,24 @@ import { useState } from "react";
 import { Download as DownloadIcon, FolderOpen, Pause, Play, RotateCw, Trash2 } from "lucide-react";
 import { downloads, formatBytes, useDownloads, type Download } from "../lib/downloads";
 import { episodeCode } from "../lib/episodes";
+import { t } from "../lib/i18n";
 import { errorMessage } from "../lib/utils";
 import { Artwork, EmptyState } from "./Primitives";
 
 const statusLabel: Record<Download["status"], string> = {
-  downloading: "Descargando",
-  paused: "En pausa",
-  failed: "Error",
-  done: "Descargado",
+  downloading: t("downloads.status.downloading"),
+  paused: t("downloads.status.paused"),
+  failed: t("downloads.status.failed"),
+  done: t("downloads.status.done"),
 };
 
 function detail(item: Download): string {
   if (item.status === "done") return formatBytes(item.received);
-  const size = item.total ? `${formatBytes(item.received)} de ${formatBytes(item.total)}` : formatBytes(item.received);
+  const size = item.total ? t("downloads.sizeOf", { received: formatBytes(item.received), total: formatBytes(item.total) }) : formatBytes(item.received);
   if (item.status === "downloading" && item.speed && item.total) {
     const seconds = Math.round((item.total - item.received) / item.speed);
     const left = seconds >= 3600 ? `${Math.floor(seconds / 3600)} h ${Math.round((seconds % 3600) / 60)} min` : seconds >= 60 ? `${Math.round(seconds / 60)} min` : `${seconds} s`;
-    return `${size} · ${formatBytes(item.speed)}/s · quedan ${left}`;
+    return t("downloads.detail", { size, speed: formatBytes(item.speed), left });
   }
   return size;
 }
@@ -31,19 +32,19 @@ export function DownloadsView({ onPlay, notify }: { onPlay: (item: Download) => 
     <div className="page">
       <header className="page-header">
         <h1>
-          Descargas <span className="count">{items.length}</span>
+          {t("nav.downloads")} <span className="count">{items.length}</span>
         </h1>
         <div className="toolbar">
           <button className="button secondary" onClick={() => reveal()}>
-            <FolderOpen size={14} /> Abrir carpeta
+            <FolderOpen size={14} /> {t("downloads.openFolder")}
           </button>
         </div>
       </header>
       {!items.length ? (
         <EmptyState
           icon={<DownloadIcon size={20} />}
-          title="No hay descargas"
-          description="Descarga un vídeo desde el menú de una fuente (···) para verlo sin conexión. Se guarda en Descargas › Vela."
+          title={t("downloads.emptyTitle")}
+          description={t("downloads.emptyDescription")}
         />
       ) : (
         <ul className="download-list">
@@ -63,7 +64,7 @@ export function DownloadsView({ onPlay, notify }: { onPlay: (item: Download) => 
                     <div
                       className="download-bar"
                       role="progressbar"
-                      aria-label={`Progreso de ${title}`}
+                      aria-label={t("downloads.progressOf", { title })}
                       aria-valuemin={0}
                       aria-valuemax={100}
                       aria-valuenow={percent === undefined ? undefined : Math.round(percent)}
@@ -80,21 +81,21 @@ export function DownloadsView({ onPlay, notify }: { onPlay: (item: Download) => 
                 <div className="download-actions">
                   {item.status === "done" && (
                     <button className="button primary small" onClick={() => onPlay(item)}>
-                      <Play size={14} /> Ver
+                      <Play size={14} /> {t("downloads.watch")}
                     </button>
                   )}
                   {item.status === "downloading" && (
-                    <button className="icon-button" aria-label={`Pausar ${title}`} title="Pausar" onClick={() => downloads.pause(item.id)}>
+                    <button className="icon-button" aria-label={t("downloads.pauseItem", { title })} title={t("downloads.pause")} onClick={() => downloads.pause(item.id)}>
                       <Pause size={15} />
                     </button>
                   )}
                   {(item.status === "paused" || item.status === "failed") && (
-                    <button className="icon-button" aria-label={`Reanudar ${title}`} title="Reanudar" onClick={() => downloads.resume(item.id)}>
+                    <button className="icon-button" aria-label={t("downloads.resumeItem", { title })} title={t("downloads.resume")} onClick={() => downloads.resume(item.id)}>
                       <RotateCw size={15} />
                     </button>
                   )}
                   {item.status === "done" && (
-                    <button className="icon-button" aria-label={`Mostrar ${title} en la carpeta`} title="Mostrar en la carpeta" onClick={() => reveal(item.path)}>
+                    <button className="icon-button" aria-label={t("downloads.revealItem", { title })} title={t("downloads.reveal")} onClick={() => reveal(item.path)}>
                       <FolderOpen size={15} />
                     </button>
                   )}
@@ -107,17 +108,17 @@ export function DownloadsView({ onPlay, notify }: { onPlay: (item: Download) => 
                           void downloads.remove(item.id).catch((error) => notify(errorMessage(error)));
                         }}
                       >
-                        Eliminar archivo
+                        {t("downloads.deleteFile")}
                       </button>
                       <button className="button subtle small" onClick={() => setConfirming(null)}>
-                        Cancelar
+                        {t("common.cancel")}
                       </button>
                     </span>
                   ) : (
                     <button
                       className="icon-button danger-hover"
-                      aria-label={`Eliminar ${title}`}
-                      title="Eliminar"
+                      aria-label={t("downloads.deleteItem", { title })}
+                      title={t("common.delete")}
                       onClick={() => setConfirming(item.id)}
                     >
                       <Trash2 size={15} />

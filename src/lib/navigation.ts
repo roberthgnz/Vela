@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useState } from "react";
 import type { InstalledAddon, MediaItem } from "./contracts";
 import { supportsResource } from "./protocol";
+import { t } from "./i18n";
 
 export type Section =
   | "home"
@@ -121,7 +122,7 @@ export function metaAddon(
       installedAt: 0,
       manifest: {
         id: "saved",
-        name: "Tu biblioteca",
+        name: t("lib.navigation.yourLibrary"),
         version: "1",
         resources: [],
         types: [meta.type],

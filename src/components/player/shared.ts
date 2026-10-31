@@ -1,5 +1,6 @@
 import type { Episode, MediaItem, ResolvedStream, Subtitle } from "../../lib/contracts";
 import { episodeCode } from "../../lib/episodes";
+import { t } from "../../lib/i18n";
 import { languageLabel, normalizeLanguage } from "../../lib/languages";
 import type { Probe } from "../../lib/streamingServer";
 
@@ -67,13 +68,13 @@ export function typing(target: EventTarget | null): boolean {
 export function mediaErrorMessage(error: MediaError | null): string {
   switch (error?.code) {
     case MediaError.MEDIA_ERR_NETWORK:
-      return "Se perdió la conexión con la fuente durante la descarga.";
+      return t("player.error.network");
     case MediaError.MEDIA_ERR_DECODE:
-      return "WebView2 no puede decodificar este vídeo. Suele ocurrir con HEVC, audio DTS/TrueHD o archivos dañados.";
+      return t("player.error.decode");
     case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-      return "La fuente no responde o usa un contenedor o códec que el reproductor integrado no admite (por ejemplo MKV con HEVC o AVI).";
+      return t("player.error.unsupported");
     default:
-      return "Esta fuente no se ha podido reproducir.";
+      return t("player.error.generic");
   }
 }
 
@@ -84,7 +85,7 @@ export function trackName(lang: string, title?: string | null): string {
   const label = lang ? languageLabel(lang) : "";
   const clean = title?.trim() ?? "";
   const named = clean && !genericTitles.test(clean) && normalizeLanguage(clean) !== normalizeLanguage(lang) ? clean : "";
-  return [label, named].filter(Boolean).join(" · ") || clean || "Pista";
+  return [label, named].filter(Boolean).join(" · ") || clean || t("player.track");
 }
 
 /** Tells apart tracks that share a label: «Español 1», «Español 2». */

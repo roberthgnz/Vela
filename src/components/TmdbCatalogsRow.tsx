@@ -3,6 +3,7 @@ import { preferencesStore, usePreferences } from "../lib/store";
 import { useTmdbConfigured } from "../lib/tmdb";
 import { TMDB_CATALOGS_URL } from "../lib/tmdbCatalogs";
 import { Switch } from "./Primitives";
+import { t } from "../lib/i18n";
 
 /** Turns Vela's TMDB catalogs on or off (they are a built-in addon, listed in Addons too). */
 export function TmdbCatalogsRow() {
@@ -17,14 +18,13 @@ export function TmdbCatalogsRow() {
   return (
     <div className="settings-row">
       <div className="settings-row-text">
-        <span className="settings-row-label">Catálogos de TMDB</span>
+        <span className="settings-row-label">{t("home.tmdbCatalogs")}</span>
         <p>
-          Tendencias, mejor valoradas, lo que hay en cada plataforma en tu país, «Recomendado para ti» según tu biblioteca y
-          catálogos infantiles, en el idioma de arriba. Aparecen en Explorar; en Ajustes › Inicio eliges cuáles se ven en Inicio.
-          {!configured && " Necesita una clave de TMDB."}
+          {t("home.tmdbCatalogsDescription")}
+          {!configured && ` ${t("home.tmdbNeedsKey")}`}
         </p>
       </div>
-      <Switch checked={on} label="Catálogos de TMDB" onChange={() => void toggle()} />
+      <Switch checked={on} label={t("home.tmdbCatalogs")} onChange={() => void toggle()} />
     </div>
   );
 }

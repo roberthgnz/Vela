@@ -1,6 +1,7 @@
 import type { AddonCatalog, AddonManifest, MediaItem } from "./contracts";
 import { storage } from "./storage";
 import { requestJson } from "./transport";
+import { t } from "./i18n";
 
 /**
  * Vela's own catalogs from The Movie Database, with the user's TMDB key: trending and top rated
@@ -55,17 +56,17 @@ export const tmdbCatalogsManifest: AddonManifest = {
   id: TMDB_CATALOGS_ID,
   name: "TMDB",
   version: "1.0.0",
-  description: "Tendencias, mejor valoradas, plataformas de tu país, recomendaciones según tu biblioteca y catálogos infantiles, en tu idioma. Necesita una clave de TMDB.",
+  description: t("lib.tmdbCatalogs.description"),
   resources: ["catalog"],
   types: ["movie", "series"],
   idPrefixes: ["tt"],
   catalogs: [
-    ...both("recommended", "Recomendado para ti", false),
-    ...both("trending", "Tendencias"),
-    ...both("top", "Mejor valoradas"),
+    ...both("recommended", t("lib.tmdbCatalogs.recommended"), false),
+    ...both("trending", t("lib.tmdbCatalogs.trending")),
+    ...both("top", t("lib.tmdbCatalogs.top")),
     ...providers.flatMap((provider) => both(`provider-${provider.id}`, provider.name)),
-    catalog("kids", "movie", "Películas infantiles", false),
-    catalog("kids", "series", "Series infantiles", false),
+    catalog("kids", "movie", t("lib.tmdbCatalogs.kidsMovies"), false),
+    catalog("kids", "series", t("lib.tmdbCatalogs.kidsSeries"), false),
   ],
 };
 
@@ -101,7 +102,7 @@ export function provideTmdbContext(value: () => Promise<TmdbContext | null>) {
 
 export async function currentTmdbContext(): Promise<TmdbContext> {
   const context = await provide?.();
-  if (!context) throw new Error("Los catálogos de TMDB necesitan una clave de TMDB (Ajustes › Información).");
+  if (!context) throw new Error(t("lib.tmdbCatalogs.needsKey"));
   return context;
 }
 /** TMDB ids never change their IMDb id: the lookups are kept between sessions (bounded). */

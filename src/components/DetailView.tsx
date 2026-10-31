@@ -36,6 +36,7 @@ import type {
 import { episodeCode, isUpcoming, orderedEpisodes, videoProgress, watchedEpisodes } from "../lib/episodes";
 import { useTitleAllowed } from "../lib/contentFilter";
 import { genreTarget, type GenreTarget } from "../lib/genres";
+import { locale, plural, t } from "../lib/i18n";
 import { useKidsMode } from "../lib/profiles";
 import { getCatalogSources, getMeta, getStreams } from "../lib/protocol";
 import { kidsCatalog } from "../lib/tmdbCatalogs";
@@ -100,14 +101,14 @@ function formatDate(value?: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? ""
-    : date.toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
+    : date.toLocaleDateString(locale(), { day: "numeric", month: "short", year: "numeric" });
 }
 
 const upcoming = (episode: Episode) => isUpcoming(episode);
 
 function markLabel(outcome: "opened" | "played" | "failed", last: boolean): string {
-  if (last) return "Viendo";
-  return outcome === "played" ? "Vista" : outcome === "failed" ? "Falló" : "Abierta";
+  if (last) return t("detail.mark.watching");
+  return outcome === "played" ? t("detail.mark.played") : outcome === "failed" ? t("detail.mark.failed") : t("detail.mark.opened");
 }
 
 function markText(outcome: "opened" | "played" | "failed", last: boolean, at: number): string {
@@ -116,11 +117,11 @@ function markText(outcome: "opened" | "played" | "failed", last: boolean, at: nu
 
 function relativeTime(at: number): string {
   const minutes = Math.round((Date.now() - at) / 60_000);
-  if (minutes < 1) return "hace un momento";
-  if (minutes < 60) return `hace ${minutes} min`;
+  if (minutes < 1) return t("detail.time.justNow");
+  if (minutes < 60) return t("detail.time.minutes", { count: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `hace ${hours} h`;
-  return `el ${new Date(at).toLocaleDateString("es", { day: "numeric", month: "short" })}`;
+  if (hours < 24) return t("detail.time.hours", { count: hours });
+  return t("detail.time.date", { date: new Date(at).toLocaleDateString(locale(), { day: "numeric", month: "short" }) });
 }
 
 /** Names in the credits; each one searches for that person's titles. */
@@ -128,7 +129,7 @@ function People({ names, onPerson }: { names: string[]; onPerson: (name: string)
   return names.map((name, index) => (
     <span key={name}>
       {index > 0 && ", "}
-      <button className="person-link" title={`Buscar títulos de ${name}`} onClick={() => onPerson(name)}>
+      <button className="person-link" title={t("detail.searchPerson", { name })} onClick={() => onPerson(name)}>
         {name}
       </button>
     </span>
@@ -229,7 +230,7 @@ export function DetailView({
       anchor,
       [
         {
-          label: "Actualizar información",
+          label: t("detail.refresh"),
           icon: <RotateCw size={15} />,
           disabled: addon.manifest.id === "saved",
           onSelect: () => void metadata.refetch(),
@@ -238,24 +239,24 @@ export function DetailView({
           ? []
           : [
               {
-                label: movieWatched ? "Marcar como no vista" : "Marcar como vista",
+                label: movieWatched ? t("detail.markMovieUnwatched") : t("detail.markMovieWatched"),
                 icon: <Check size={15} />,
                 onSelect: () => markWatched([meta.id], !movieWatched),
               },
             ]),
         {
-          label: "Copiar identificador",
+          label: t("detail.copyId"),
           icon: <Clipboard size={15} />,
           onSelect: () =>
             void navigator.clipboard
               .writeText(meta.id)
-              .then(() => notify("Identificador copiado."))
-              .catch(() => notify("No se pudo copiar al portapapeles.")),
+              .then(() => notify(t("detail.idCopied")))
+              .catch(() => notify(t("detail.copyFailed"))),
         },
         ...(/^tt\d+$/.test(meta.id)
           ? [
               {
-                label: "Abrir en IMDb",
+                label: t("detail.openImdb"),
                 icon: <ExternalLink size={15} />,
                 onSelect: () =>
                   void openExternal(`https://www.imdb.com/title/${meta.id}/`).catch((error) =>
@@ -265,7 +266,7 @@ export function DetailView({
             ]
           : []),
       ],
-      "Más acciones",
+      t("detail.moreActions"),
     );
   const watched = useQuery({
     queryKey: ["watched", meta.type, meta.id, entry?.remoteWatched, entry?.remoteWatchedAt, entry?.videos, episodes.map((item) => item.id).join()],
@@ -280,9 +281,9 @@ export function DetailView({
     notify(
       ids.length === 1
         ? value
-          ? "Marcado como visto."
-          : "Marcado como no visto."
-        : `${ids.length} episodios marcados como ${value ? "vistos" : "no vistos"}.`,
+          ? t("detail.markedWatched")
+          : t("detail.markedUnwatched")
+        : t(value ? "detail.episodesMarkedWatched" : "detail.episodesMarkedUnwatched", { count: ids.length }),
     );
   };
   const resume =
@@ -299,7 +300,7 @@ export function DetailView({
     yearOf(meta),
     meta.runtime,
     isSeries && seasons.filter((value) => value > 0).length
-      ? `${seasons.filter((value) => value > 0).length} ${seasons.filter((value) => value > 0).length === 1 ? "temporada" : "temporadas"}`
+      ? plural(seasons.filter((value) => value > 0).length, "detail.seasons.one", "detail.seasons.other")
       : "",
   ].filter(Boolean);
   const long = (meta.description?.length || 0) > 360;
@@ -311,13 +312,13 @@ export function DetailView({
         <div className="page-body">
           {access === "pending" ? (
             <div className="detail-checking" role="status">
-              <Spinner /> Comprobando la clasificación por edad…
+              <Spinner /> {t("detail.checkingAge")}
             </div>
           ) : (
             <EmptyState
               icon={<Lock size={20} />}
-              title="No disponible en este perfil"
-              description="La clasificación por edad de este título supera el límite del perfil, o es contenido para adultos."
+              title={t("detail.blocked.title")}
+              description={t("detail.blocked.description")}
             />
           )}
         </div>
@@ -340,11 +341,11 @@ export function DetailView({
                 ))}
                 {movieWatched && (
                   <span className="watched-fact">
-                    <Check size={12} /> Vista
+                    <Check size={12} /> {t("card.watched")}
                   </span>
                 )}
                 {meta.imdbRating && (
-                  <span className="rating" title="Valoración IMDb">
+                  <span className="rating" title={t("detail.imdbRating")}>
                     <Star size={12} fill="currentColor" /> {meta.imdbRating}
                   </span>
                 )}
@@ -363,7 +364,7 @@ export function DetailView({
                       <button
                         key={genre}
                         className="genre-link"
-                        title={`Ver ${type === "movie" ? "películas" : "series"} de ${genre}`}
+                        title={t(type === "movie" ? "detail.genreMovies" : "detail.genreSeries", { genre })}
                         onClick={() => onGenre(type, target)}
                       >
                         {genre}
@@ -378,7 +379,7 @@ export function DetailView({
                 {resume && (
                   <button
                     className="button primary"
-                    title={lastSource ? `Continuar con ${streamHeading(lastSource.stream)}` : undefined}
+                    title={lastSource ? t("detail.continueWith", { source: streamHeading(lastSource.stream) }) : undefined}
                     onClick={() => {
                       // With a source already watched, play it directly; otherwise show the sources.
                       if (lastSource) return onResume();
@@ -388,7 +389,7 @@ export function DetailView({
                     }}
                   >
                     <Play size={14} fill="currentColor" />
-                    {upNext ? "Siguiente" : "Continuar"}
+                    {upNext ? t("common.next") : t("detail.continue")}
                     <span className="button-meta">
                       {resumeEpisode ? episodeCode(resumeEpisode) : ""}
                       {upNext ? "" : `${resumeEpisode ? " · " : ""}${clock(resume.seconds)}`}
@@ -400,47 +401,47 @@ export function DetailView({
                   onClick={focusSources}
                 >
                   <Play size={14} fill={resume ? "none" : "currentColor"} />
-                  Ver fuentes
+                  {t("card.viewSources")}
                 </button>
                 {meta.trailers?.length ? (
                   <button className="button secondary" onClick={() => setTrailer(0)}>
                     <Clapperboard size={15} />
-                    Tráiler
+                    {t("detail.trailer")}
                   </button>
                 ) : null}
                 <button
                   className="button secondary"
-                  aria-label={saved ? "Quitar de mi biblioteca" : "Guardar en mi biblioteca"}
+                  aria-label={saved ? t("detail.removeFromMyLibrary") : t("detail.saveToMyLibrary")}
                   aria-pressed={saved}
                   onClick={() => preferencesStore.toggleMedia(meta, addon.manifestUrl)}
                 >
                   {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
-                  <span>{saved ? "En la biblioteca" : "Guardar"}</span>
+                  <span>{saved ? t("detail.inLibrary") : t("common.save")}</span>
                 </button>
                 {/* Ratings teach the recommendations; pressing the current one clears it. */}
                 <button
                   className={`icon-button bordered rate-button ${rating === "like" ? "on" : ""}`}
-                  aria-label="Me gusta"
+                  aria-label={t("card.like")}
                   aria-pressed={rating === "like"}
-                  title={rating === "like" ? "Quitar «Me gusta»" : "Me gusta"}
+                  title={rating === "like" ? t("detail.removeLike") : t("card.like")}
                   onClick={() => taste.rate(meta, rating === "like" ? null : "like")}
                 >
                   <ThumbsUp size={15} fill={rating === "like" ? "currentColor" : "none"} />
                 </button>
                 <button
                   className={`icon-button bordered rate-button ${rating === "dislike" ? "on" : ""}`}
-                  aria-label="No me gusta"
+                  aria-label={t("card.dislike")}
                   aria-pressed={rating === "dislike"}
-                  title={rating === "dislike" ? "Quitar «No me gusta»" : "No me gusta"}
+                  title={rating === "dislike" ? t("detail.removeDislike") : t("card.dislike")}
                   onClick={() => taste.rate(meta, rating === "dislike" ? null : "dislike")}
                 >
                   <ThumbsDown size={15} fill={rating === "dislike" ? "currentColor" : "none"} />
                 </button>
                 <button
                   className="icon-button bordered"
-                  aria-label="Más acciones"
+                  aria-label={t("detail.moreActions")}
                   aria-haspopup="menu"
-                  title="Más acciones"
+                  title={t("detail.moreActions")}
                   onClick={(event) => more(anchorFrom(event.currentTarget))}
                 >
                   <MoreHorizontal size={16} />
@@ -460,7 +461,7 @@ export function DetailView({
                 <p className={long && !descriptionOpen ? "clamped" : ""}>{meta.description}</p>
                 {long && (
                   <button className="link-button" onClick={() => setDescriptionOpen(!descriptionOpen)}>
-                    {descriptionOpen ? "Mostrar menos" : "Mostrar más"}
+                    {descriptionOpen ? t("detail.showLess") : t("detail.showMore")}
                   </button>
                 )}
               </div>
@@ -468,7 +469,7 @@ export function DetailView({
           )}
           {metadata.isError && (
             <ErrorState
-              message="No se han podido cargar todos los detalles de este título."
+              message={t("detail.metaError")}
               retry={() => void metadata.refetch()}
             />
           )}
@@ -476,7 +477,7 @@ export function DetailView({
             <dl className="credits">
               {meta.director?.length ? (
                 <div>
-                  <dt>Dirección</dt>
+                  <dt>{t("detail.director")}</dt>
                   <dd>
                     <People names={meta.director} onPerson={onPerson} />
                   </dd>
@@ -484,7 +485,7 @@ export function DetailView({
               ) : null}
               {meta.cast?.length ? (
                 <div>
-                  <dt>Reparto</dt>
+                  <dt>{t("detail.cast")}</dt>
                   <dd>
                     <People names={meta.cast.slice(0, 8)} onPerson={onPerson} />
                   </dd>
@@ -493,11 +494,11 @@ export function DetailView({
             </dl>
           )}
           <p className="provider-note">
-            Información de {addon.manifest.name}
-            {translated ? " · traducción de TMDB" : ""}
+            {t("detail.provider", { name: addon.manifest.name })}
+            {translated ? ` · ${t("detail.tmdbTranslation")}` : ""}
           </p>
         </div>
-        <aside className="detail-panel" ref={panel} aria-label={isSeries && !showSources ? "Episodios" : "Fuentes"}>
+        <aside className="detail-panel" ref={panel} aria-label={isSeries && !showSources ? t("detail.episodes") : t("detail.sources")}>
           {isSeries && !showSources ? (
             <EpisodesPanel
               seasons={seasons}
@@ -516,15 +517,15 @@ export function DetailView({
                 menu.open(
                   anchor,
                   [
-                    { label: "Ver fuentes", icon: <Play size={15} />, onSelect: () => chooseEpisode(episode) },
+                    { label: t("card.viewSources"), icon: <Play size={15} />, onSelect: () => chooseEpisode(episode) },
                     "separator",
                     {
-                      label: isWatched ? "Marcar como no visto" : "Marcar como visto",
+                      label: isWatched ? t("detail.markEpisodeUnwatched") : t("detail.markEpisodeWatched"),
                       icon: isWatched ? <Circle size={15} /> : <Check size={15} />,
                       onSelect: () => markWatched([episode.id], !isWatched),
                     },
                     {
-                      label: "Marcar como vistos hasta aquí",
+                      label: t("detail.markWatchedUpToHere"),
                       icon: <CheckCheck size={15} />,
                       disabled: before.every((item) => watchedIds.has(item.id)),
                       onSelect: () => markWatched(before.map((item) => item.id), true),
@@ -532,14 +533,14 @@ export function DetailView({
                     {
                       label:
                         episode.season === 0
-                          ? "Marcar especiales como vistos"
-                          : `Marcar temporada ${episode.season ?? 1} como vista`,
+                          ? t("detail.markSpecialsWatched")
+                          : t("detail.markSeasonWatched", { season: episode.season ?? 1 }),
                       icon: <CheckCheck size={15} />,
                       disabled: ordered.every((item) => watchedIds.has(item.id) || upcoming(item)),
                       onSelect: () => markWatched(ordered.filter((item) => !upcoming(item)).map((item) => item.id), true),
                     },
                   ],
-                  `Episodio ${episodeCode(episode)}`,
+                  t("detail.episodeMenu", { code: episodeCode(episode) }),
                 );
               }}
             />
@@ -624,13 +625,13 @@ function TrailerDialog({
     };
   }, [current.ytId]);
   return (
-    <Dialog title={`Tráiler de ${title}`} onClose={onClose} className="trailer-dialog" hideClose>
+    <Dialog title={t("detail.trailerOf", { title })} onClose={onClose} className="trailer-dialog" hideClose>
       <div className="trailer-frame">
         <iframe
           key={current.ytId}
           ref={frame}
           src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(current.ytId)}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`}
-          title={`Tráiler de ${title}`}
+          title={t("detail.trailerOf", { title })}
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
           referrerPolicy="strict-origin-when-cross-origin"
           allowFullScreen
@@ -646,14 +647,14 @@ function TrailerDialog({
           <div className="trailer-loading" role="status">
             <img src={`https://i.ytimg.com/vi/${encodeURIComponent(current.ytId)}/hqdefault.jpg`} alt="" />
             <span>
-              <Spinner /> Cargando tráiler…
+              <Spinner /> {t("detail.loadingTrailer")}
             </span>
           </div>
         )}
       </div>
       <div className="trailer-bar">
         {trailers.length > 1 && (
-          <div className="segmented" role="radiogroup" aria-label="Tráileres">
+          <div className="segmented" role="radiogroup" aria-label={t("detail.trailers")}>
             {trailers.map((item, position) => (
               <button key={item.ytId} role="radio" aria-checked={position === index} onClick={() => onIndex(position)}>
                 <span className="segment-text">{position + 1}</span>
@@ -669,10 +670,10 @@ function TrailerDialog({
             )
           }
         >
-          Abrir en YouTube <ExternalLink size={12} />
+          {t("detail.openYoutube")} <ExternalLink size={12} />
         </button>
         <button className="button secondary small" data-autofocus onClick={onClose}>
-          Cerrar
+          {t("common.close")}
         </button>
       </div>
     </Dialog>
@@ -709,17 +710,17 @@ function EpisodesPanel({
   return (
     <>
       <header className="panel-header">
-        <h2>Episodios</h2>
+        <h2>{t("detail.episodes")}</h2>
         {seasons.length > 0 && (
           <label className="select compact">
             <select
-              aria-label="Temporada"
+              aria-label={t("detail.season")}
               value={season}
               onChange={(event) => onSeason(Number(event.target.value))}
             >
               {seasons.map((item) => (
                 <option key={item} value={item}>
-                  {item === 0 ? "Especiales" : `Temporada ${item}`}
+                  {item === 0 ? t("detail.specials") : t("detail.seasonNumber", { number: item })}
                 </option>
               ))}
             </select>
@@ -743,7 +744,7 @@ function EpisodesPanel({
               <button
                 key={episode.id}
                 className={`episode-row ${selectedId === episode.id ? "selected" : ""} ${future ? "future" : ""} ${seen ? "watched" : ""}`}
-                aria-label={`${episode.episode ?? 1}. ${episode.title || `Episodio ${episode.episode ?? 1}`}${seen ? ", visto" : ""}`}
+                aria-label={`${episode.episode ?? 1}. ${episode.title || t("detail.episodeNumber", { number: episode.episode ?? 1 })}${seen ? t("detail.watchedSuffix") : ""}`}
                 onClick={() => onChoose(episode)}
                 onContextMenu={(event) => {
                   event.preventDefault();
@@ -784,10 +785,10 @@ function EpisodesPanel({
                 <span className="episode-text">
                   <strong>
                     <span className="episode-number">{episode.episode ?? 1}.</span>{" "}
-                    {episode.title || `Episodio ${episode.episode ?? 1}`}
+                    {episode.title || t("detail.episodeNumber", { number: episode.episode ?? 1 })}
                   </strong>
                   <small>
-                    {future ? `Se estrena el ${formatDate(episode.released)}` : formatDate(episode.released)}
+                    {future ? t("detail.premieres", { date: formatDate(episode.released) }) : formatDate(episode.released)}
                   </small>
                   {episode.overview && <span className="episode-overview">{episode.overview}</span>}
                 </span>
@@ -797,8 +798,8 @@ function EpisodesPanel({
         ) : (
           <EmptyState
             compact
-            title="Sin episodios"
-            description="El addon de metadatos no proporciona una lista de episodios para esta serie."
+            title={t("detail.noEpisodes.title")}
+            description={t("detail.noEpisodes.description")}
           />
         )}
       </div>
@@ -856,7 +857,7 @@ function CollapsibleChips({ label, selected, children }: { label: string; select
       )}
       {expanded && (
         <button className="chip chip-more" aria-expanded onClick={() => (setExpanded(false), setLimit(null))}>
-          Menos
+          {t("detail.less")}
         </button>
       )}
     </div>
@@ -951,12 +952,12 @@ function SourcesPanel({
       anchor,
       [
         {
-          label: kind === "external" || kind === "youtube" ? "Abrir en el navegador" : "Reproducir en Vela",
+          label: kind === "external" || kind === "youtube" ? t("detail.openInBrowser") : t("detail.playInVela"),
           icon: <Play size={15} />,
           onSelect: () => start(stream, "internal", index),
         },
         {
-          label: "Abrir en reproductor externo",
+          label: t("detail.openExternalPlayer"),
           icon: <MonitorPlay size={15} />,
           disabled: kind === "external" || kind === "youtube",
           onSelect: () => start(stream, "external", index),
@@ -964,48 +965,48 @@ function SourcesPanel({
         ...(downloadsAvailable
           ? [
               {
-                label: "Descargar",
+                label: t("detail.download"),
                 icon: <DownloadIcon size={15} />,
                 disabled: kind === "external" || kind === "youtube" || !videoId,
                 onSelect: () =>
                   void downloads
                     .start({ meta, addonUrl: addon.manifestUrl, videoId: videoId!, stream, episode, serviceUrl: prefs.serviceUrl })
-                    .then(() => notify("Descarga iniciada. Puedes seguirla en Descargas."))
+                    .then(() => notify(t("detail.downloadStarted")))
                     .catch((error) => notify(errorMessage(error))),
               },
             ]
           : []),
         "separator",
         ...(marks[sourceKey(stream)]
-          ? [{ label: "Quitar marca", icon: <Eraser size={15} />, onSelect: () => videoId && sourceHistory.clear(videoId, stream) }]
+          ? [{ label: t("detail.clearMark"), icon: <Eraser size={15} />, onSelect: () => videoId && sourceHistory.clear(videoId, stream) }]
           : []),
         {
-          label: stream.infoHash && !stream.url ? "Copiar enlace magnet" : "Copiar enlace",
+          label: stream.infoHash && !stream.url ? t("detail.copyMagnet") : t("detail.copyLink"),
           icon: <Clipboard size={15} />,
           disabled: !link && !stream.infoHash,
           onSelect: () =>
             void navigator.clipboard
               .writeText(link || `magnet:?xt=urn:btih:${stream.infoHash}`)
-              .then(() => notify("Enlace copiado."))
-              .catch(() => notify("No se pudo copiar al portapapeles.")),
+              .then(() => notify(t("detail.linkCopied")))
+              .catch(() => notify(t("detail.copyFailed"))),
         },
       ],
-      "Opciones de la fuente",
+      t("detail.sourceOptions"),
     );
   };
   return (
     <>
       <header className="panel-header">
         {onBack && (
-          <button className="icon-button" aria-label="Volver a episodios" title="Episodios" onClick={onBack}>
+          <button className="icon-button" aria-label={t("detail.backToEpisodes")} title={t("detail.episodes")} onClick={onBack}>
             <ArrowLeft size={16} />
           </button>
         )}
         <div className="panel-title">
-          <h2>Fuentes</h2>
+          <h2>{t("detail.sources")}</h2>
           {episode && (
             <span className="panel-subtitle" title={episode.title}>
-              T{episode.season ?? 1} · E{episode.episode ?? 1}
+              {t("detail.episodeShort", { season: episode.season ?? 1, episode: episode.episode ?? 1 })}
               {episode.title ? ` · ${episode.title}` : ""}
             </span>
           )}
@@ -1015,8 +1016,8 @@ function SourcesPanel({
         )}
         <button
           className="icon-button"
-          aria-label="Actualizar fuentes"
-          title="Actualizar fuentes"
+          aria-label={t("detail.refreshSources")}
+          title={t("detail.refreshSources")}
           disabled={!videoId || sources.isFetching}
           onClick={() => void sources.refetch()}
         >
@@ -1026,7 +1027,7 @@ function SourcesPanel({
       {streams.length > 1 && (
         <div className="source-toolbar">
           {tiers.length > 1 ? (
-            <div className="segmented" role="radiogroup" aria-label="Calidad">
+            <div className="segmented" role="radiogroup" aria-label={t("detail.quality")}>
               {["", ...tiers].map((tier) => (
                 <button
                   key={tier || "all"}
@@ -1034,7 +1035,7 @@ function SourcesPanel({
                   aria-checked={qualityFilter === tier}
                   onClick={() => setQualityFilter(tier)}
                 >
-                  <span className="segment-text">{tier === "" ? "Todas" : tier === "?" ? "Otras" : tier}</span>
+                  <span className="segment-text">{tier === "" ? t("detail.allQualities") : tier === "?" ? t("detail.otherQualities") : tier}</span>
                 </button>
               ))}
             </div>
@@ -1042,17 +1043,17 @@ function SourcesPanel({
             <span />
           )}
           <label className="select compact">
-            <select aria-label="Ordenar fuentes" value={order} onChange={(event) => setOrder(event.target.value as SourceOrder)}>
-              <option value="addon">Orden del addon</option>
-              <option value="seeders">Más semillas</option>
-              <option value="largest">Mayor tamaño</option>
-              <option value="smallest">Menor tamaño</option>
+            <select aria-label={t("detail.sortSources")} value={order} onChange={(event) => setOrder(event.target.value as SourceOrder)}>
+              <option value="addon">{t("detail.order.addon")}</option>
+              <option value="seeders">{t("detail.order.seeders")}</option>
+              <option value="largest">{t("detail.order.largest")}</option>
+              <option value="smallest">{t("detail.order.smallest")}</option>
             </select>
           </label>
         </div>
       )}
       {addonUrls.length > 1 && (
-        <div className="chip-row" role="toolbar" aria-label="Filtrar por addon">
+        <div className="chip-row" role="toolbar" aria-label={t("detail.filterByAddon")}>
           {["", ...addonUrls].map((url) => (
             <button
               key={url || "all"}
@@ -1061,20 +1062,20 @@ function SourcesPanel({
               title={url ? addonHost(url) : undefined}
               onClick={() => setAddonFilter(url)}
             >
-              {url ? addonLabels.get(url) : "Todos"}
+              {url ? addonLabels.get(url) : t("detail.allAddons")}
               <span>{url ? streams.filter((stream) => stream.addonUrl === url).length : streams.length}</span>
             </button>
           ))}
         </div>
       )}
       {languages.size > 0 && (
-        <CollapsibleChips label="Filtrar por idioma" selected={languageFilter}>
+        <CollapsibleChips label={t("detail.filterByLanguage")} selected={languageFilter}>
           <button
             className={`chip ${!languageFilter ? "selected" : ""}`}
             aria-pressed={!languageFilter}
             onClick={() => setLanguageFilter("")}
           >
-            Todos los idiomas
+            {t("detail.allLanguages")}
           </button>
           {[...languages]
             .sort((a, b) => b[1].count - a[1].count)
@@ -1083,7 +1084,7 @@ function SourcesPanel({
                 key={flag}
                 className={`chip ${languageFilter === flag ? "selected" : ""}`}
                 aria-pressed={languageFilter === flag}
-                aria-label={`${label}: ${count} fuentes`}
+                aria-label={t("detail.languageCount", { label, count })}
                 title={label}
                 onClick={() => setLanguageFilter(languageFilter === flag ? "" : flag)}
               >
@@ -1096,25 +1097,25 @@ function SourcesPanel({
       {filteredOut > 0 && (
         <p className="source-keywords">
           {showFiltered
-            ? `Se muestran ${filteredOut === 1 ? "la fuente" : `las ${filteredOut} fuentes`} que tus palabras clave ocultan.`
-            : `${filteredOut === 1 ? "1 fuente oculta" : `${filteredOut} fuentes ocultas`} por tus palabras clave.`}
+            ? plural(filteredOut, "detail.keywordsShown.one", "detail.keywordsShown.other")
+            : plural(filteredOut, "detail.keywordsHidden.one", "detail.keywordsHidden.other")}
           <button className="link-button" onClick={() => setShowFiltered(!showFiltered)}>
-            {showFiltered ? "Ocultarlas" : "Mostrar"}
+            {showFiltered ? t("detail.hideThem") : t("detail.show")}
           </button>
         </p>
       )}
       {play.isError && (
         <div className="panel-alert">
-          <ErrorState title="No se pudo reproducir" message={errorMessage(play.error)} />
+          <ErrorState title={t("detail.playFailed")} message={errorMessage(play.error)} />
         </div>
       )}
       <div className="panel-scroll">
         {!videoId ? (
-          <EmptyState compact title="Elige un episodio" description="Selecciona un episodio para consultar sus fuentes." />
+          <EmptyState compact title={t("detail.chooseEpisode.title")} description={t("detail.chooseEpisode.description")} />
         ) : sources.isPending ? (
           <>
             <p className="panel-status">
-              <Spinner /> Consultando {enabled.length} addons…
+              <Spinner /> {t("detail.querying", { count: enabled.length })}
             </p>
             {Array.from({ length: 5 }, (_, index) => (
               <div className="source-row skeleton-row" key={index} aria-hidden="true">
@@ -1125,7 +1126,7 @@ function SourcesPanel({
           </>
         ) : sources.isError ? (
           <ErrorState
-            title="Las fuentes no respondieron"
+            title={t("detail.sourcesFailed")}
             message={errorMessage(sources.error)}
             retry={() => void sources.refetch()}
           />
@@ -1153,7 +1154,7 @@ function SourcesPanel({
                 >
                   <button
                     className="source-row"
-                    aria-label={`Reproducir ${stream.name || stream.addonName} ${index + 1}${mark ? `, ${markLabel(mark.outcome, isLast).toLowerCase()}` : ""}`}
+                    aria-label={`${t("detail.playSource", { name: stream.name || stream.addonName, number: index + 1 })}${mark ? `, ${markLabel(mark.outcome, isLast).toLowerCase()}` : ""}`}
                     disabled={play.isPending}
                     onClick={() => start(stream, "internal", index)}
                     onKeyDown={(event) => {
@@ -1180,7 +1181,7 @@ function SourcesPanel({
                           <span
                             className="flags"
                             title={streamLanguageList.map((language) => language.label).join(", ")}
-                            aria-label={`Idiomas: ${streamLanguageList.map((language) => language.label).join(", ")}`}
+                            aria-label={t("detail.languages", { list: streamLanguageList.map((language) => language.label).join(", ") })}
                           >
                             {streamLanguageList.slice(0, 6).map((language) => (
                               <span className="flag" key={language.flag}>
@@ -1192,7 +1193,7 @@ function SourcesPanel({
                             )}
                           </span>
                         )}
-                        {facts.multiAudio && <span className="tag">Multiaudio</span>}
+                        {facts.multiAudio && <span className="tag">{t("detail.multiAudio")}</span>}
                         {streamTags(stream).map((tag) => (
                           <span className="tag" key={tag}>
                             {tag}
@@ -1200,13 +1201,13 @@ function SourcesPanel({
                         ))}
                         {warnings.length > 0 && (
                           <span className="tag warning" title={warnings.join(". ")}>
-                            <AlertTriangle size={11} /> {warnings.length > 1 ? "Limitaciones" : warnings[0].startsWith("Requiere") ? "Cabeceras" : "No web"}
+                            <AlertTriangle size={11} /> {warnings.length > 1 ? t("detail.warning.limitations") : warnings[0] === t("streams.warning.headers") ? t("detail.warning.headers") : t("detail.warning.noWeb")}
                           </span>
                         )}
                         {facts.seeders !== undefined && (
                           <span
                             className="tag seeders"
-                            title={`${facts.seeders} ${facts.seeders === 1 ? "semilla" : "semillas"} según el addon. Es la cifra que registró al indexar el torrent: al conectar suelen responder bastantes menos pares.`}
+                            title={plural(facts.seeders, "detail.seeders.one", "detail.seeders.other")}
                           >
                             <Users size={11} /> {facts.seeders}
                           </span>
@@ -1217,7 +1218,7 @@ function SourcesPanel({
                               className={`source-mark ${isLast ? "last" : mark.outcome}`}
                               title={mark.error ? `${mark.error} (${relativeTime(mark.at)})` : relativeTime(mark.at)}
                             >
-                              {isLast && position && position >= 15 ? `Viendo · ${clock(position)}` : isLast ? "Viendo" : markText(mark.outcome, false, mark.at)}
+                              {isLast && position && position >= 15 ? t("detail.watchingAt", { time: clock(position) }) : isLast ? t("detail.mark.watching") : markText(mark.outcome, false, mark.at)}
                             </span>
                           ) : (
                             [addonLabel(stream), facts.provider].filter(Boolean).join(" · ")
@@ -1228,9 +1229,9 @@ function SourcesPanel({
                   </button>
                   <button
                     className="icon-button source-more"
-                    aria-label={`Opciones de la fuente ${index + 1}`}
+                    aria-label={t("detail.sourceOptionsNumber", { number: index + 1 })}
                     aria-haspopup="menu"
-                    title="Más opciones"
+                    title={t("detail.moreOptions")}
                     tabIndex={-1}
                     onClick={(event) => rowMenu(anchorFrom(event.currentTarget, "end"), stream, index)}
                   >
@@ -1243,11 +1244,11 @@ function SourcesPanel({
         ) : filteredOut > 0 ? (
           <EmptyState
             compact
-            title="Tus palabras clave ocultan todas las fuentes"
-            description="Cámbialas en Ajustes › Streaming o muéstralas solo esta vez."
+            title={t("detail.keywordsHideAll.title")}
+            description={t("detail.keywordsHideAll.description")}
             action={
               <button className="button secondary small" onClick={() => setShowFiltered(true)}>
-                Mostrar fuentes
+                {t("detail.showSources")}
               </button>
             }
           />
@@ -1255,11 +1256,11 @@ function SourcesPanel({
           <EmptyState
             compact
             icon={<Puzzle size={18} />}
-            title="No hay fuentes para este título"
-            description="Cinemeta aporta solo el catálogo. Instala o activa un addon que ofrezca fuentes de reproducción."
+            title={t("detail.noSources.title")}
+            description={t("detail.noSources.description")}
             action={
               <button className="button secondary small" onClick={onAddons}>
-                Gestionar addons
+                {t("detail.manageAddons")}
               </button>
             }
           />

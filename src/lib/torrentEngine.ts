@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { Episode, ResolvedStream, Subtitle } from "./contracts";
+import { t } from "./i18n";
 import { storage } from "./storage";
 import type { TorrentStats } from "./streamingServer";
 
@@ -54,7 +55,7 @@ export async function prepareVelaTorrent(
   stream: Pick<ResolvedStream, "infoHash" | "fileIdx" | "sources">,
   episode?: Pick<Episode, "season" | "episode">,
 ): Promise<{ url: string; fileIdx: number; fileName: string; subtitles: Subtitle[] }> {
-  if (!velaEngineAvailable) throw new Error("El motor de torrents de Vela solo está en la aplicación de escritorio.");
+  if (!velaEngineAvailable) throw new Error(t("torrent.engine.desktopOnly"));
   const prepared = await invoke<Prepared>("torrent_prepare", {
     infoHash: stream.infoHash!.toLowerCase(),
     fileIdx: stream.fileIdx !== undefined && Number.isInteger(stream.fileIdx) ? stream.fileIdx : null,
@@ -62,7 +63,7 @@ export async function prepareVelaTorrent(
     season: episode?.season ?? null,
     episode: episode?.episode ?? null,
   }).catch((error: unknown) => {
-    throw new Error(typeof error === "string" ? error : error instanceof Error ? error.message : "No se pudo abrir el torrent.");
+    throw new Error(typeof error === "string" ? error : error instanceof Error ? error.message : t("torrent.engine.failed"));
   });
   const subtitles = prepared.files.flatMap((item, index) => {
     if (!/\.(srt|vtt)$/i.test(item.name)) return [];

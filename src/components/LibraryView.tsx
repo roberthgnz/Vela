@@ -7,6 +7,7 @@ import { clock, yearOf } from "../lib/utils";
 import { inProgress, type OpenMedia } from "./HomeView";
 import { cardKeys, MediaCard, typeLabel, type CardMenu } from "./MediaCard";
 import { Artwork, EmptyState, Segmented } from "./Primitives";
+import { compareText, locale, t } from "../lib/i18n";
 
 type Filter = "all" | "continue" | "movie" | "series";
 const sorts = ["recent", "watched", "title", "year"] as const;
@@ -45,7 +46,7 @@ export function LibraryView({
     .filter((entry) => !needle || entry.meta.name.toLocaleLowerCase("es").includes(needle))
     .sort((a, b) =>
       sort === "title"
-        ? a.meta.name.localeCompare(b.meta.name, "es")
+        ? compareText(a.meta.name, b.meta.name)
         : sort === "year"
           ? yearOf(b.meta).localeCompare(yearOf(a.meta))
           : sort === "watched"
@@ -62,50 +63,50 @@ export function LibraryView({
     <div className="page">
       <header className="page-header">
         <h1>
-          Biblioteca <span className="count">{all.length}</span>
+          {t("nav.library")} <span className="count">{all.length}</span>
         </h1>
         <div className="toolbar">
           <label className="filter-field">
             <Search size={14} />
             <input
               type="search"
-              aria-label="Filtrar biblioteca"
-              placeholder="Filtrar"
+              aria-label={t("library.filterLabel")}
+              placeholder={t("library.filterPlaceholder")}
               value={text}
               onChange={(event) => setText(event.target.value)}
             />
           </label>
           <label className="select">
-            <span className="select-label">Orden</span>
+            <span className="select-label">{t("browse.filter.sort")}</span>
             <select
-              aria-label="Ordenar biblioteca"
+              aria-label={t("library.sortLabel")}
               value={sort}
               onChange={(event) => setSort(event.target.value as (typeof sorts)[number])}
             >
-              <option value="recent">Actividad reciente</option>
-              <option value="watched">Visto recientemente</option>
-              <option value="title">Título</option>
-              <option value="year">Año</option>
+              <option value="recent">{t("library.sort.recent")}</option>
+              <option value="watched">{t("library.sort.watched")}</option>
+              <option value="title">{t("library.sort.title")}</option>
+              <option value="year">{t("library.sort.year")}</option>
             </select>
           </label>
           <Segmented
-            label="Vista"
+            label={t("library.view")}
             value={view}
             onChange={setView}
             options={[
-              { value: "grid", label: <LayoutGrid size={14} />, title: "Cuadrícula" },
-              { value: "list", label: <List size={14} />, title: "Lista" },
+              { value: "grid", label: <LayoutGrid size={14} />, title: t("library.grid") },
+              { value: "list", label: <List size={14} />, title: t("library.list") },
             ]}
           />
         </div>
       </header>
-      <div className="page-tabs" role="tablist" aria-label="Filtrar por tipo">
+      <div className="page-tabs" role="tablist" aria-label={t("library.filterByType")}>
         {(
           [
-            ["all", "Todo"],
-            ["continue", "Seguir viendo"],
-            ["movie", "Películas"],
-            ["series", "Series"],
+            ["all", t("library.tab.all")],
+            ["continue", t("home.continueWatching")],
+            ["movie", t("nav.movies")],
+            ["series", t("nav.series")],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -140,14 +141,14 @@ export function LibraryView({
           </div>
         ) : (
           <div className="page-body">
-            <div className="table" role="table" aria-label="Biblioteca">
+            <div className="table" role="table" aria-label={t("nav.library")}>
               <div className="table-row table-head" role="row">
-                <span role="columnheader">Título</span>
-                <span role="columnheader">Tipo</span>
-                <span role="columnheader">Año</span>
-                <span role="columnheader">Progreso</span>
-                <span role="columnheader">Añadido</span>
-                <span role="columnheader" className="sr-only">Acciones</span>
+                <span role="columnheader">{t("library.column.title")}</span>
+                <span role="columnheader">{t("library.column.type")}</span>
+                <span role="columnheader">{t("library.column.year")}</span>
+                <span role="columnheader">{t("library.column.progress")}</span>
+                <span role="columnheader">{t("library.column.added")}</span>
+                <span role="columnheader" className="sr-only">{t("library.column.actions")}</span>
               </div>
               <div data-card-track>
                 {entries.map((entry) => {
@@ -160,7 +161,7 @@ export function LibraryView({
                       <span role="cell" className="table-title">
                         <button
                           data-card-focus
-                          aria-label={`Ver ${entry.meta.name}`}
+                          aria-label={t("library.open", { name: entry.meta.name })}
                           onKeyDown={cardKeys}
                           onClick={() => onOpen(entry.meta, entry.addonUrl)}
                         >
@@ -181,7 +182,7 @@ export function LibraryView({
                         )}
                       </span>
                       <span role="cell" className="muted tabular">
-                        {new Date(entry.addedAt).toLocaleDateString("es", {
+                        {new Date(entry.addedAt).toLocaleDateString(locale(), {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
@@ -190,8 +191,8 @@ export function LibraryView({
                       <span role="cell" className="row-actions">
                         <button
                           className="icon-button"
-                          aria-label={`Quitar ${entry.meta.name} de mi biblioteca`}
-                          title="Quitar de la biblioteca"
+                          aria-label={t("library.removeName", { name: entry.meta.name })}
+                          title={t("home.removeFromLibrary")}
                           onClick={() => preferencesStore.removeMedia(entry.meta.type, entry.meta.id)}
                         >
                           <Trash2 size={14} />
@@ -209,22 +210,22 @@ export function LibraryView({
           icon={<Library size={20} />}
           title={
             needle
-              ? "Sin coincidencias"
+              ? t("library.noMatches")
               : filter === "continue"
-                ? "Nada pendiente"
-                : "La biblioteca está vacía"
+                ? t("library.nothingInProgress")
+                : t("library.empty")
           }
           description={
             needle
-              ? "Ningún título guardado coincide con el filtro."
+              ? t("library.noMatchesDescription")
               : filter === "continue"
-                ? "Los títulos que empieces a reproducir aparecerán aquí."
-                : "Guarda películas y series desde sus detalles o con el botón + de cada cartel."
+                ? t("library.nothingInProgressDescription")
+                : t("library.emptyDescription")
           }
           action={
             !needle && (
               <button className="button primary" onClick={onDiscover}>
-                Explorar catálogos
+                {t("library.explore")}
               </button>
             )
           }

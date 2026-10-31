@@ -15,6 +15,7 @@ import { taste, useTaste } from "../lib/taste";
 import { clock, errorMessage, motion, safeImage } from "../lib/utils";
 import { cardKeys, MediaCard, PosterSkeletons, typeLabel, type CardMenu } from "./MediaCard";
 import { Artwork, EmptyState, ErrorState } from "./Primitives";
+import { plural, t } from "../lib/i18n";
 
 export type OpenMedia = (meta: MediaItem, addonUrl: string, sources?: boolean) => void;
 
@@ -69,7 +70,7 @@ function Shelf({
         {subtitle && <span className="shelf-subtitle">{subtitle}</span>}
         {onBrowse && (
           <button className="link-button" onClick={onBrowse}>
-            Ver todo <ChevronRight size={14} />
+            {t("home.seeAll")} <ChevronRight size={14} />
           </button>
         )}
       </header>
@@ -77,7 +78,7 @@ function Shelf({
         {edges.start && (
           <button
             className="shelf-nav start"
-            aria-label={`Anterior en ${title}`}
+            aria-label={t("home.previousIn", { title })}
             tabIndex={-1}
             onClick={() => page(-1)}
           >
@@ -90,7 +91,7 @@ function Shelf({
         {edges.end && (
           <button
             className="shelf-nav end"
-            aria-label={`Siguiente en ${title}`}
+            aria-label={t("home.nextIn", { title })}
             tabIndex={-1}
             onClick={() => page(1)}
           >
@@ -158,7 +159,7 @@ function episodeLabel(entry: LibraryEntry): string {
   const episode = entry.meta.videos?.find((video) => video.id === videoId);
   if (episode) return episodeCode(episode);
   const match = videoId?.match(/:(\d+):(\d+)$/);
-  return match ? `T${match[1]} · E${match[2]}` : "";
+  return match ? t("home.episodeCode", { season: match[1], episode: match[2] }) : "";
 }
 
 function ContinueCard({
@@ -180,8 +181,8 @@ function ContinueCard({
       <button
         className="continue-button"
         data-card-focus
-        aria-label={`Continuar ${entry.meta.name}`}
-        title="Continuar con la misma fuente"
+        aria-label={t("home.resume", { name: entry.meta.name })}
+        title={t("home.resumeTitle")}
         onClick={() => onResume(entry.meta, entry.addonUrl)}
         onContextMenu={(event) => {
           event.preventDefault();
@@ -196,8 +197,8 @@ function ContinueCard({
           <strong>{entry.meta.name}</strong>
           <small>
             {upNext
-              ? `Siguiente · ${episodeLabel(entry)}`
-              : [episodeLabel(entry), `Quedan ${clock(remaining)}`].filter(Boolean).join(" · ")}
+              ? t("home.upNext", { episode: episodeLabel(entry) })
+              : [episodeLabel(entry), t("home.remaining", { time: clock(remaining) })].filter(Boolean).join(" · ")}
           </small>
         </span>
         <span className="card-progress">
@@ -206,8 +207,8 @@ function ContinueCard({
       </button>
       <button
         className="continue-dismiss"
-        aria-label={`Quitar ${entry.meta.name} de seguir viendo`}
-        title="Quitar de Seguir viendo"
+        aria-label={t("home.dismissLabel", { name: entry.meta.name })}
+        title={t("home.dismissTitle")}
         tabIndex={-1}
         onClick={() => preferencesStore.dismissProgress(entry.meta.type, entry.meta.id)}
       >
@@ -235,7 +236,7 @@ function ForYouHero({ item, onOpen }: { item: Scored; onOpen: OpenMedia }) {
   const [logoFailed, setLogoFailed] = useState<string>();
   const logo = logoFailed === meta.logo ? undefined : safeImage(meta.logo);
   return (
-    <section className="for-you-hero" aria-label={`Destacado: ${meta.name}`}>
+    <section className="for-you-hero" aria-label={t("home.featured", { name: meta.name })}>
       {image && (
         <div className="for-you-hero-art" aria-hidden="true">
           <img src={image} alt="" draggable={false} />
@@ -250,7 +251,7 @@ function ForYouHero({ item, onOpen }: { item: Scored; onOpen: OpenMedia }) {
           <h2 className="for-you-title">{meta.name}</h2>
         )}
         <div className="facts for-you-facts">
-          <span className="for-you-match">{item.match} % de coincidencia</span>
+          <span className="for-you-match">{t("home.match", { match: item.match })}</span>
           {item.year && <span>{item.year}</span>}
           <span>{typeLabel(meta.type)}</span>
           {meta.imdbRating && <span>★ {meta.imdbRating}</span>}
@@ -259,16 +260,16 @@ function ForYouHero({ item, onOpen }: { item: Scored; onOpen: OpenMedia }) {
         <p className="for-you-reason">{reasonText(item.reason)}</p>
         <div className="for-you-actions">
           <button className="button primary" onClick={() => onOpen(meta, addonUrl, true)}>
-            <Play size={15} /> Ver ahora
+            <Play size={15} /> {t("home.watchNow")}
           </button>
           <button className="button secondary" onClick={() => onOpen(meta, addonUrl)}>
-            <Info size={15} /> Más información
+            <Info size={15} /> {t("home.moreInfo")}
           </button>
           <button
             className={`for-you-icon ${saved ? "on" : ""}`}
             aria-pressed={saved}
-            title={saved ? "Quitar de la biblioteca" : "Añadir a la biblioteca"}
-            aria-label={saved ? `Quitar ${meta.name} de la biblioteca` : `Añadir ${meta.name} a la biblioteca`}
+            title={saved ? t("home.removeFromLibrary") : t("home.addToLibrary")}
+            aria-label={saved ? t("home.removeNameFromLibrary", { name: meta.name }) : t("home.addNameToLibrary", { name: meta.name })}
             onClick={() => preferencesStore.toggleMedia(meta, addonUrl)}
           >
             {saved ? <Check size={16} /> : <Plus size={16} />}
@@ -276,16 +277,16 @@ function ForYouHero({ item, onOpen }: { item: Scored; onOpen: OpenMedia }) {
           <button
             className={`for-you-icon ${liked ? "on" : ""}`}
             aria-pressed={liked}
-            title={liked ? "Quitar «Me gusta»" : "Me gusta"}
-            aria-label={`Me gusta ${meta.name}`}
+            title={liked ? t("home.unlike") : t("home.like")}
+            aria-label={t("home.likeName", { name: meta.name })}
             onClick={() => taste.rate(meta, liked ? null : "like")}
           >
             <ThumbsUp size={16} />
           </button>
           <button
             className="for-you-icon"
-            title="No me interesa"
-            aria-label={`No me interesa ${meta.name}`}
+            title={t("home.notInterested")}
+            aria-label={t("home.notInterestedName", { name: meta.name })}
             onClick={() => taste.hide(meta.type, meta.id)}
           >
             <EyeOff size={16} />
@@ -327,7 +328,7 @@ function ForYouShelf({ row, onOpen, onMenu }: { row: Row; onOpen: OpenMedia; onM
           onSources={() => onOpen(item.item, item.addonUrl, true)}
           onSave={() => preferencesStore.toggleMedia(item.item, item.addonUrl)}
           onMenu={onMenu}
-          extraMenu={[{ label: "No me interesa", icon: <EyeOff size={15} />, onSelect: () => taste.hide(item.item.type, item.item.id) }]}
+          extraMenu={[{ label: t("home.notInterested"), icon: <EyeOff size={15} />, onSelect: () => taste.hide(item.item.type, item.item.id) }]}
         />
       ))}
     </Shelf>
@@ -369,11 +370,11 @@ function ColdStart({ liked: count, onOpen }: { liked: number; onOpen: OpenMedia 
   if (!addonUrl || (!content.visible.length && !movies.isPending && !content.pending)) return null;
   return (
     <Shelf
-      title="¿Qué te gusta?"
+      title={t("home.coldTitle")}
       subtitle={
         count
-          ? `${count} de ${COLD_LIKES}`
-          : `Marca ${COLD_LIKES} que te gusten`
+          ? t("home.coldProgress", { count, total: COLD_LIKES })
+          : t("home.coldPrompt", { count: COLD_LIKES })
       }
       ready={!movies.isPending}
     >
@@ -386,7 +387,7 @@ function ColdStart({ liked: count, onOpen }: { liked: number; onOpen: OpenMedia 
               className={`poster-button taste-pick ${liked ? "on" : ""}`}
               data-card-focus
               aria-pressed={liked}
-              aria-label={`Me gusta ${meta.name}`}
+              aria-label={t("home.likeName", { name: meta.name })}
               onClick={() => taste.rate(meta, liked ? null : "like")}
               onContextMenu={(event) => {
                 event.preventDefault();
@@ -467,12 +468,12 @@ export function HomeView({
   const recommendedShelf = (row: Row) => <ForYouShelf key={row.id} row={row} onOpen={openRecommended} onMenu={onMenu} />;
   return (
     <div className="page home-page">
-      <h1 className="sr-only">Inicio</h1>
+      <h1 className="sr-only">{t("nav.home")}</h1>
       {/* A new profile is asked first; the billboard follows as soon as there is a recommendation. */}
       {forYou.cold && <ColdStart liked={forYou.liked} onOpen={onOpen} />}
       {hero ? <AllowedHero item={hero} onOpen={openRecommended} /> : forYou.loading && <HeroSkeleton />}
       {continuing.length > 0 && (
-        <Shelf title="Seguir viendo" ready className="continue-shelf">
+        <Shelf title={t("home.continueWatching")} ready className="continue-shelf">
           {continuing.map((entry) => (
             <ContinueCard
               key={mediaKey(entry.meta.type, entry.meta.id)}
@@ -484,7 +485,7 @@ export function HomeView({
         </Shelf>
       )}
       {forYou.loading && !recommended.length && (
-        <Shelf title="Elegidos para ti" ready={false}>
+        <Shelf title={t("home.forYou")} ready={false}>
           <PosterSkeletons count={10} />
         </Shelf>
       )}
@@ -505,27 +506,27 @@ export function HomeView({
       {later.slice(Math.floor(visible.length / 2)).map(recommendedShelf)}
       {hidden > 0 && (
         <p className="for-you-footer">
-          Has ocultado {hidden === 1 ? "1 título" : `${hidden} títulos`} de tus recomendaciones.{" "}
+          {plural(hidden, "home.hidden.one", "home.hidden.other")}{" "}
           <button className="link-button" onClick={() => taste.clearHidden()}>
-            Volver a mostrarlos
+            {t("home.showAgain")}
           </button>
         </p>
       )}
       {!rows.length && kids && (
         <EmptyState
           icon={<Puzzle size={20} />}
-          title="No hay catálogos infantiles"
-          description="Este perfil infantil solo muestra los catálogos infantiles de TMDB. Actívalos en Ajustes › Información con una clave de TMDB."
+          title={t("home.noKidsCatalogs")}
+          description={t("home.noKidsCatalogsDescription")}
         />
       )}
       {!rows.length && !kids && (
         <EmptyState
           icon={<Puzzle size={20} />}
-          title="No hay catálogos activos"
-          description="Activa o instala un addon con catálogos para explorar títulos."
+          title={t("home.noCatalogs")}
+          description={t("home.noCatalogsDescription")}
           action={
             <button className="button primary" onClick={onAddons}>
-              Gestionar addons
+              {t("home.manageAddons")}
             </button>
           }
         />

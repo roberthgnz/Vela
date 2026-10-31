@@ -7,6 +7,7 @@ import { getSubtitles } from "./protocol";
 import { dedupeSubtitles } from "./subtitles";
 import { CREDITS_THRESHOLD, preferencesStore, WATCHED_THRESHOLD } from "./store";
 import { type ExternalLaunch, launchExternalPlayer } from "./transport";
+import { t } from "./i18n";
 
 /**
  * Follows videos opened in an external player. With MPV, the desktop app reads the position
@@ -129,7 +130,7 @@ async function subtitlesFor(meta: MediaItem, videoId: string, stream: ResolvedSt
 
 /** Name shown in notices about the external player. */
 export function externalPlayerName(launch: ExternalLaunch): string {
-  return launch.player === "vlc" ? "VLC" : launch.player === "mpv" ? "MPV" : "el reproductor externo";
+  return launch.player === "vlc" ? "VLC" : launch.player === "mpv" ? "MPV" : t("lib.external.player");
 }
 
 /** Opens a video in the configured player and follows it. Returns whether progress is reported. */

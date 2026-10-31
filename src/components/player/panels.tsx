@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { PlayerPreferences } from "../../lib/contracts";
+import { formatNumber, locale, t } from "../../lib/i18n";
 import { languageLabel, normalizeLanguage } from "../../lib/languages";
 import type { SeriesMarks } from "../../lib/skipSegments";
 import { subtitleColors, subtitleSizes } from "../../lib/store";
@@ -57,15 +58,15 @@ export function SpeedPanel({
     <div
       className={`player-popover speed-panel ${marks ? "with-marks" : ""}`}
       role="dialog"
-      aria-label={marks ? "Velocidad, intro y créditos" : "Velocidad"}
+      aria-label={marks ? t("player.speedAndMarks") : t("player.speed")}
       ref={ref}
       style={{ right }}
     >
       <section>
-        <h3>Velocidad</h3>
-        <div role="radiogroup" aria-label="Velocidad de reproducción">
+        <h3>{t("player.speed")}</h3>
+        <div role="radiogroup" aria-label={t("player.playbackSpeed")}>
           {speeds.map((value) => (
-            <Option key={value} checked={rate === value} label={value === 1 ? "Normal" : `${value}×`} onSelect={() => onChange(value)} />
+            <Option key={value} checked={rate === value} label={value === 1 ? t("player.speedNormal") : `${value}×`} onSelect={() => onChange(value)} />
           ))}
         </div>
       </section>
@@ -83,22 +84,22 @@ export function MarksSection({ value, time, duration, fromChapters, onChange }: 
   const setCredits = () => duration > now && onChange({ ...value, creditsFromEnd: Math.round(duration - now) });
   return (
     <section className="skip-marks">
-      <h3>Intro y créditos de la serie</h3>
+      <h3>{t("player.marks.title")}</h3>
       <p className="skip-marks-value">
-        Intro: {intro ? `${clock(intro.start)} – ${clock(intro.end)}` : "sin marcar"}
-        {fromChapters.includes("intro") && " (usa los capítulos)"}
+        {t("player.marks.intro", { value: intro ? `${clock(intro.start)} – ${clock(intro.end)}` : t("player.marks.unset") })}
+        {fromChapters.includes("intro") && ` ${t("player.marks.usesChapters")}`}
       </p>
       <div className="skip-marks-actions">
-        <button className="button small subtle" onClick={setStart}>Empieza aquí</button>
-        <button className="button small subtle" onClick={setEnd}>Termina aquí</button>
+        <button className="button small subtle" onClick={setStart}>{t("player.marks.introStart")}</button>
+        <button className="button small subtle" onClick={setEnd}>{t("player.marks.introEnd")}</button>
       </div>
       <p className="skip-marks-value">
-        Créditos: {value?.creditsFromEnd ? `últimos ${clock(value.creditsFromEnd)}` : "sin marcar"}
-        {fromChapters.includes("credits") && " (usa los capítulos)"}
+        {t("player.marks.credits", { value: value?.creditsFromEnd ? t("player.marks.lastPart", { time: clock(value.creditsFromEnd) }) : t("player.marks.unset") })}
+        {fromChapters.includes("credits") && ` ${t("player.marks.usesChapters")}`}
       </p>
       <div className="skip-marks-actions">
-        <button className="button small subtle" disabled={!duration} onClick={setCredits}>Empiezan aquí</button>
-        <button className="button small subtle" disabled={!value} onClick={() => onChange({})}>Borrar</button>
+        <button className="button small subtle" disabled={!duration} onClick={setCredits}>{t("player.marks.creditsStart")}</button>
+        <button className="button small subtle" disabled={!value} onClick={() => onChange({})}>{t("player.marks.clear")}</button>
       </div>
     </section>
   );
@@ -151,10 +152,10 @@ export function TrackPanel({
   const selectedLang = selected ? langOf(selected) : undefined;
   const all = [...new Set(subtitles.map(langOf))];
   const wanted = preferred.map((code) => normalizeLanguage(code)).filter(Boolean);
-  const label = (lang: string) => (lang === "und" ? "Idioma no indicado" : languageLabel(lang));
+  const label = (lang: string) => (lang === "und" ? t("player.unknownLanguage") : languageLabel(lang));
   const top = all.filter((lang) => wanted.includes(lang) || lang === selectedLang)
     .sort((a, b) => (wanted.indexOf(a) + 1 || 99) - (wanted.indexOf(b) + 1 || 99));
-  const others = all.filter((lang) => !top.includes(lang)).sort((a, b) => label(a).localeCompare(label(b), "es"));
+  const others = all.filter((lang) => !top.includes(lang)).sort((a, b) => label(a).localeCompare(label(b), locale()));
   const variants = selected ? subtitles.filter((track) => langOf(track) === selectedLang) : [];
   // Syncing by ear: the position is frozen when the list opens, so the lines do not move under
   // the pointer, and the chosen line is shown at that position.
@@ -171,7 +172,7 @@ export function TrackPanel({
     ref.current?.querySelector<HTMLElement>(".track-languages [aria-checked=true]")?.focus();
   }, []);
   const conversionHint = (track: Track) =>
-    track.origin === "embedded" && track.key.startsWith("file-audio") ? "Cambia a la conversión de Stremio Service" : undefined;
+    track.origin === "embedded" && track.key.startsWith("file-audio") ? t("player.conversionHint") : undefined;
   const language = (lang: string) => {
     const first = subtitles.find((track) => langOf(track) === lang)!;
     const count = subtitles.filter((track) => langOf(track) === lang).length;
@@ -186,22 +187,22 @@ export function TrackPanel({
     );
   };
   return (
-    <div className="player-popover track-panel" role="dialog" aria-label="Audio y subtítulos" ref={ref} style={{ right }}>
+    <div className="player-popover track-panel" role="dialog" aria-label={t("player.audioAndSubtitles")} ref={ref} style={{ right }}>
       <section className="track-languages">
-        <h3>Subtítulos</h3>
-        <div role="radiogroup" aria-label="Idioma de los subtítulos" className="track-scroll">
-          <Option checked={!selected} label="Desactivados" onSelect={() => onSubtitle(null)} />
+        <h3>{t("player.subtitles")}</h3>
+        <div role="radiogroup" aria-label={t("player.subtitleLanguage")} className="track-scroll">
+          <Option checked={!selected} label={t("player.subtitlesOff")} onSelect={() => onSubtitle(null)} />
           {top.map(language)}
           {others.length > 0 && top.length > 0 && <hr className="track-divider" aria-hidden="true" />}
           {others.map(language)}
-          {!subtitles.length && <p className="track-empty">No hay subtítulos para este vídeo.</p>}
+          {!subtitles.length && <p className="track-empty">{t("player.noSubtitles")}</p>}
         </div>
       </section>
       <div className="track-side">
         {audio.length > 1 && (
           <section>
-            <h3>Audio</h3>
-            <div role="radiogroup" aria-label="Pista de audio">
+            <h3>{t("player.audio")}</h3>
+            <div role="radiogroup" aria-label={t("player.audioTrack")}>
               {audio.map((track) => (
                 <Option
                   key={track.key}
@@ -217,14 +218,14 @@ export function TrackPanel({
         )}
         {variants.length > 1 && (
           <section>
-            <h3>Versión</h3>
-            <div role="radiogroup" aria-label="Versión de los subtítulos" className="track-scroll">
+            <h3>{t("player.version")}</h3>
+            <div role="radiogroup" aria-label={t("player.subtitleVersion")} className="track-scroll">
               {variants.map((track) => (
                 <Option
                   key={track.key}
                   checked={track.key === subtitleKey}
                   label={track.label}
-                  detail={[track.origin === "file" ? "Externo" : "Del archivo", track.detail].filter(Boolean).join(" · ")}
+                  detail={[track.origin === "file" ? t("player.external") : t("player.fromFile"), track.detail].filter(Boolean).join(" · ")}
                   onSelect={() => onSubtitle(track)}
                 />
               ))}
@@ -232,17 +233,17 @@ export function TrackPanel({
           </section>
         )}
         <section className="track-delay">
-          <h3 id="subtitle-delay">Desfase</h3>
+          <h3 id="subtitle-delay">{t("player.delay")}</h3>
           <div className="stepper" role="group" aria-labelledby="subtitle-delay">
-            <button className="button small subtle" aria-label="Adelantar subtítulos 0,1 s" title="Adelantar (G)" disabled={!selected} onClick={() => onDelay(delay - 0.1)}>
-              −0,1
+            <button className="button small subtle" aria-label={t("player.delayEarlierLabel")} title={t("player.delayEarlierTitle")} disabled={!selected} onClick={() => onDelay(delay - 0.1)}>
+              {t("player.delayEarlierButton")}
             </button>
-            <output aria-live="polite">{`${delay > 0 ? "+" : ""}${delay.toLocaleString("es", { minimumFractionDigits: 1 })} s`}</output>
-            <button className="button small subtle" aria-label="Retrasar subtítulos 0,1 s" title="Retrasar (H)" disabled={!selected} onClick={() => onDelay(delay + 0.1)}>
-              +0,1
+            <output aria-live="polite">{`${delay > 0 ? "+" : ""}${formatNumber(delay, { minimumFractionDigits: 1 })} s`}</output>
+            <button className="button small subtle" aria-label={t("player.delayLaterLabel")} title={t("player.delayLaterTitle")} disabled={!selected} onClick={() => onDelay(delay + 0.1)}>
+              {t("player.delayLaterButton")}
             </button>
             <button className="button small subtle" disabled={!delay} onClick={() => onDelay(0)}>
-              Restablecer
+              {t("player.reset")}
             </button>
           </div>
           <button
@@ -251,11 +252,11 @@ export function TrackPanel({
             disabled={!selected || !cues.length}
             onClick={() => setSyncAt(syncAt === null ? time : null)}
           >
-            {syncAt === null ? "Sincronizar con una frase" : "Cancelar sincronización"}
+            {syncAt === null ? t("player.syncWithLine") : t("player.cancelSync")}
           </button>
           {syncAt !== null && (
             <div className="track-sync">
-              <p>Elige la frase que acabas de oír.</p>
+              <p>{t("player.pickLine")}</p>
               <div className="track-sync-list track-scroll" role="list">
                 {candidates.map((cue) => (
                   <button
@@ -272,19 +273,19 @@ export function TrackPanel({
                     <span>{cue.text}</span>
                   </button>
                 ))}
-                {!candidates.length && <p className="track-empty">No hay frases cerca de este momento.</p>}
+                {!candidates.length && <p className="track-empty">{t("player.noLinesNearby")}</p>}
               </div>
             </div>
           )}
         </section>
         <section className="track-look">
-          <h3>Estilo</h3>
+          <h3>{t("player.style")}</h3>
           <div className="track-look-row">
-            <span id="subtitle-size">Tamaño</span>
+            <span id="subtitle-size">{t("player.size")}</span>
             <div className="stepper" role="group" aria-labelledby="subtitle-size">
               <button
                 className="button small subtle"
-                aria-label="Subtítulos más pequeños"
+                aria-label={t("player.smallerSubtitles")}
                 disabled={look.subtitleSize <= subtitleSizes[0]}
                 onClick={() => resize(-1)}
               >
@@ -293,7 +294,7 @@ export function TrackPanel({
               <output aria-live="polite">{look.subtitleSize} %</output>
               <button
                 className="button small subtle"
-                aria-label="Subtítulos más grandes"
+                aria-label={t("player.largerSubtitles")}
                 disabled={look.subtitleSize >= subtitleSizes[subtitleSizes.length - 1]}
                 onClick={() => resize(1)}
               >
@@ -302,7 +303,7 @@ export function TrackPanel({
             </div>
           </div>
           <div className="track-look-row">
-            <span id="subtitle-color">Color</span>
+            <span id="subtitle-color">{t("player.color")}</span>
             <div className="track-swatches" role="group" aria-labelledby="subtitle-color">
               {subtitleColors.map((color) => (
                 <button
@@ -318,17 +319,17 @@ export function TrackPanel({
             </div>
           </div>
           <div className="track-look-row">
-            <span id="subtitle-background">Fondo</span>
+            <span id="subtitle-background">{t("player.background")}</span>
             <div className="track-choices" role="group" aria-labelledby="subtitle-background">
               {[0, 0.5, 0.75, 1].map((value) => (
                 <button
                   key={value}
                   className="button small subtle"
                   aria-pressed={look.subtitleBackground === value}
-                  title={value ? `Fondo al ${value * 100} %` : "Sin fondo"}
+                  title={value ? t("player.backgroundAt", { percent: value * 100 }) : t("player.noBackground")}
                   onClick={() => onLook({ subtitleBackground: value })}
                 >
-                  {value ? `${value * 100} %` : "No"}
+                  {value ? `${value * 100} %` : t("player.backgroundNone")}
                 </button>
               ))}
             </div>
