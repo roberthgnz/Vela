@@ -16,5 +16,6 @@ export default defineConfig({
     include: ["jassub > throughput", "jassub > abslink", "jassub > abslink/w3c", "jassub > rvfc-polyfill", "jassub > lfa-ponyfill"],
   },
   build: { target: "es2022", sourcemap: false },
-  test: { include: ["src/**/*.test.ts"], environment: "node" },
+  // Component and hook tests declare `// @vitest-environment jsdom` at the top of the file.
+  test: { include: ["src/**/*.test.{ts,tsx}"], environment: "node", setupFiles: ["src/test-setup.ts"] },
 });

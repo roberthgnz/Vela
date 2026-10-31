@@ -34,7 +34,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-La CI ejecuta lo mismo. No hay pruebas automáticas de interfaz: comprueba los cambios visibles en la ventana Tauri y descríbelo en el pull request.
+La CI ejecuta lo mismo. Las pruebas de `src/lib` corren en Node; las de componentes y hooks (`*.test.tsx`, y los `.test.ts` que declaran `// @vitest-environment jsdom`) usan jsdom y Testing Library, con los colaboradores de red simulados. No sustituyen a la ventana real: comprueba los cambios visibles en la ventana Tauri y descríbelo en el pull request.
 
 - Añade pruebas unitarias para los cambios de comportamiento y de regresión para los errores que corrijas.
 - Distingue en la descripción lo verificado contra servicios reales de lo cubierto solo por pruebas simuladas, y actualiza `docs/stremio.md` cuando cambie lo que sabemos de un contrato o de un servicio.
