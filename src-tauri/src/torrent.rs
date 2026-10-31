@@ -1026,6 +1026,14 @@ impl Engine {
     }
 }
 
+/// Starts the engine ahead of the first torrent (the window asks when Vela opens and the engine
+/// will be used): the DHT gets its nodes and the listening port is open by the time a torrent is
+/// played. Starting it again does nothing.
+#[tauri::command]
+pub async fn torrent_warm(app: AppHandle, engine: State<'_, Engine>) -> Result<(), String> {
+    engine.running(&app).await.map(|_| ())
+}
+
 #[tauri::command]
 pub async fn torrent_prepare(
     app: AppHandle,

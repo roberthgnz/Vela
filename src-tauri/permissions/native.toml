@@ -25,8 +25,8 @@ commands.allow = ["log_write", "log_tail", "log_folder", "log_reveal", "log_save
 
 [[permission]]
 identifier = "allow-torrents"
-description = "Allow the main window to open torrents with Vela's own engine, read their swarm statistics and release them; the files are served only on 127.0.0.1 behind a secret path and deleted afterwards."
-commands.allow = ["torrent_prepare", "torrent_stats", "torrent_release"]
+description = "Allow the main window to start Vela's own torrent engine ahead of time, open torrents with it, read their swarm statistics and release them; the files are served only on 127.0.0.1 behind a secret path and deleted afterwards."
+commands.allow = ["torrent_warm", "torrent_prepare", "torrent_stats", "torrent_release"]
 
 [[permission]]
 identifier = "allow-embedded-mpv"

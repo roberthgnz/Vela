@@ -452,6 +452,7 @@ fn main() {
             desktop::tray_set,
             desktop::stremio_links_get,
             desktop::stremio_links_set,
+            torrent::torrent_warm,
             torrent::torrent_prepare,
             torrent::torrent_stats,
             torrent::torrent_release,

@@ -44,7 +44,7 @@ import type { CardMenu } from "./components/MediaCard";
 import { Player, PreparingPlayer, type Playing } from "./components/Player";
 import { EmbeddedPlayer } from "./components/EmbeddedPlayer";
 import { prefersEmbedded } from "./lib/embeddedMpv";
-import { releaseVelaTorrent } from "./lib/torrentEngine";
+import { releaseVelaTorrent, useTorrentEngine, warmVelaEngine } from "./lib/torrentEngine";
 import { trayIcon, useLinks } from "./lib/desktop";
 import { interfaceScale, startGamepad } from "./lib/gamepad";
 import { Dialog, ErrorBoundary, ErrorState, useMenu } from "./components/Primitives";
@@ -370,6 +370,12 @@ export default function App() {
     interfaceScale.restore();
     startGamepad();
   }, []);
+  // Vela's torrent engine starts with the app when it is the one that will open torrents, so the
+  // first one does not wait for it (and again if that choice changes in Settings).
+  const engineChoice = useTorrentEngine();
+  useEffect(() => {
+    void warmVelaEngine(prefs.serviceUrl);
+  }, [engineChoice, prefs.serviceUrl]);
 
   useEffect(() => {
     void account.init();

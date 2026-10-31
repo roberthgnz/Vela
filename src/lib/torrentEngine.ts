@@ -3,7 +3,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { Episode, ResolvedStream, Subtitle } from "./contracts";
 import { t } from "./i18n";
 import { storage } from "./storage";
-import type { TorrentStats } from "./streamingServer";
+import { isLocalService, serviceAvailable, serviceInstalled, type TorrentStats } from "./streamingServer";
 
 /**
  * Which engine opens torrent sources. Vela has its own (librqbit, see `torrent.rs`); Stremio's
@@ -46,6 +46,27 @@ export const torrentEngine = {
 
 export function useTorrentEngine(): TorrentEngine {
   return useSyncExternalStore(torrentEngine.subscribe, torrentEngine.get, torrentEngine.get);
+}
+
+/**
+ * Starts Vela's engine ahead of the first torrent when it is the one that will open them: chosen
+ * in Settings, or in «auto» when Stremio's server neither answers nor can be started (the choice
+ * `resolvePlayback` makes). Its DHT then has its nodes and its port is open when a torrent is
+ * played, instead of starting with it. Nothing is started for people who stream through Stremio.
+ */
+export async function warmVelaEngine(serviceUrl: string): Promise<boolean> {
+  if (!velaEngineAvailable) return false;
+  const engine = torrentEngine.get();
+  if (engine === "service") return false;
+  if (
+    engine === "auto" &&
+    ((await serviceAvailable(serviceUrl)) || (isLocalService(serviceUrl) && (await serviceInstalled())))
+  )
+    return false;
+  return invoke("torrent_warm").then(
+    () => true,
+    () => false,
+  );
 }
 
 type Prepared = { base: string; fileIdx: number; fileName: string; files: { name: string; length: number }[] };
