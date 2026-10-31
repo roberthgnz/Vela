@@ -7,7 +7,7 @@
     "type": "git",
     "url": "git+https://github.com/roberthgnz/Vela.git"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "packageManager": "pnpm@11.1.1",
   "scripts": {
