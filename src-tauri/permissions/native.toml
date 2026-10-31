@@ -1,7 +1,7 @@
 [[permission]]
 identifier = "allow-native-transport"
-description = "Allow the main window to request addon and account data, keep its Stremio session in the OS credential store, explicitly launch links or a configured player, and check for and install signed updates."
-commands.allow = ["request_json", "post_json", "request_text", "request_bytes", "request_range", "open_external", "launch_external_player", "secret_get", "secret_set", "secret_delete", "update_check", "update_install"]
+description = "Allow the main window to request addon and account data, keep its Stremio session in the OS credential store, explicitly launch links or a configured player (and tell which kind it is and send it subtitle URLs found after it started), and check for and install signed updates."
+commands.allow = ["request_json", "post_json", "request_text", "request_bytes", "request_range", "open_external", "launch_external_player", "external_player_kind", "external_player_subtitles", "secret_get", "secret_set", "secret_delete", "update_check", "update_install"]
 
 [[permission]]
 identifier = "allow-downloads"
@@ -30,8 +30,8 @@ commands.allow = ["torrent_prepare", "torrent_stats", "torrent_release"]
 
 [[permission]]
 identifier = "allow-embedded-mpv"
-description = "Allow the main window to play a source with the libmpv already installed on the machine (Stremio's or next to mpv.exe), drawn in a child window over the video area, and to place, focus, pause and close it."
-commands.allow = ["mpv_embedded_library", "mpv_embedded_open", "mpv_embedded_place", "mpv_embedded_focus", "mpv_embedded_command", "mpv_embedded_close"]
+description = "Allow the main window to play a source with the libmpv already installed on the machine (Stremio's or next to mpv.exe), drawn in a child window over the video area, to place, focus, pause and close it, and to add subtitle URLs found after it opened."
+commands.allow = ["mpv_embedded_library", "mpv_embedded_open", "mpv_embedded_place", "mpv_embedded_focus", "mpv_embedded_command", "mpv_embedded_subtitles", "mpv_embedded_close"]
 
 [[permission]]
 identifier = "allow-desktop-integration"

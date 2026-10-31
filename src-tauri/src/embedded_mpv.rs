@@ -241,6 +241,30 @@ struct Session {
     events: std::thread::JoinHandle<()>,
     /// Set by `close` so the event thread does not report the shutdown as an error.
     closing: Arc<AtomicBool>,
+    subtitles: Arc<Mutex<Subtitles>>,
+}
+
+/// External subtitles of the session. mpv opens without waiting for the subtitle addons; what
+/// they find arrives while the file opens and is added with the rest once it is loaded.
+#[derive(Default)]
+struct Subtitles {
+    urls: Vec<String>,
+    loaded: bool,
+}
+
+impl Subtitles {
+    /// Keeps the web addresses among `urls` that are new and returns the ones mpv has to add
+    /// now: none until the file is loaded, when the event thread adds them all.
+    fn admit(&mut self, urls: Vec<String>) -> Vec<String> {
+        let mut fresh = Vec::new();
+        for url in urls {
+            if crate::transport::checked_url(&url).is_ok() && !self.urls.contains(&url) {
+                self.urls.push(url.clone());
+                fresh.push(url);
+            }
+        }
+        if self.loaded { fresh } else { Vec::new() }
+    }
 }
 
 #[derive(Default)]
@@ -379,7 +403,12 @@ fn configure(mpv: &Mpv, options: &OpenOptions, window: isize) -> Result<(), Stri
     Ok(())
 }
 
-fn event_loop(app: AppHandle, mpv: Arc<Mpv>, subtitles: Vec<String>, closing: Arc<AtomicBool>) {
+fn event_loop(
+    app: AppHandle,
+    mpv: Arc<Mpv>,
+    subtitles: Arc<Mutex<Subtitles>>,
+    closing: Arc<AtomicBool>,
+) {
     let (mut time, mut duration, mut paused) = (0.0_f64, 0.0_f64, false);
     let mut last = Instant::now() - Duration::from_secs(1);
     loop {
@@ -388,8 +417,14 @@ fn event_loop(app: AppHandle, mpv: Arc<Mpv>, subtitles: Vec<String>, closing: Ar
         match event.event_id {
             EVENT_SHUTDOWN => break,
             EVENT_FILE_LOADED => {
+                // The ones that arrive later are added by `mpv_embedded_subtitles`.
+                let urls = {
+                    let mut subtitles = subtitles.lock().unwrap_or_else(|p| p.into_inner());
+                    subtitles.loaded = true;
+                    subtitles.urls.clone()
+                };
                 // «auto» lets `sid`/`slang` decide: none with sid=no, the preferred language otherwise.
-                for url in &subtitles {
+                for url in &urls {
                     let _ = mpv.command(&["sub-add", url, "auto"]);
                 }
             }
@@ -634,6 +669,7 @@ impl EmbeddedMpv {
             window,
             events,
             closing,
+            ..
         } = session;
         closing.store(true, Ordering::Relaxed);
         let _ = mpv.command(&["quit"]);
@@ -720,15 +756,15 @@ pub async fn mpv_embedded_open(
         return Err(error);
     }
     let closing = Arc::new(AtomicBool::new(false));
+    // Only web subtitles; the page already filters them, this is a second check.
+    let subtitles = Arc::new(Mutex::new(Subtitles::default()));
+    subtitles
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .admit(options.subtitles);
     let events = {
-        let (app, mpv, closing) = (app.clone(), mpv.clone(), closing.clone());
-        // Only web subtitles; the page already filters them, this is a second check.
-        let subtitles: Vec<String> = options
-            .subtitles
-            .iter()
-            .filter(|url| crate::transport::checked_url(url).is_ok())
-            .cloned()
-            .collect();
+        let (app, mpv, closing, subtitles) =
+            (app.clone(), mpv.clone(), closing.clone(), subtitles.clone());
         std::thread::Builder::new()
             .name("vela-mpv-events".into())
             .spawn(move || event_loop(app, mpv, subtitles, closing))
@@ -739,6 +775,7 @@ pub async fn mpv_embedded_open(
         window,
         events,
         closing,
+        subtitles,
     });
     // mpv creates its window shortly after the file starts; give it the keyboard then.
     let app_focus = app.clone();
@@ -819,6 +856,38 @@ pub async fn mpv_embedded_command(
     .map_err(|error| error.to_string())?
 }
 
+/// Subtitles found after mpv was opened (subtitle addons answer while the file opens). They join
+/// the session's list and are added now if the file is already loaded, or with the others when
+/// it loads, with the same «auto» as those.
+#[tauri::command]
+pub async fn mpv_embedded_subtitles(
+    state: State<'_, EmbeddedMpv>,
+    urls: Vec<String>,
+) -> Result<(), String> {
+    let (mpv, subtitles) = state
+        .session
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .as_ref()
+        .map(|session| (session.mpv.clone(), session.subtitles.clone()))
+        .ok_or("No hay ningún vídeo en mpv.")?;
+    let now = subtitles
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .admit(urls);
+    if now.is_empty() {
+        return Ok(());
+    }
+    // sub-add downloads the file before it returns: not on the UI thread, not under the lock.
+    tauri::async_runtime::spawn_blocking(move || {
+        for url in &now {
+            let _ = mpv.command(&["sub-add", url, "auto"]);
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())
+}
+
 /// An mpv key name (`SPACE`, `LEFT`, `k`, `<`…): short, printable, no spaces or separators.
 fn valid_key(key: &str) -> bool {
     !key.is_empty()
@@ -858,6 +927,26 @@ mod tests {
             assert!(first < stremio);
         }
         assert!(candidates(Some("  ")).iter().all(|p| !p.starts_with("  ")));
+    }
+
+    #[test]
+    fn keeps_late_subtitles_until_the_file_is_loaded() {
+        let mut list = Subtitles::default();
+        let first = "https://subs.example/a.srt".to_owned();
+        let late = "https://subs.example/b.srt".to_owned();
+        // Before the file loads nothing is added now; the event thread adds the whole list.
+        assert!(
+            list.admit(vec![first.clone(), "file:///C:/x.srt".to_owned()])
+                .is_empty()
+        );
+        assert_eq!(list.urls, vec![first.clone()]);
+        list.loaded = true;
+        // Once it is loaded, only the new web addresses, each once.
+        assert_eq!(
+            list.admit(vec![first.clone(), late.clone(), late.clone()]),
+            vec![late.clone()]
+        );
+        assert_eq!(list.urls, vec![first, late]);
     }
 
     #[test]

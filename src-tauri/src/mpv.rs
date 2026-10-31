@@ -6,8 +6,71 @@
 //! Protocol: <https://mpv.io/manual/stable/#json-ipc>.
 
 use serde_json::{Value, json};
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+
+/// A subtitle URL to add to a running MPV, and whether to show it.
+pub type LateSubtitle = (String, bool);
+
+/// The MPV sessions Vela follows, for subtitles that arrive after the player started: Vela opens
+/// MPV without waiting for the subtitle addons.
+fn late_channels() -> &'static Mutex<HashMap<String, UnboundedSender<Vec<LateSubtitle>>>> {
+    static CHANNELS: OnceLock<Mutex<HashMap<String, UnboundedSender<Vec<LateSubtitle>>>>> =
+        OnceLock::new();
+    CHANNELS.get_or_init(Default::default)
+}
+
+/// Opens a session's channel before MPV starts, so nothing sent meanwhile is lost.
+pub fn late_subtitles(session: &str) -> UnboundedReceiver<Vec<LateSubtitle>> {
+    let (sender, receiver) = unbounded_channel();
+    late_channels()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .insert(session.to_owned(), sender);
+    receiver
+}
+
+pub fn forget_session(session: &str) {
+    late_channels()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .remove(session);
+}
+
+/// Subtitles for a running session: web addresses only (they become IPC arguments) and at most
+/// 10, like at the start; the first is shown when `show_first` is set. False when the session is
+/// not an MPV Vela follows (any more).
+pub fn send_subtitles(session: &str, urls: &[String], show_first: bool) -> bool {
+    let list: Vec<LateSubtitle> = urls
+        .iter()
+        .filter(|url| url.len() <= 2048)
+        .filter_map(|url| crate::transport::checked_url(url).ok())
+        .take(10)
+        .enumerate()
+        .map(|(index, url)| (url.to_string(), show_first && index == 0))
+        .collect();
+    !list.is_empty()
+        && late_channels()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(session)
+            .is_some_and(|sender| sender.send(list).is_ok())
+}
+
+/// The IPC line that adds a subtitle file: «select» shows it, «auto» leaves the choice to MPV.
+fn sub_add((url, show): &LateSubtitle) -> String {
+    let flag = if *show { "select" } else { "auto" };
+    format!("{}\n", json!({ "command": ["sub-add", url, flag] }))
+}
+
+fn is_file_loaded(line: &str) -> bool {
+    serde_json::from_str::<Value>(line)
+        .ok()
+        .is_some_and(|message| message.get("event").and_then(Value::as_str) == Some("file-loaded"))
+}
 
 /// Property ids used with `observe_property`.
 const OBSERVED: [(u64, &str); 4] = [
@@ -147,14 +210,17 @@ pub fn subtitle_arguments(urls: &[String], show: bool) -> Vec<String> {
     arguments
 }
 
-/// Connects to the pipe, observes playback and calls `progress` while MPV runs.
-/// Returns the last state once MPV closes the pipe, or `None` if it never answered.
+/// Connects to the pipe, observes playback and calls `progress` while MPV runs, and adds the
+/// subtitles that arrive through `subtitles` once the file is loaded (MPV adds them to the file
+/// that is playing). Returns the last state once MPV closes the pipe, or `None` if it never
+/// answered.
 #[cfg(windows)]
 pub async fn follow(
     pipe: &str,
     session: &str,
     mut alive: impl FnMut() -> bool,
     mut progress: impl FnMut(Value),
+    mut subtitles: UnboundedReceiver<Vec<LateSubtitle>>,
 ) -> Option<Playback> {
     use tokio::net::windows::named_pipe::ClientOptions;
     let started = tokio::time::Instant::now();
@@ -182,13 +248,39 @@ pub async fn follow(
     let mut lines = BufReader::new(reader).lines();
     let mut last_sent = tokio::time::Instant::now() - PROGRESS_INTERVAL;
     let mut last_paused = false;
-    while let Ok(Some(line)) = lines.next_line().await {
-        if state.apply(&line)
-            && (last_sent.elapsed() >= PROGRESS_INTERVAL || state.paused != last_paused)
-        {
-            last_sent = tokio::time::Instant::now();
-            last_paused = state.paused;
-            progress(state.to_json(session));
+    // Vela may connect after the file loaded and miss the event; the observed properties, which
+    // MPV reports as soon as they are observed, tell it too.
+    let mut loaded = false;
+    let mut waiting: Vec<LateSubtitle> = Vec::new();
+    loop {
+        tokio::select! {
+            line = lines.next_line() => {
+                let Ok(Some(line)) = line else { break };
+                if state.apply(&line)
+                    && (last_sent.elapsed() >= PROGRESS_INTERVAL || state.paused != last_paused)
+                {
+                    last_sent = tokio::time::Instant::now();
+                    last_paused = state.paused;
+                    progress(state.to_json(session));
+                }
+                if !loaded
+                    && (is_file_loaded(&line) || state.duration.is_some() || state.position.is_some())
+                {
+                    loaded = true;
+                    for subtitle in waiting.drain(..) {
+                        let _ = writer.write_all(sub_add(&subtitle).as_bytes()).await;
+                    }
+                }
+            }
+            Some(batch) = subtitles.recv() => {
+                if loaded {
+                    for subtitle in &batch {
+                        let _ = writer.write_all(sub_add(subtitle).as_bytes()).await;
+                    }
+                } else {
+                    waiting.extend(batch);
+                }
+            }
         }
     }
     Some(state)
@@ -299,9 +391,16 @@ mod tests {
             commands
         });
         let mut updates = Vec::new();
-        let state = follow(&pipe, "test-follow", || true, |value| updates.push(value))
-            .await
-            .unwrap();
+        let (_sender, receiver) = unbounded_channel();
+        let state = follow(
+            &pipe,
+            "test-follow",
+            || true,
+            |value| updates.push(value),
+            receiver,
+        )
+        .await
+        .unwrap();
         let commands = fake.await.unwrap();
         assert!(commands[0].contains(r#""observe_property",1,"time-pos""#));
         assert_eq!(state.position, Some(61.5));
@@ -314,7 +413,111 @@ mod tests {
     #[cfg(windows)]
     #[tokio::test]
     async fn gives_up_when_the_player_exits_without_ipc() {
-        let state = follow(&pipe_name("test-missing"), "test-missing", || false, |_| {}).await;
+        let (_sender, receiver) = unbounded_channel();
+        let state = follow(
+            &pipe_name("test-missing"),
+            "test-missing",
+            || false,
+            |_| {},
+            receiver,
+        )
+        .await;
         assert!(state.is_none());
+    }
+
+    #[test]
+    fn sends_late_subtitles_only_to_followed_sessions() {
+        let web = |url: &str| url.to_owned();
+        assert!(!send_subtitles(
+            "unit-nobody",
+            &[web("https://subs.example/a.srt")],
+            false
+        ));
+        let mut receiver = late_subtitles("unit-late");
+        assert!(!send_subtitles(
+            "unit-late",
+            &[web("file:///C:/x.srt")],
+            true
+        ));
+        assert!(send_subtitles(
+            "unit-late",
+            &[
+                web("file:///C:/x.srt"),
+                web("https://subs.example/a b.srt"),
+                web("http://127.0.0.1:11470/s.vtt"),
+            ],
+            true,
+        ));
+        assert_eq!(
+            receiver.try_recv().unwrap(),
+            vec![
+                (web("https://subs.example/a%20b.srt"), true),
+                (web("http://127.0.0.1:11470/s.vtt"), false),
+            ]
+        );
+        assert_eq!(
+            sub_add(&(web("https://subs.example/a.srt"), false)),
+            "{\"command\":[\"sub-add\",\"https://subs.example/a.srt\",\"auto\"]}\n"
+        );
+        forget_session("unit-late");
+        assert!(!send_subtitles(
+            "unit-late",
+            &[web("https://subs.example/a.srt")],
+            false
+        ));
+    }
+
+    /// Subtitles sent while MPV opens wait for the file; later ones go at once.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn adds_late_subtitles_once_the_file_is_loaded() {
+        use tokio::net::windows::named_pipe::ServerOptions;
+        let pipe = pipe_name("test-late");
+        let server = ServerOptions::new()
+            .first_pipe_instance(true)
+            .create(&pipe)
+            .unwrap();
+        let receiver = late_subtitles("test-late");
+        assert!(send_subtitles(
+            "test-late",
+            &["https://subs.example/a.srt".to_owned()],
+            true
+        ));
+        let fake = tokio::spawn(async move {
+            server.connect().await.unwrap();
+            let (reader, mut writer) = tokio::io::split(server);
+            let mut lines = BufReader::new(reader).lines();
+            for _ in 0..4 {
+                lines.next_line().await.unwrap().unwrap();
+            }
+            writer
+                .write_all(b"{\"event\":\"file-loaded\"}\n")
+                .await
+                .unwrap();
+            let first = lines.next_line().await.unwrap().unwrap();
+            assert!(send_subtitles(
+                "test-late",
+                &["https://subs.example/b.srt".to_owned()],
+                false
+            ));
+            let second = lines.next_line().await.unwrap().unwrap();
+            writer
+                .write_all(b"{\"event\":\"end-file\",\"reason\":\"quit\"}\n")
+                .await
+                .unwrap();
+            (first, second)
+        });
+        let state = follow(&pipe, "test-late", || true, |_| {}, receiver).await;
+        forget_session("test-late");
+        let (first, second) = fake.await.unwrap();
+        assert!(state.is_some());
+        assert_eq!(
+            first,
+            r#"{"command":["sub-add","https://subs.example/a.srt","select"]}"#
+        );
+        assert_eq!(
+            second,
+            r#"{"command":["sub-add","https://subs.example/b.srt","auto"]}"#
+        );
     }
 }

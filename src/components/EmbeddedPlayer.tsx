@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, MonitorPlay } from "lucide-react";
 import {
+  addEmbeddedSubtitles,
   closeEmbedded,
   focusEmbedded,
   mpvKey,
@@ -73,18 +74,16 @@ export function EmbeddedPlayer({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  // Opens mpv once, with the addon subtitles (fetched first, briefly) and the user's languages.
+  // Opens mpv once, with the user's languages and the subtitles already known. The subtitle
+  // addons are asked meanwhile: mpv does not wait for them, and adds what they find once the file
+  // is loaded.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const box = area.current;
       if (!box) return;
-      const subtitles = await Promise.race([
-        getSubtitles(preferencesStore.getSnapshot().addons, playing.meta.type, playing.videoId, playing.stream).catch(() => []),
-        new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 4000)),
-      ]);
-      if (cancelled) return;
-      const urls = [...new Set([...(playing.stream.subtitles ?? []), ...subtitles].map((item) => item.url))];
+      const found = getSubtitles(preferencesStore.getSnapshot().addons, playing.meta.type, playing.videoId, playing.stream).catch(() => []);
+      const urls = [...new Set((playing.stream.subtitles ?? []).map((item) => item.url))];
       const saved = Number(storage.getItem(volumeKey));
       try {
         await openEmbedded({
@@ -99,7 +98,14 @@ export function EmbeddedPlayer({
           volume: Number.isFinite(saved) && saved > 0 && saved <= 1 ? saved : 1,
           rect: rectOf(box),
         });
-        if (cancelled) void closeEmbedded();
+        if (cancelled) {
+          void closeEmbedded();
+          return;
+        }
+        void found.then((items) => {
+          const late = [...new Set(items.map((item) => item.url))].filter((url) => !urls.includes(url));
+          if (!cancelled && late.length) void addEmbeddedSubtitles(late).catch(() => {});
+        });
       } catch (cause) {
         if (cancelled) return;
         const message = errorMessage(cause);

@@ -220,6 +220,11 @@ async fn launch_external_player(
         item_options = vlc::item_options(title.as_deref());
     }
     let ipc = session.is_some() && (is_mpv || interface.is_some());
+    // Subtitles found after MPV starts reach it through the IPC (`external_player_subtitles`).
+    let late = session
+        .as_deref()
+        .filter(|_| is_mpv)
+        .map(mpv::late_subtitles);
     let mut command = Command::new(executable);
     command
         .args(arguments)
@@ -232,9 +237,12 @@ async fn launch_external_player(
         .kill_on_drop(false);
     #[cfg(windows)]
     command.creation_flags(0x0800_0000);
-    let mut child = command
-        .spawn()
-        .map_err(|_| "No se pudo iniciar el reproductor elegido.".to_owned())?;
+    let mut child = command.spawn().map_err(|_| {
+        if let Some(session) = session.as_deref().filter(|_| late.is_some()) {
+            mpv::forget_session(session);
+        }
+        "No se pudo iniciar el reproductor elegido.".to_owned()
+    })?;
     // The proxy has to live as long as the player, even when nobody follows the session.
     if session.is_some() || proxy.is_some() {
         tauri::async_runtime::spawn(async move {
@@ -258,14 +266,18 @@ async fn launch_external_player(
                         .await;
                 }
                 #[cfg(windows)]
-                if ipc {
-                    return mpv::follow(&mpv::pipe_name(session), session, alive, report).await;
+                if ipc && let Some(late) = late {
+                    return mpv::follow(&mpv::pipe_name(session), session, alive, report, late)
+                        .await;
                 }
+                #[cfg(not(windows))]
+                drop(late);
                 None
             };
             let (code, state) = tokio::join!(watcher, follower);
             drop(proxy);
             if let Some(session) = &session {
+                mpv::forget_session(session);
                 let mut payload = state.clone().unwrap_or_default().to_json(session);
                 payload["ipc"] = serde_json::json!(state.is_some());
                 payload["exitCode"] = serde_json::json!(code);
@@ -281,6 +293,24 @@ async fn launch_external_player(
         "other"
     };
     Ok(serde_json::json!({ "ipc": ipc, "player": player }))
+}
+
+/// The kind of player `path` points to, or the one Vela would find: MPV takes subtitles while it
+/// plays, VLC only when it starts, and other players none.
+#[tauri::command]
+async fn external_player_kind(path: String) -> &'static str {
+    match player_executable(&path) {
+        Ok(executable) if is_mpv(&executable) => "mpv",
+        Ok(executable) if vlc::is_vlc(&executable) => "vlc",
+        _ => "other",
+    }
+}
+
+/// Subtitles found after an MPV session started; the first is shown when `show_first` is set.
+/// False when the session is not an MPV that Vela follows (any more).
+#[tauri::command]
+fn external_player_subtitles(session: String, subtitles: Vec<String>, show_first: bool) -> bool {
+    mpv::valid_session(&session) && mpv::send_subtitles(&session, &subtitles, show_first)
 }
 
 #[cfg(test)]
@@ -402,6 +432,8 @@ fn main() {
             downloads::download_reveal,
             open_external,
             launch_external_player,
+            external_player_kind,
+            external_player_subtitles,
             service::service_installed,
             service::service_start,
             webview::hardware_decoding_get,
@@ -428,6 +460,7 @@ fn main() {
             embedded_mpv::mpv_embedded_place,
             embedded_mpv::mpv_embedded_focus,
             embedded_mpv::mpv_embedded_command,
+            embedded_mpv::mpv_embedded_subtitles,
             embedded_mpv::mpv_embedded_close,
             secrets::secret_get,
             secrets::secret_set,

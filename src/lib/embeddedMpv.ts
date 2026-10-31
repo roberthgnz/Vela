@@ -120,6 +120,11 @@ export function openEmbedded(options: EmbeddedOpen): Promise<string> {
   });
 }
 
+/** Subtitles found after mpv was opened: mpv adds them once the file is loaded. */
+export function addEmbeddedSubtitles(urls: string[]): Promise<void> {
+  return invoke("mpv_embedded_subtitles", { urls });
+}
+
 export function placeEmbedded(rect: Rect): Promise<void> {
   return invoke("mpv_embedded_place", { rect });
 }

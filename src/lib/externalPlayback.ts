@@ -6,7 +6,7 @@ import { normalizeLanguage } from "./languages";
 import { getSubtitles } from "./protocol";
 import { dedupeSubtitles } from "./subtitles";
 import { CREDITS_THRESHOLD, preferencesStore, WATCHED_THRESHOLD } from "./store";
-import { type ExternalLaunch, launchExternalPlayer } from "./transport";
+import { type ExternalLaunch, externalPlayerKind, launchExternalPlayer, sendExternalSubtitles } from "./transport";
 import { t } from "./i18n";
 
 /**
@@ -117,16 +117,21 @@ export function externalSubtitles(items: Subtitle[], primary: string, secondary:
     .map(({ item }) => item.url);
 }
 
-/** Subtitles from the stream and the subtitle addons, without holding the player back for slow addons. */
-async function subtitlesFor(meta: MediaItem, videoId: string, stream: ResolvedStream | undefined, extra: Subtitle[]) {
+/** Subtitles from the stream and the subtitle addons, giving up on addons slower than `wait`. */
+async function subtitlesFor(meta: MediaItem, videoId: string, stream: ResolvedStream | undefined, extra: Subtitle[], wait: number) {
   let fetched: Subtitle[] = [];
   try {
-    fetched = await getSubtitles(preferencesStore.getSnapshot().addons, meta.type, videoId, stream, AbortSignal.timeout(6000));
+    fetched = await getSubtitles(preferencesStore.getSnapshot().addons, meta.type, videoId, stream, AbortSignal.timeout(wait));
   } catch {
     fetched = stream?.subtitles ?? [];
   }
   return [...extra, ...fetched];
 }
+
+/** How long VLC, which takes subtitles only when it starts, waits for the subtitle addons. */
+const VLC_SUBTITLE_WAIT = 6000;
+/** How long the subtitle addons have when MPV is already playing and gets their files later. */
+const LATE_SUBTITLE_WAIT = 20_000;
 
 /** Name shown in notices about the external player. */
 export function externalPlayerName(launch: ExternalLaunch): string {
@@ -150,10 +155,17 @@ export async function playExternally(
   },
 ): Promise<ExternalLaunch> {
   const settings = preferencesStore.getSnapshot().player;
-  const subtitles = externalSubtitles(
-    await subtitlesFor(options.meta, options.videoId, options.stream, options.subtitles ?? []),
-    settings.subtitleLanguage,
-    settings.subtitleSecondary,
+  const path = preferencesStore.getSnapshot().externalPlayerPath;
+  const rank = (items: Subtitle[]) => externalSubtitles(items, settings.subtitleLanguage, settings.subtitleSecondary);
+  const extra = options.subtitles ?? [];
+  // VLC takes subtitles only when it starts, so it waits (briefly) for the subtitle addons. MPV
+  // starts with the ones already known and gets the addons' through its IPC when they answer;
+  // other players take none.
+  const kind = await externalPlayerKind(path);
+  const subtitles = rank(
+    kind === "vlc"
+      ? await subtitlesFor(options.meta, options.videoId, options.stream, extra, VLC_SUBTITLE_WAIT)
+      : [...extra, ...(options.stream?.subtitles ?? [])],
   );
   const session = isTauri() ? crypto.randomUUID() : undefined;
   if (session) {
@@ -164,8 +176,9 @@ export async function playExternally(
     await listening;
     sessions.set(session, { meta: options.meta, addonUrl: options.addonUrl, videoId: options.videoId, watched: false });
   }
+  let launch: ExternalLaunch;
   try {
-    return await launchExternalPlayer(url, preferencesStore.getSnapshot().externalPlayerPath, {
+    launch = await launchExternalPlayer(url, path, {
       headers: options.headers,
       title: options.title,
       session,
@@ -177,4 +190,13 @@ export async function playExternally(
     if (session) sessions.delete(session);
     throw error;
   }
+  if (session && launch.player === "mpv" && launch.ipc)
+    void subtitlesFor(options.meta, options.videoId, options.stream, extra, LATE_SUBTITLE_WAIT).then((found) => {
+      const ranked = rank(found);
+      const late = ranked.filter((item) => !subtitles.includes(item));
+      if (!late.length) return;
+      // The preferred one is shown, as at the start, when it is among the new ones.
+      void sendExternalSubtitles(session, late, settings.subtitlesAuto && ranked[0] === late[0]).catch(() => {});
+    });
+  return launch;
 }

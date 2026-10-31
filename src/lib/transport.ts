@@ -190,3 +190,17 @@ export async function launchExternalPlayer(
     });
   } catch (error) { throw message(error); }
 }
+
+/**
+ * The kind of player that would start (the configured one, or the one Vela finds): MPV takes
+ * subtitles while it plays, VLC only when it starts, other players none.
+ */
+export async function externalPlayerKind(path: string): Promise<'mpv' | 'vlc' | 'other'> {
+  if (!isTauri()) return 'other';
+  return invoke<'mpv' | 'vlc' | 'other'>('external_player_kind', { path }).catch(() => 'other' as const);
+}
+
+/** Subtitle URLs found after an MPV session started; the first is shown when `showFirst` is set. */
+export function sendExternalSubtitles(session: string, subtitles: string[], showFirst: boolean): Promise<boolean> {
+  return invoke<boolean>('external_player_subtitles', { session, subtitles, showFirst });
+}
