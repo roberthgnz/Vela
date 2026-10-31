@@ -196,9 +196,11 @@ const fallback: KeyValueStorage & { getStatus(): StorageStatus; subscribe(listen
           removeItem: (key: string) => void memory.delete(key),
         };
       })()),
-  getStatus: () => ({ backend: hasLocalStorage() ? "browser" : "memory", pending: 0, migrated: false }),
+  // One object: `useSyncExternalStore` re-renders forever when a snapshot is new on every call.
+  getStatus: () => fallbackStatus,
   subscribe: () => () => {},
 };
+const fallbackStatus: StorageStatus = { backend: hasLocalStorage() ? "browser" : "memory", pending: 0, migrated: false };
 
 let active: KeyValueStorage = desktop ?? fallback;
 
@@ -221,16 +223,16 @@ export async function initStorage(): Promise<void> {
     active = desktop;
   } catch (error) {
     active = fallback;
-    unavailable = error instanceof Error ? error.message : String(error);
+    unavailable = { ...fallbackStatus, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-let unavailable: string | undefined;
+/** The fallback's status with why the database could not be opened (one object, as above). */
+let unavailable: StorageStatus | undefined;
 
 export function getStorageStatus(): StorageStatus {
   if (active === desktop && desktop) return desktop.getStatus();
-  const status = fallback.getStatus();
-  return unavailable ? { ...status, error: unavailable } : status;
+  return unavailable ?? fallback.getStatus();
 }
 
 export function subscribeStorage(listener: () => void): () => void {

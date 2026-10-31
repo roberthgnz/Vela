@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDesktopStorage, MIGRATION_KEY, type Change } from './storage';
+import { createDesktopStorage, getStorageStatus, MIGRATION_KEY, type Change } from './storage';
 
 function fakeLocalStorage(entries: Record<string, string>) {
   const keys = Object.keys(entries);
@@ -139,5 +139,12 @@ describe('desktop storage', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(60);
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('storage status', () => {
+  it('is the same object until it changes, as useSyncExternalStore needs', () => {
+    // A new object on every read made React re-render forever: Home stayed blank in the browser.
+    expect(getStorageStatus()).toBe(getStorageStatus());
   });
 });
