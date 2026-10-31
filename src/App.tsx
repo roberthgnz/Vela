@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
@@ -37,12 +38,15 @@ import { DetailView, type PlayHandler, type PlayMode } from "./components/Detail
 import { HomeView } from "./components/HomeView";
 import { LibraryView } from "./components/LibraryView";
 import { DownloadsView } from "./components/DownloadsView";
+import { CalendarView } from "./components/CalendarView";
 import { downloads, downloadsAvailable, type Download } from "./lib/downloads";
 import type { CardMenu } from "./components/MediaCard";
 import { Player, PreparingPlayer, type Playing } from "./components/Player";
 import { EmbeddedPlayer } from "./components/EmbeddedPlayer";
 import { prefersEmbedded } from "./lib/embeddedMpv";
 import { releaseVelaTorrent } from "./lib/torrentEngine";
+import { trayIcon, useLinks } from "./lib/desktop";
+import { interfaceScale, startGamepad } from "./lib/gamepad";
 import { Dialog, ErrorBoundary, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
@@ -61,6 +65,7 @@ const primary = [
   { id: "movies", label: t("nav.movies"), icon: Film, shortcut: "Ctrl 2" },
   { id: "series", label: t("nav.series"), icon: Tv, shortcut: "Ctrl 3" },
   { id: "library", label: t("nav.library"), icon: Library, shortcut: "Ctrl 4" },
+  { id: "calendar", label: t("nav.calendar"), icon: CalendarDays, shortcut: "Ctrl 5" },
 ] as const;
 const secondary = [
   ...(downloadsAvailable ? [{ id: "downloads", label: t("nav.downloads"), icon: DownloadIcon, shortcut: "" } as const] : []),
@@ -96,7 +101,7 @@ export default function App() {
   /** Text the palette starts with when it is opened to search for something specific. */
   const [searchText, setSearchText] = useState("");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [installRequest, setInstallRequest] = useState(0);
+  const [installRequest, setInstallRequest] = useState<{ id: number; url?: string }>({ id: 0 });
   const [playing, setPlaying] = useState<Playing | null>(null);
   /** Title whose source is being prepared: the player opens on its cover right away. */
   const [preparing, setPreparing] = useState<{ meta: MediaItem; episode?: Episode } | null>(null);
@@ -356,6 +361,17 @@ export default function App() {
     [notify],
   );
 
+  // vela:// and stremio:// links open the install dialog with the manifest filled in.
+  useLinks((url) => {
+    section("addons");
+    setInstallRequest((value) => ({ id: value.id + 1, url }));
+  });
+  useEffect(() => trayIcon.restore(), []);
+  useEffect(() => {
+    interfaceScale.restore();
+    startGamepad();
+  }, []);
+
   useEffect(() => {
     void account.init();
     // Look for a new version shortly after starting (installed builds only).
@@ -412,7 +428,7 @@ export default function App() {
       else if (event.altKey && key === "arrowright") app.forward();
       else if (event.key === "BrowserBack") app.back();
       else if (event.key === "BrowserForward") app.forward();
-      else if (ctrl && /^[1-4]$/.test(key)) app.section(primary[Number(key) - 1].id);
+      else if (ctrl && /^[1-5]$/.test(key)) app.section(primary[Number(key) - 1].id);
       else if (ctrl && key === ",") app.section("settings");
       else if (ctrl && key === "b") app.setSidebar(app.sidebar === "expanded" ? "collapsed" : "expanded");
       else if ((ctrl && key === "/") || key === "f1") setShortcutsOpen(true);
@@ -463,7 +479,7 @@ export default function App() {
       icon: <Plus size={15} />,
       run: () => {
         section("addons");
-        setInstallRequest((value) => value + 1);
+        setInstallRequest((value) => ({ id: value.id + 1 }));
       },
     },
     { id: "settings", label: t("nav.settings"), icon: <Settings size={15} />, shortcut: "Ctrl ,", run: () => section("settings") },
@@ -618,6 +634,14 @@ export default function App() {
         )}
         {route.name === "library" && (
           <LibraryView onOpen={openMedia} onDiscover={() => section("home")} onMenu={onCardMenu} />
+        )}
+        {route.name === "calendar" && (
+          <CalendarView
+            onOpenEpisode={(meta, addonUrl, episode) =>
+              go({ name: "detail", meta, addonUrl, videoId: episode.id, season: episode.season })
+            }
+            onDiscover={() => section("series")}
+          />
         )}
         {route.name === "downloads" && <DownloadsView onPlay={playDownload} notify={notify} />}
         {route.name === "addons" && <AddonsView notify={notify} installRequest={installRequest} />}

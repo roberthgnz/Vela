@@ -45,6 +45,8 @@ import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
 import { TorrentEngineRow } from "./TorrentEngineRow";
 import { VideoPlayerRow } from "./VideoPlayerRow";
+import { DesktopRows } from "./DesktopRows";
+import { TvRows } from "./TvRows";
 import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
 import { tmdb, useTmdbConfigured } from "../lib/tmdb";
 import { updates, useUpdates } from "../lib/updates";
@@ -58,7 +60,7 @@ import { compareText, formatDateTime, languageSetting, plural, setLanguage, t, t
 export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
   return [
     ["Ctrl K  ·  /", t("settings.shortcuts.search")],
-    ["Ctrl 1–4", t("settings.shortcuts.sections")],
+    ["Ctrl 1–5", t("settings.shortcuts.sections")],
     ["Ctrl ,", t("nav.settings")],
     ["Ctrl B", t("settings.shortcuts.sidebar")],
     ["Alt ←  ·  Alt →", t("settings.shortcuts.history")],
@@ -617,6 +619,9 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-keyboard" className="settings-group" aria-labelledby="settings-keyboard-title">
             <h2 id="settings-keyboard-title">{t("settings.section.keyboard")}</h2>
             <div className="settings-card">
+              <TvRows />
+            </div>
+            <div className="settings-card">
               <ShortcutTable seekShort={prefs.player.seekShort} seekLong={prefs.player.seekLong} />
             </div>
           </section>
@@ -627,6 +632,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
               <Row label={`Vela ${__APP_VERSION__}`} description={t("settings.about.description")} />
               {updates.supported() && <UpdateRows />}
               {native && <DiagnosticsRows notify={notify} />}
+              {native && <DesktopRows notify={notify} />}
               <Row
                 label={t("settings.about.privacy")}
                 description={t("settings.about.privacyHint")}

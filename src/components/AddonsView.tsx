@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Check, Clipboard, Download, MoreHorizontal, Plus, Puzzle, Trash2 } from "lucide-react";
 import { account, useAccount } from "../lib/account";
@@ -45,24 +45,32 @@ function AddonIcon({ addon }: { addon: InstalledAddon }) {
   );
 }
 
+/** The last install request handled, across mounts of the view. */
+let handledInstall = 0;
+
 export function AddonsView({
   notify,
   installRequest,
 }: {
   notify: (message: string) => void;
-  installRequest?: number;
+  installRequest?: { id: number; url?: string };
 }) {
   const prefs = usePreferences();
   const menu = useMenu();
-  const [installOpen, setInstallOpen] = useState(false);
-  const [handledRequest, setHandledRequest] = useState(installRequest);
+  // A request newer than the last one handled opens the dialog, also when it is what brought
+  // the user here (the view mounts with it, from the command palette or a link).
+  const fresh = Boolean(installRequest && installRequest.id > handledInstall);
+  const [installOpen, setInstallOpen] = useState(fresh);
+  const [linkUrl, setLinkUrl] = useState<string | undefined>(fresh ? installRequest?.url : undefined);
   const [removing, setRemoving] = useState<InstalledAddon | null>(null);
   const [filter, setFilter] = useState<"all" | "on" | "off" | "account">("all");
   const accountState = useAccount();
-  if (installRequest !== handledRequest) {
-    setHandledRequest(installRequest);
-    if (installRequest) setInstallOpen(true);
-  }
+  useEffect(() => {
+    if (!installRequest || installRequest.id <= handledInstall) return;
+    handledInstall = installRequest.id;
+    setLinkUrl(installRequest.url);
+    setInstallOpen(true);
+  }, [installRequest]);
   const active = prefs.addons.filter((addon) => addon.enabled).length;
   const list = prefs.addons.filter((addon) =>
     filter === "all" ? true : filter === "on" ? addon.enabled : !addon.enabled,
@@ -199,7 +207,11 @@ export function AddonsView({
       </div>
       {installOpen && (
         <InstallDialog
-          onClose={() => setInstallOpen(false)}
+          initialUrl={linkUrl}
+          onClose={() => {
+            setInstallOpen(false);
+            setLinkUrl(undefined);
+          }}
           onInstalled={(addon) => notify(t("addons.installedNamed", { name: addon.manifest.name }))}
         />
       )}
@@ -235,13 +247,16 @@ export function AddonsView({
 }
 
 function InstallDialog({
+  initialUrl,
   onClose,
   onInstalled,
 }: {
+  /** From a vela:// or stremio:// link: filled in, still installed only on confirmation. */
+  initialUrl?: string;
   onClose: () => void;
   onInstalled: (addon: InstalledAddon) => void;
 }) {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl ?? "");
   const install = useMutation({
     mutationFn: () => loadManifest(url),
     onSuccess: (addon) => {

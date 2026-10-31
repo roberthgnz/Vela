@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod clock;
+mod desktop;
 mod downloads;
 mod embedded_mpv;
 mod logging;
@@ -322,12 +323,8 @@ fn main() {
     tauri::Builder::default()
         // One Vela at a time: a second launch brings the open window forward. Two instances would
         // share the database and the torrent cache (the second empties it at start).
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            desktop::second_instance(app, args);
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -337,6 +334,7 @@ fn main() {
         .manage(service::Service::default())
         .manage(torrent::Engine::default())
         .manage(embedded_mpv::EmbeddedMpv::default())
+        .manage(desktop::Desktop::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_data_dir() {
                 logging::init(&dir);
@@ -355,6 +353,10 @@ fn main() {
                 }
                 Err(error) => logging::log_error!("database unavailable: {error}"),
             }
+            desktop::register_own_scheme();
+            if let Some(link) = desktop::link_in(std::env::args().skip(1)) {
+                app.state::<desktop::Desktop>().remember_link(link);
+            }
             webview::create_main_window(app.handle())?;
             Ok(())
         })
@@ -363,6 +365,19 @@ fn main() {
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
+                // With the tray icon on, closing hides the window; «Salir» in the tray quits.
+                let to_tray = window
+                    .app_handle()
+                    .try_state::<desktop::Desktop>()
+                    .is_some_and(|desktop| {
+                        desktop
+                            .close_to_tray
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                    });
+                if to_tray {
+                    let _ = window.hide();
+                    return;
+                }
                 if window.emit("vela://close-requested", ()).is_err() {
                     let _ = window.destroy();
                     return;
@@ -401,6 +416,10 @@ fn main() {
             logging::log_folder,
             logging::log_reveal,
             logging::log_save_report,
+            desktop::link_pending,
+            desktop::tray_set,
+            desktop::stremio_links_get,
+            desktop::stremio_links_set,
             torrent::torrent_prepare,
             torrent::torrent_stats,
             torrent::torrent_release,

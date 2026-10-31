@@ -32,3 +32,8 @@ commands.allow = ["torrent_prepare", "torrent_stats", "torrent_release"]
 identifier = "allow-embedded-mpv"
 description = "Allow the main window to play a source with the libmpv already installed on the machine (Stremio's or next to mpv.exe), drawn in a child window over the video area, and to place, focus, pause and close it."
 commands.allow = ["mpv_embedded_library", "mpv_embedded_open", "mpv_embedded_place", "mpv_embedded_focus", "mpv_embedded_command", "mpv_embedded_close"]
+
+[[permission]]
+identifier = "allow-desktop-integration"
+description = "Allow the main window to read the link Vela was opened with, show or remove the tray icon (closing to it), and register or give back stremio:// links for the current user."
+commands.allow = ["link_pending", "tray_set", "stremio_links_get", "stremio_links_set"]

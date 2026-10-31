@@ -72,6 +72,11 @@ Las capturas usan los tráileres de Blender Foundation incluidos en Vela (CC BY 
 - MPV seguido por IPC: reanuda en la posición guardada, informa del progreso, detecta el cierre y el final, marca vistos y avanza al siguiente episodio.
 - Cuenta de Stremio: vinculación desde el navegador (sin introducir la contraseña en Vela) o correo y contraseña. La clave de sesión se guarda en el Administrador de credenciales de Windows. Sincronización en ambos sentidos de biblioteca, elementos temporales de «Seguir viendo», progreso, siguiente episodio y vistos por episodio (el campo `watched` de Stremio), conservando los campos remotos que Vela no edita; lectura e instalación de los addons de la cuenta. Vela no envía actividad de reproducción a los addons.
 - Dos tráileres de demostración para probar la reproducción sin un proveedor de películas.
+- Calendario (Ctrl 5) con los episodios de las series guardadas: la última semana y las próximas, por día.
+- Icono en la bandeja del sistema (opcional): al cerrar, Vela y la reproducción siguen en la bandeja.
+- Enlaces `vela://…/manifest.json` (siempre) y, si se activa en Ajustes, `stremio://`: abren el diálogo de instalación del addon con la URL rellena y piden confirmación. Al desactivarlo, Stremio recupera sus enlaces.
+- Uso desde el sofá: mando (cruceta o stick, A, B, Start, LB/RB, Y) y tamaño de la interfaz al 125, 150 o 175 %.
+- Una sola instancia: abrir Vela de nuevo trae la ventana abierta al frente.
 - Registro de errores en `%APPDATA%\com.vela.desktop\logs\vela.log` (rotado a 2 MB, nada se envía) y «Copiar diagnóstico» en Ajustes › Acerca de, que reúne versiones, estado del almacenamiento y el final del registro para pegarlo en un issue. Si una vista falla, solo esa parte muestra el error y se puede reintentar.
 
 ## Límites actuales
