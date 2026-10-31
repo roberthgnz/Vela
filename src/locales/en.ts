@@ -1137,4 +1137,12 @@ export const en: Record<keyof typeof es, string> = {
   "mpv.embedded.builtinTitle": "Vela's player (WebView2), with its controls and styled subtitles",
   "mpv.embedded.mpv": "Embedded mpv",
   "mpv.embedded.mpvTitle": "mpv inside Vela's window: every format, no conversion",
+  "tray.show": "Show Vela",
+  "tray.quit": "Quit",
+  "desktop.tray.label": "Icon in the system tray",
+  "desktop.tray.hint": "Closing the window keeps Vela (and any playback) running in the tray: click the icon to open it again, «Quit» to close it for good.",
+  "desktop.stremioLinks.label": "Open stremio:// links with Vela",
+  "desktop.stremioLinks.hint": "The «Install» buttons on add-on pages then open Vela's install dialog, which asks for confirmation. vela:// links always work. Turning this off gives the links back to Stremio.",
+  "desktop.stremioLinks.on": "stremio:// links now open Vela.",
+  "desktop.stremioLinks.off": "stremio:// links go back to Stremio.",
 };

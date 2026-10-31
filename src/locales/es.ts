@@ -1139,4 +1139,12 @@ export const es = {
   "mpv.embedded.builtinTitle": "El reproductor de Vela (WebView2), con sus controles y subtítulos con estilo",
   "mpv.embedded.mpv": "mpv integrado",
   "mpv.embedded.mpvTitle": "mpv dentro de la ventana de Vela: todos los formatos, sin conversión",
+  "tray.show": "Mostrar Vela",
+  "tray.quit": "Salir",
+  "desktop.tray.label": "Icono en la bandeja del sistema",
+  "desktop.tray.hint": "Al cerrar la ventana, Vela sigue en la bandeja (y la reproducción, si hay una): un clic en el icono la vuelve a abrir y «Salir» la cierra del todo.",
+  "desktop.stremioLinks.label": "Abrir enlaces stremio:// con Vela",
+  "desktop.stremioLinks.hint": "Los botones «Install» de las páginas de addons abren entonces el diálogo de instalación de Vela, que pide confirmación. Los enlaces vela:// funcionan siempre. Al desactivarlo, Stremio vuelve a recibirlos.",
+  "desktop.stremioLinks.on": "Los enlaces stremio:// abren Vela.",
+  "desktop.stremioLinks.off": "Los enlaces stremio:// vuelven a Stremio.",
 } as const;

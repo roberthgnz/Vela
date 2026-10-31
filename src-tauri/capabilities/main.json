@@ -23,6 +23,7 @@
     "allow-logging",
     "allow-torrents",
     "allow-embedded-mpv",
+    "allow-desktop-integration",
     "allow-desktop-services"
   ]
 }

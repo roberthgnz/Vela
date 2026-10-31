@@ -43,6 +43,7 @@ import { Player, PreparingPlayer, type Playing } from "./components/Player";
 import { EmbeddedPlayer } from "./components/EmbeddedPlayer";
 import { prefersEmbedded } from "./lib/embeddedMpv";
 import { releaseVelaTorrent } from "./lib/torrentEngine";
+import { trayIcon, useLinks } from "./lib/desktop";
 import { Dialog, ErrorBoundary, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
@@ -95,7 +96,7 @@ export default function App() {
   /** Text the palette starts with when it is opened to search for something specific. */
   const [searchText, setSearchText] = useState("");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [installRequest, setInstallRequest] = useState(0);
+  const [installRequest, setInstallRequest] = useState<{ id: number; url?: string }>({ id: 0 });
   const [playing, setPlaying] = useState<Playing | null>(null);
   /** Title whose source is being prepared: the player opens on its cover right away. */
   const [preparing, setPreparing] = useState<{ meta: MediaItem; episode?: Episode } | null>(null);
@@ -355,6 +356,13 @@ export default function App() {
     [notify],
   );
 
+  // vela:// and stremio:// links open the install dialog with the manifest filled in.
+  useLinks((url) => {
+    section("addons");
+    setInstallRequest((value) => ({ id: value.id + 1, url }));
+  });
+  useEffect(() => trayIcon.restore(), []);
+
   useEffect(() => {
     void account.init();
     // Look for a new version shortly after starting (installed builds only).
@@ -462,7 +470,7 @@ export default function App() {
       icon: <Plus size={15} />,
       run: () => {
         section("addons");
-        setInstallRequest((value) => value + 1);
+        setInstallRequest((value) => ({ id: value.id + 1 }));
       },
     },
     { id: "settings", label: t("nav.settings"), icon: <Settings size={15} />, shortcut: "Ctrl ,", run: () => section("settings") },

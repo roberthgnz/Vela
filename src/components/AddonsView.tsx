@@ -50,18 +50,20 @@ export function AddonsView({
   installRequest,
 }: {
   notify: (message: string) => void;
-  installRequest?: number;
+  installRequest?: { id: number; url?: string };
 }) {
   const prefs = usePreferences();
   const menu = useMenu();
   const [installOpen, setInstallOpen] = useState(false);
-  const [handledRequest, setHandledRequest] = useState(installRequest);
+  const [handledRequest, setHandledRequest] = useState(installRequest?.id);
+  const [linkUrl, setLinkUrl] = useState<string | undefined>(installRequest?.url);
   const [removing, setRemoving] = useState<InstalledAddon | null>(null);
   const [filter, setFilter] = useState<"all" | "on" | "off" | "account">("all");
   const accountState = useAccount();
-  if (installRequest !== handledRequest) {
-    setHandledRequest(installRequest);
-    if (installRequest) setInstallOpen(true);
+  if (installRequest && installRequest.id !== handledRequest) {
+    setHandledRequest(installRequest.id);
+    setLinkUrl(installRequest.url);
+    if (installRequest.id) setInstallOpen(true);
   }
   const active = prefs.addons.filter((addon) => addon.enabled).length;
   const list = prefs.addons.filter((addon) =>
@@ -199,7 +201,11 @@ export function AddonsView({
       </div>
       {installOpen && (
         <InstallDialog
-          onClose={() => setInstallOpen(false)}
+          initialUrl={linkUrl}
+          onClose={() => {
+            setInstallOpen(false);
+            setLinkUrl(undefined);
+          }}
           onInstalled={(addon) => notify(t("addons.installedNamed", { name: addon.manifest.name }))}
         />
       )}
@@ -235,13 +241,16 @@ export function AddonsView({
 }
 
 function InstallDialog({
+  initialUrl,
   onClose,
   onInstalled,
 }: {
+  /** From a vela:// or stremio:// link: filled in, still installed only on confirmation. */
+  initialUrl?: string;
   onClose: () => void;
   onInstalled: (addon: InstalledAddon) => void;
 }) {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl ?? "");
   const install = useMutation({
     mutationFn: () => loadManifest(url),
     onSuccess: (addon) => {

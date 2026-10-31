@@ -45,6 +45,7 @@ import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
 import { TorrentEngineRow } from "./TorrentEngineRow";
 import { VideoPlayerRow } from "./VideoPlayerRow";
+import { DesktopRows } from "./DesktopRows";
 import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
 import { tmdb, useTmdbConfigured } from "../lib/tmdb";
 import { updates, useUpdates } from "../lib/updates";
@@ -627,6 +628,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
               <Row label={`Vela ${__APP_VERSION__}`} description={t("settings.about.description")} />
               {updates.supported() && <UpdateRows />}
               {native && <DiagnosticsRows notify={notify} />}
+              {native && <DesktopRows notify={notify} />}
               <Row
                 label={t("settings.about.privacy")}
                 description={t("settings.about.privacyHint")}

@@ -1214,6 +1214,17 @@ kbd {
   --poster: 116px;
   gap: 16px 12px;
 }
+/* Long catalogs (a decade brings hundreds of titles): cards out of view are not laid out or
+   painted. `auto` remembers each card's last size so the scroll height stays right; the clip
+   margin keeps the focus ring, which is drawn outside the card, visible. */
+.poster-grid > .media-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 156px auto 290px;
+  overflow-clip-margin: 8px;
+}
+.poster-grid.compact > .media-card {
+  contain-intrinsic-size: auto 116px auto 174px;
+}
 .poster-grid.compact .card-meta {
   display: none;
 }
