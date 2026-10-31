@@ -2,7 +2,6 @@ import type { Episode, MediaItem, ResolvedStream, Subtitle } from "../../lib/con
 import { episodeCode } from "../../lib/episodes";
 import { t } from "../../lib/i18n";
 import { languageLabel, normalizeLanguage } from "../../lib/languages";
-import type { Probe } from "../../lib/streamingServer";
 
 /** Everything the player needs to play one video. */
 export type Playing = {
@@ -16,9 +15,8 @@ export type Playing = {
   headers?: Record<string, string>;
   /** HLS conversion through Stremio Service, when available. */
   transcodeUrl?: string;
-  transcodedBecause?: string[];
-  /** Tracks found by Stremio Service before playback. */
-  probe?: Probe;
+  /** Switch to the conversion if Stremio Service finds a track WebView2 cannot decode. */
+  convertIfNeeded?: boolean;
   serviceUrl: string;
   resume: number;
   episode?: Episode;

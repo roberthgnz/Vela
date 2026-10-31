@@ -12,15 +12,20 @@ vi.mock("../lib/protocol", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/protocol")>()),
   getSubtitles: vi.fn(() => Promise.resolve([])),
 }));
-vi.mock("../lib/streamingServer", () => ({
-  torrentStats: vi.fn(() => Promise.reject(new Error("no service"))),
-  probe: vi.fn(() => Promise.reject(new Error("no service"))),
-  describeTorrent: () => "",
-  embeddedAssUrl: () => "",
-  embeddedSubtitlePlaylist: () => "",
-  readSubtitleRendition: vi.fn(),
-  subtitleUrl: () => "",
-}));
+vi.mock("../lib/streamingServer", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/streamingServer")>();
+  return {
+    torrentStats: vi.fn(() => Promise.reject(new Error("no service"))),
+    probe: vi.fn(() => Promise.reject(new Error("no service"))),
+    describeTorrent: () => "",
+    embeddedAssUrl: () => "",
+    embeddedSubtitlePlaylist: () => "",
+    readSubtitleRendition: vi.fn(),
+    subtitleUrl: () => "",
+    mediaCapabilities: actual.mediaCapabilities,
+    probeProblems: actual.probeProblems,
+  };
+});
 vi.mock("../lib/externalPlayback", () => ({
   playExternally: vi.fn(() => Promise.reject(new Error("no player"))),
   externalPlayerName: () => "",
@@ -28,6 +33,7 @@ vi.mock("../lib/externalPlayback", () => ({
 vi.mock("../lib/mkvChapters", () => ({ readMkvChapters: vi.fn(() => Promise.reject(new Error("not mkv"))) }));
 
 import type { Episode } from "../lib/contracts";
+import { probe } from "../lib/streamingServer";
 import { Player, type Playing } from "./Player";
 
 const play = vi.fn(() => Promise.resolve());
@@ -122,6 +128,29 @@ describe("Player", () => {
     expect(onFailed).toHaveBeenCalledWith(expect.stringContaining("HEVC"));
     // Without a conversion URL there is nothing to convert with.
     expect(screen.queryByRole("button", { name: /Convertir/ })).toBeNull();
+  });
+
+  it("starts with the file and switches to the conversion when the inspection finds a track it cannot decode", async () => {
+    vi.mocked(probe).mockResolvedValueOnce({
+      format: { name: "matroska,webm" },
+      streams: [
+        { track: "video", codec: "hevc" },
+        { track: "audio", codec: "aac" },
+      ],
+    });
+    // WebView2 plays HLS natively, so the conversion becomes the element's source.
+    const canPlayType = HTMLMediaElement.prototype.canPlayType;
+    HTMLMediaElement.prototype.canPlayType = (type: string) => (type.includes("mpegurl") ? "maybe" : "");
+    try {
+      const transcodeUrl = "http://127.0.0.1:11470/hlsv2/x/master.m3u8?mediaURL=http%3A%2F%2Fmedia.test%2Fbunny.mp4";
+      const { video } = setup({ ...movie(), transcodeUrl, convertIfNeeded: true });
+      expect(video.getAttribute("src")).toBe("http://media.test/bunny.mp4");
+      await act(async () => {});
+      expect(video.getAttribute("src")).toBe(transcodeUrl);
+      expect(document.querySelector(".player-loading")?.textContent).toContain("vídeo HEVC");
+    } finally {
+      HTMLMediaElement.prototype.canPlayType = canPlayType;
+    }
   });
 
   it("answers the keyboard wherever the focus is: K plays, Escape closes", () => {

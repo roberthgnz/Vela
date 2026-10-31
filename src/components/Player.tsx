@@ -172,7 +172,7 @@ export function Player({
     },
     onHlsAudioSwitched: (key) => audio.setAudioKey(key),
   });
-  const { source, converting, usingHls, probe, hls, pending, resumeAt, mount, hlsAudio, hlsSubtitles, switchToConversion } = media;
+  const { source, converting, convertedBecause, usingHls, probe, hls, pending, resumeAt, mount, hlsAudio, hlsSubtitles, switchToConversion } = media;
   const audio = useAudioTracks({
     video,
     hls,
@@ -540,8 +540,10 @@ export function Player({
             <span>
               {status === "buffering"
                 ? t("player.loadingMore")
-                : converting && !playing.transcodedBecause
-                  ? t("player.converting")
+                : converting
+                  ? convertedBecause
+                    ? t("lib.playback.converting", { problems: convertedBecause.join(", ") })
+                    : t("player.converting")
                   : playing.note || t("player.loading")}
             </span>
             {swarm && (

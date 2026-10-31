@@ -2,14 +2,33 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import type Hls from "hls.js";
 import { t } from "../../lib/i18n";
 import { normalizeLanguage } from "../../lib/languages";
-import { probe as probeMedia, type Probe } from "../../lib/streamingServer";
+import { mediaCapabilities, probe as probeMedia, probeProblems, type Probe } from "../../lib/streamingServer";
 import { hlsPattern, numbered, trackName, type Playing, type Track } from "./shared";
+
+/** `HTMLMediaElement.HAVE_CURRENT_DATA`: the element is decoding the source. */
+const DECODING = 2;
+
+/**
+ * Why a file needs Stremio Service's conversion, from its inspection. Once the direct source is
+ * decoding, only a file without a playable audio track switches: its video already plays (the
+ * conversion would only cost quality), but WebView2 plays it in silence when it cannot decode
+ * any of its audio tracks.
+ */
+export function conversionReasons(result: Probe, element: HTMLVideoElement | null): string[] {
+  const capabilities = mediaCapabilities();
+  const problems = probeProblems(result, capabilities);
+  if (!problems.length || (element?.readyState ?? 0) < DECODING) return problems;
+  const audio = result.streams.filter((stream) => stream.track === "audio");
+  const silent = audio.length > 0 && !audio.some((stream) => capabilities.audioCodecs.includes(stream.codec));
+  return silent ? problems : [];
+}
 
 /**
  * The video element's source: the direct file, an HLS list (native in WebView2, hls.js elsewhere)
  * or Stremio Service's conversion, which the player switches to when the browser cannot decode
- * the file or the user picks an audio track inside it. Also asks Stremio Service which tracks the
- * file has when nothing inspected it before playback.
+ * the file or the user picks an audio track inside it. Stremio Service inspects the file in the
+ * background while the direct source starts: the track menus use what it finds, and a file that
+ * may need it (`convertIfNeeded`) switches to the conversion when a track cannot be decoded.
  */
 export function useMediaSource(options: {
   playing: Playing;
@@ -29,7 +48,11 @@ export function useMediaSource(options: {
   callbacks.current = options;
 
   const [source, setSource] = useState(playing.url);
-  const [probe, setProbe] = useState<Probe | undefined>(playing.probe);
+  const current = useRef(source);
+  current.current = source;
+  const [probe, setProbe] = useState<Probe | undefined>();
+  /** Why the player switched to the conversion by itself after the inspection, if it did. */
+  const [convertedBecause, setConvertedBecause] = useState<string[]>();
   const [hlsAudio, setHlsAudio] = useState<Track[]>([]);
   const [hlsSubtitles, setHlsSubtitles] = useState<Track[]>([]);
   const hls = useRef<Hls | null>(null);
@@ -121,20 +144,6 @@ export function useMediaSource(options: {
     [save, source, video],
   );
 
-  // Without a previous inspection, ask Stremio Service which tracks the file has (in the background).
-  useEffect(() => {
-    if (probe || !playing.transcodeUrl || hlsPattern.test(playing.url)) return;
-    let active = true;
-    void probeMedia(playing.serviceUrl, new URL(playing.transcodeUrl).searchParams.get("mediaURL") ?? playing.url)
-      .then((result) => {
-        if (active) setProbe(result);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [playing, probe]);
-
   const switchToConversion = useCallback(
     (choice: { audio?: number }) => {
       if (!playing.transcodeUrl) return;
@@ -147,5 +156,39 @@ export function useMediaSource(options: {
     [playing.transcodeUrl, video],
   );
 
-  return { source, converting, usingHls, probe, hls, pending, resumeAt, mount, hlsAudio, hlsSubtitles, switchToConversion };
+  // Stremio Service inspects the file in the background (for a torrent it waits for the first
+  // pieces, which the direct source is fetching anyway).
+  useEffect(() => {
+    if (probe || !playing.transcodeUrl || hlsPattern.test(playing.url)) return;
+    let active = true;
+    void probeMedia(playing.serviceUrl, new URL(playing.transcodeUrl).searchParams.get("mediaURL") ?? playing.url)
+      .then((result) => {
+        if (!active) return;
+        setProbe(result);
+        if (!playing.convertIfNeeded || current.current === playing.transcodeUrl) return;
+        const reasons = conversionReasons(result, video.current);
+        if (!reasons.length) return;
+        setConvertedBecause(reasons);
+        switchToConversion({});
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [playing, probe, switchToConversion, video]);
+
+  return {
+    source,
+    converting,
+    convertedBecause,
+    usingHls,
+    probe,
+    hls,
+    pending,
+    resumeAt,
+    mount,
+    hlsAudio,
+    hlsSubtitles,
+    switchToConversion,
+  };
 }

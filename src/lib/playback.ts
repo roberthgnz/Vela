@@ -1,11 +1,8 @@
 import type { Episode, MediaItem, ResolvedStream, Subtitle } from "./contracts";
 import {
-  type Probe,
   ensureService,
   mediaCapabilities,
   prepareTorrent,
-  probe,
-  probeProblems,
   proxyUrl,
   serviceAvailable,
   transcodeUrl,
@@ -24,18 +21,31 @@ export type PlaybackTarget = {
   note?: string;
   /** HLS conversion offered by Stremio Service when the integrated player cannot decode the file. */
   transcodeUrl?: string;
-  /** Why the file was converted before playback, if it was. */
-  transcodedBecause?: string[];
+  /**
+   * The file may be one the integrated player cannot decode (a torrent, `notWebReady`, HEVC or
+   * MKV): the player has Stremio Service inspect it while it starts and switches to the
+   * conversion if a track cannot be decoded.
+   */
+  convertIfNeeded?: boolean;
   /** Subtitle files shipped inside a torrent. */
   subtitles?: Subtitle[];
-  /** Tracks reported by Stremio Service, when the file was inspected. */
-  probe?: Probe;
   /** Which engine is streaming a torrent source. */
   torrentEngine?: "vela" | "service";
 };
 
 const serviceHint =
   t("lib.playback.serviceHint");
+
+/**
+ * How long a torrent on Vela's engine waits, once open, for the answer about Stremio Service,
+ * which it asked for meanwhile. The server answers at once when it runs (or the connection is
+ * refused); only a host that hangs takes longer, and then the conversion is not offered.
+ */
+const SERVICE_GRACE = 500;
+
+function within(answer: Promise<boolean>, ms: number): Promise<boolean> {
+  return Promise.race([answer, new Promise<boolean>((resolve) => setTimeout(() => resolve(false), ms))]);
+}
 
 /** Turns an addon stream into URLs the integrated or external player can open. */
 export async function resolvePlayback(
@@ -51,11 +61,16 @@ export async function resolvePlayback(
   // Vela's own engine opens torrents when chosen, or in «auto» when Stremio's server is missing.
   const ownEngine = torrent && velaEngineAvailable && engine === "vela";
   // Torrents and header proxies need the server, so Vela starts it if it can; plain links (and
-  // torrents on Vela's engine) only use it for optional probing and conversion.
-  const service =
-    (torrent && !ownEngine) || needsHeaders
-      ? await ensureService(serviceUrl)
-      : !options.external && (await serviceAvailable(serviceUrl));
+  // torrents on Vela's engine) only use it for optional inspection and conversion. On Vela's
+  // engine the question is asked while the torrent opens, so it costs nothing in between.
+  let optionalService: Promise<boolean> | undefined;
+  let service: boolean;
+  if ((torrent && !ownEngine) || needsHeaders) service = await ensureService(serviceUrl);
+  else if (options.external) service = false;
+  else if (ownEngine) {
+    optionalService = serviceAvailable(serviceUrl);
+    service = false;
+  } else service = await serviceAvailable(serviceUrl);
   const useVela = ownEngine || (torrent && velaEngineAvailable && engine === "auto" && !service);
   let url = stream.url;
   let note: string | undefined;
@@ -100,27 +115,15 @@ export async function resolvePlayback(
     subtitles,
     torrentEngine: engineUsed,
   };
+  if (optionalService) service = await within(optionalService, SERVICE_GRACE);
   if (!service || /\.m3u8(?:$|[?#])/i.test(playable)) return target;
-  const capabilities = mediaCapabilities();
-  target.transcodeUrl = transcodeUrl(serviceUrl, playable, capabilities);
-  const suspicious =
+  target.transcodeUrl = transcodeUrl(serviceUrl, playable, mediaCapabilities());
+  // The file is not inspected here: that waits for the server to read its header (for a torrent,
+  // for the first pieces), and the player can start meanwhile. It inspects it in the background.
+  target.convertIfNeeded = Boolean(
     torrent ||
-    stream.behaviorHints?.notWebReady ||
-    streamTags(stream).some((tag) => tag === "HEVC" || tag === "MKV");
-  if (!suspicious) return target;
-  try {
-    // The server reads the file's header before answering, which waits for peers on a torrent.
-    // The player shows the swarm and offers the conversion later, so the wait is kept short.
-    target.probe = await probe(serviceUrl, playable, AbortSignal.timeout(torrent ? 10_000 : 20_000));
-    if (useVela) target.note = note;
-    const problems = probeProblems(target.probe, capabilities);
-    if (problems.length) {
-      target.url = target.transcodeUrl;
-      target.transcodedBecause = problems;
-      target.note = t("lib.playback.converting", { problems: problems.join(", ") });
-    }
-  } catch {
-    /* Probing is best effort; the player still offers conversion if decoding fails. */
-  }
+      stream.behaviorHints?.notWebReady ||
+      streamTags(stream).some((tag) => tag === "HEVC" || tag === "MKV"),
+  );
   return target;
 }

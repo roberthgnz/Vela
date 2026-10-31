@@ -27,7 +27,7 @@ vi.mock('./streamingServer', () => ({
 }));
 
 import { resolvePlayback } from './playback';
-import { ensureService, prepareTorrent, serviceAvailable } from './streamingServer';
+import { ensureService, prepareTorrent, probe, serviceAvailable } from './streamingServer';
 import { prepareVelaTorrent } from './torrentEngine';
 
 const meta = { id: 'tt1', type: 'movie' as const, name: 'Sintel' };
@@ -71,6 +71,39 @@ describe('resolvePlayback torrent engines', () => {
     expect(ensureService).not.toHaveBeenCalled();
     expect(target.torrentEngine).toBe('vela');
     expect(target.transcodeUrl).toContain(encodeURIComponent('http://127.0.0.1:5000/token/abc/0'));
+  });
+
+  it('vela: asks for Stremio Service while the torrent opens, and does not wait for a server that hangs', async () => {
+    vi.useFakeTimers();
+    try {
+      engine.value = 'vela';
+      vi.mocked(serviceAvailable).mockReturnValue(new Promise(() => {}));
+      const pending = resolvePlayback(meta, torrent, service);
+      await vi.advanceTimersByTimeAsync(500);
+      const target = await pending;
+      expect(target.torrentEngine).toBe('vela');
+      expect(target.transcodeUrl).toBeUndefined();
+      expect(vi.mocked(serviceAvailable).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(prepareVelaTorrent).mock.invocationCallOrder[0],
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not inspect the file before the player starts: the player does it in the background', async () => {
+    engine.value = 'vela';
+    vi.mocked(serviceAvailable).mockResolvedValue(true);
+    const target = await resolvePlayback(meta, torrent, service);
+    expect(target.url).toBe('http://127.0.0.1:5000/token/abc/0');
+    expect(target.convertIfNeeded).toBe(true);
+    expect(probe).not.toHaveBeenCalled();
+    // A plain link with nothing suspicious only gets the conversion offered.
+    const link = { addonName: 'Demo', addonUrl: 'http://addon.test/manifest.json', url: 'https://media.test/a.mp4' };
+    const direct = await resolvePlayback(meta, link, service);
+    expect(direct.url).toBe('https://media.test/a.mp4');
+    expect(direct.transcodeUrl).toContain('hlsv2');
+    expect(direct.convertIfNeeded).toBe(false);
   });
 
   it('service: explains that Stremio Service is needed when it does not answer', async () => {
