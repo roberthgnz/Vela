@@ -1,9 +1,10 @@
 import { Download, RefreshCw, X } from "lucide-react";
 import { updates, useUpdates } from "../lib/updates";
 import { Spinner } from "./Primitives";
+import { formatNumber, t } from "../lib/i18n";
 
 function megabytes(bytes: number): string {
-  return `${(bytes / 1048576).toLocaleString("es", { maximumFractionDigits: 1 })} MB`;
+  return `${formatNumber(bytes / 1048576, { maximumFractionDigits: 1 })} MB`;
 }
 
 /** Announces a new version and shows the download while it installs. */
@@ -16,11 +17,11 @@ export function UpdateNotice() {
   const { downloaded = 0, total } = state.progress ?? {};
   const percent = total ? Math.min(100, Math.round((downloaded / total) * 100)) : undefined;
   return (
-    <section className="update-notice" aria-label="Actualización disponible" role="status">
+    <section className="update-notice" aria-label={t("update.available")} role="status">
       <div className="update-heading">
-        <strong>Vela {state.info.version} disponible</strong>
+        <strong>{t("update.title", { version: state.info.version })}</strong>
         {!installing && (
-          <button className="icon-button" aria-label="Recordar más tarde" title="Más tarde" onClick={() => updates.dismiss()}>
+          <button className="icon-button" aria-label={t("update.remindLater")} title={t("update.later")} onClick={() => updates.dismiss()}>
             <X size={14} />
           </button>
         )}
@@ -28,25 +29,25 @@ export function UpdateNotice() {
       {installing ? (
         <>
           <span className="update-detail">
-            {percent === undefined ? `Descargando… ${megabytes(downloaded)}` : `Descargando… ${percent} % de ${megabytes(total!)}`}
+            {percent === undefined ? t("update.downloading", { size: megabytes(downloaded) }) : t("update.downloadingPercent", { percent, size: megabytes(total!) })}
           </span>
           <span className="update-progress" aria-hidden="true">
             <span style={{ width: `${percent ?? 0}%` }} />
           </span>
-          <span className="update-detail">Vela se cerrará para instalarla y se abrirá de nuevo.</span>
+          <span className="update-detail">{t("update.restartNotice")}</span>
         </>
       ) : (
         <>
           <span className="update-detail">
-            {failed ? state.error : `Tienes la ${state.info.current}. La descarga se verifica con la firma de Vela antes de instalarse.`}
+            {failed ? state.error : t("update.current", { version: state.info.current })}
           </span>
           <div className="update-actions">
             <button className="button primary small" onClick={() => void (failed ? updates.retry() : updates.install())}>
               {failed ? <RefreshCw size={14} /> : <Download size={14} />}
-              {failed ? "Reintentar" : "Instalar y reiniciar"}
+              {failed ? t("common.retry") : t("update.install")}
             </button>
             <button className="button subtle small" onClick={() => updates.dismiss()}>
-              Más tarde
+              {t("update.later")}
             </button>
           </div>
         </>

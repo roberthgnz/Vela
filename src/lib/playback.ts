@@ -12,6 +12,7 @@ import {
 } from "./streamingServer";
 import { streamTags } from "./streams";
 import { isDirectUrl } from "./utils";
+import { t } from "./i18n";
 
 export type PlaybackTarget = {
   /** URL for the integrated player. */
@@ -31,7 +32,7 @@ export type PlaybackTarget = {
 };
 
 const serviceHint =
-  "Vela inicia el servidor de Stremio si Stremio está instalado; si no, instala Stremio o abre Stremio Service y comprueba su dirección en Ajustes › Streaming.";
+  t("lib.playback.serviceHint");
 
 /** Turns an addon stream into URLs the integrated or external player can open. */
 export async function resolvePlayback(
@@ -54,13 +55,13 @@ export async function resolvePlayback(
   let subtitles: Subtitle[] = [];
   if (torrent) {
     if (!service)
-      throw new Error(`Las fuentes torrent necesitan Stremio Service y no responde. ${serviceHint}`);
+      throw new Error(t("lib.playback.torrentNeedsService", { hint: serviceHint }));
     const prepared = await prepareTorrent(serviceUrl, stream, options.episode);
     url = prepared.url;
     subtitles = prepared.subtitles;
-    note = prepared.fileName ? `Conectando con pares · ${prepared.fileName}` : "Conectando con los pares del torrent";
+    note = prepared.fileName ? t("lib.playback.connectingFile", { file: prepared.fileName }) : t("lib.playback.connecting");
   }
-  if (!isDirectUrl(url)) throw new Error("Esta fuente no proporciona un enlace de vídeo compatible.");
+  if (!isDirectUrl(url)) throw new Error(t("lib.playback.unsupportedLink"));
   if (options.external) {
     if (needsHeaders) return { url, externalUrl: url, headers };
     return { url, externalUrl: url };
@@ -69,12 +70,12 @@ export async function resolvePlayback(
   if (needsHeaders) {
     if (!service)
       throw new Error(
-        `Esta fuente exige cabeceras HTTP especiales. Para verla en Vela hace falta el proxy de Stremio Service (${serviceHint.toLowerCase()}), o ábrela con MPV.`,
+        t("lib.playback.needsProxy", { hint: serviceHint.toLowerCase() }),
       );
     // Verified against the server bundled with Stremio: its proxy rejects plain HTTP destinations.
     if (new URL(url).protocol !== "https:")
       throw new Error(
-        "Esta fuente exige cabeceras HTTP y no usa HTTPS; el proxy de Stremio Service solo acepta HTTPS. Ábrela con MPV desde el menú de la fuente.",
+        t("lib.playback.needsHttps"),
       );
     playable = proxyUrl(serviceUrl, url, headers, stream.behaviorHints?.proxyHeaders?.response);
   }
@@ -101,7 +102,7 @@ export async function resolvePlayback(
     if (problems.length) {
       target.url = target.transcodeUrl;
       target.transcodedBecause = problems;
-      target.note = `Convirtiendo con Stremio Service (${problems.join(", ")})`;
+      target.note = t("lib.playback.converting", { problems: problems.join(", ") });
     }
   } catch {
     /* Probing is best effort; the player still offers conversion if decoding fails. */

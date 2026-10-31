@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { AlertTriangle, Film, LoaderCircle, RotateCw, X } from "lucide-react";
+import { t } from "../lib/i18n";
 import { log } from "../lib/log";
 import { safeImage } from "../lib/utils";
 
@@ -40,8 +41,8 @@ export class ErrorBoundary extends Component<
     return (
       <div className="banner">
         <ErrorState
-          title="Esta parte de Vela ha fallado"
-          message={`${this.state.error.message}. El resto sigue funcionando; el detalle está en Ajustes › Acerca de › Copiar diagnóstico.`}
+          title={t("ui.viewCrashed.title")}
+          message={t("ui.viewCrashed.message", { message: this.state.error.message })}
           retry={() => this.setState({ error: undefined })}
         />
       </div>
@@ -137,8 +138,8 @@ export function Dialog({
       {!hideClose && (
         <button
           className="icon-button dialog-close"
-          aria-label="Cerrar"
-          title="Cerrar (Esc)"
+          aria-label={t("common.close")}
+          title={t("ui.closeEsc")}
           onClick={onClose}
         >
           <X size={16} />
@@ -190,14 +191,14 @@ export function ErrorState({
       </div>
       {retry && (
         <button className="button small subtle" onClick={retry}>
-          <RotateCw size={13} /> Reintentar
+          <RotateCw size={13} /> {t("common.retry")}
         </button>
       )}
     </div>
   );
 }
 
-export function Loading({ label = "Cargando" }: { label?: string }) {
+export function Loading({ label = t("ui.loading") }: { label?: string }) {
   return (
     <div className="loading" role="status">
       <LoaderCircle className="spin" size={16} />

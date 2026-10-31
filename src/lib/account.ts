@@ -15,6 +15,7 @@ import {
   type SyncState,
 } from "./stremioApi";
 import { deleteSecret, getSecret, setSecret } from "./transport";
+import { t } from "./i18n";
 
 const storageKey = "vela.account.v1";
 const secretName = "stremio-auth-key";
@@ -99,7 +100,7 @@ function userOf(user: StremioUser): AccountState["user"] {
 
 async function authKey(): Promise<string> {
   const key = await getSecret(secretName);
-  if (!key) throw new Error("No hay ninguna sesión de Stremio guardada en este equipo.");
+  if (!key) throw new Error(t("lib.account.noSession"));
   return key;
 }
 
@@ -194,7 +195,7 @@ export const account = {
       return summary;
     } catch (error) {
       if (!(await expire(error)))
-        set({ syncing: false, error: error instanceof Error ? error.message : "No se pudo sincronizar." });
+        set({ syncing: false, error: error instanceof Error ? error.message : t("lib.account.syncFailed") });
       return undefined;
     }
   },

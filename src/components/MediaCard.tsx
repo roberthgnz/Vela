@@ -1,6 +1,7 @@
 import type { KeyboardEvent, MouseEvent } from "react";
 import { Bookmark, BookmarkCheck, Check, Info, Play, Plus, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import type { LibraryEntry, MediaItem } from "../lib/contracts";
+import { t } from "../lib/i18n";
 import { taste } from "../lib/taste";
 import { clock, yearOf } from "../lib/utils";
 import { Artwork, type MenuAnchor, type MenuItem } from "./Primitives";
@@ -14,7 +15,7 @@ function progressOf(entry?: LibraryEntry): number {
 }
 
 export function typeLabel(type: string): string {
-  return type === "series" ? "Serie" : type === "movie" ? "Película" : type;
+  return type === "series" ? t("common.series") : type === "movie" ? t("common.movie") : type;
 }
 
 /** Moves focus between sibling cards with the arrow keys. */
@@ -52,9 +53,9 @@ export function cardKeys(event: KeyboardEvent<HTMLElement>) {
 export function ratingItems(meta: MediaItem): MenuItem[] {
   const current = taste.rating(meta.type, meta.id);
   return [
-    { label: "Me gusta", icon: <ThumbsUp size={15} />, checked: current === "like", onSelect: () => taste.rate(meta, current === "like" ? null : "like") },
+    { label: t("card.like"), icon: <ThumbsUp size={15} />, checked: current === "like", onSelect: () => taste.rate(meta, current === "like" ? null : "like") },
     {
-      label: "No me gusta",
+      label: t("card.dislike"),
       icon: <ThumbsDown size={15} />,
       checked: current === "dislike",
       onSelect: () => taste.rate(meta, current === "dislike" ? null : "dislike"),
@@ -97,19 +98,19 @@ export function MediaCard({
     onMenu?.(
       anchor,
       [
-        { label: "Abrir detalles", icon: <Info size={15} />, shortcut: "Intro", onSelect: onOpen },
+        { label: t("card.openDetails"), icon: <Info size={15} />, shortcut: t("card.enterKey"), onSelect: onOpen },
         ...(onSources
-          ? [{ label: "Ver fuentes", icon: <Play size={15} />, onSelect: onSources }]
+          ? [{ label: t("card.viewSources"), icon: <Play size={15} />, onSelect: onSources }]
           : []),
         "separator",
         saved
           ? {
-              label: "Quitar de la biblioteca",
+              label: t("card.removeFromLibrary"),
               icon: removeLabel ? <Trash2 size={15} /> : <BookmarkCheck size={15} />,
               danger: removeLabel,
               onSelect: onSave,
             }
-          : { label: "Añadir a la biblioteca", icon: <Bookmark size={15} />, onSelect: onSave },
+          : { label: t("card.addToLibrary"), icon: <Bookmark size={15} />, onSelect: onSave },
         "separator",
         ...ratingItems(meta),
         ...(extraMenu ?? []),
@@ -138,20 +139,20 @@ export function MediaCard({
           }
           cardKeys(event);
         }}
-        aria-label={`Ver ${meta.name}`}
+        aria-label={t("card.open", { name: meta.name })}
         title={reason}
       >
         <Artwork src={meta.poster} name={meta.name} className="poster" />
         {watched && (
-          <span className="card-watched" title="Vista">
+          <span className="card-watched" title={t("card.watched")}>
             <Check size={12} strokeWidth={2.5} />
-            <span className="sr-only">Vista</span>
+            <span className="sr-only">{t("card.watched")}</span>
           </span>
         )}
         {progress > 0 && progress < 95 && (
           <span
             className="card-progress"
-            title={`Visto ${clock(entry!.progress!.seconds)} de ${clock(entry!.progress!.duration)}`}
+            title={t("card.progress", { position: clock(entry!.progress!.seconds), duration: clock(entry!.progress!.duration) })}
           >
             <span style={{ width: `${progress}%` }} />
           </span>
@@ -161,10 +162,10 @@ export function MediaCard({
         className={`card-save ${saved ? "saved" : ""}`}
         aria-label={
           saved
-            ? `Quitar ${meta.name} de mi biblioteca`
-            : `Guardar ${meta.name} en mi biblioteca`
+            ? t("card.removeNamed", { name: meta.name })
+            : t("card.saveNamed", { name: meta.name })
         }
-        title={saved ? "Quitar de la biblioteca" : "Añadir a la biblioteca"}
+        title={saved ? t("card.removeFromLibrary") : t("card.addToLibrary")}
         aria-pressed={saved}
         tabIndex={-1}
         onClick={onSave}
@@ -176,7 +177,7 @@ export function MediaCard({
           {meta.name}
         </span>
         <span className="card-meta">
-          {match !== undefined && <span className="card-match">{match} %</span>}
+          {match !== undefined && <span className="card-match">{t("card.match", { match })}</span>}
           {match !== undefined && details && " · "}
           {details || (match === undefined && typeLabel(meta.type))}
         </span>

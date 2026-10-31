@@ -17,6 +17,7 @@ import type {
 import { normalizeLanguage } from './languages';
 import { defaultAddons, normalizeManifestUrl } from './protocol';
 import { TMDB_CATALOGS_URL, tmdbCatalogsManifest } from './tmdbCatalogs';
+import { t } from './i18n';
 
 /**
  * Version 2 adds per-video history, watched marks, library vs «Seguir viendo» entries and player
@@ -247,10 +248,10 @@ const ranges: Partial<Record<keyof PlayerPreferences, [number, number]>> = {
 
 /** Subtitle text colours offered in the player and in Ajustes. */
 export const subtitleColors = [
-  { value: '#ffffff', label: 'Blanco' },
-  { value: '#ffe45c', label: 'Amarillo' },
-  { value: '#7fe3ff', label: 'Cian' },
-  { value: '#a6f28b', label: 'Verde' },
+  { value: '#ffffff', label: t('lib.store.color.white') },
+  { value: '#ffe45c', label: t('lib.store.color.yellow') },
+  { value: '#7fe3ff', label: t('lib.store.color.cyan') },
+  { value: '#a6f28b', label: t('lib.store.color.green') },
 ] as const;
 
 /** Subtitle sizes (percent of the default) offered in the player and in Ajustes. */

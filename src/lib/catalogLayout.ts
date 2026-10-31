@@ -1,4 +1,5 @@
 import type { CatalogLayout, CatalogSource } from './contracts';
+import { t } from './i18n';
 
 /** Rows shown on Home until the user arranges them (Cinemeta's two plus eight more). */
 export const DEFAULT_HOME_ROWS = 10;
@@ -48,7 +49,7 @@ export function homeRows(sources: CatalogSource[], layout: CatalogLayout): HomeR
     const browse = type === 'movie' || type === 'series' ? type : undefined;
     // «Populares» describes Cinemeta's top catalogs; any other addon keeps its own catalog name.
     const popular = (source === movie || source === series) && source.addon.manifest.id === 'com.linvo.cinemeta';
-    const defaultTitle = popular ? (type === 'movie' ? 'Películas populares' : 'Series populares') : source.catalog.name;
+    const defaultTitle = popular ? (type === 'movie' ? t('lib.catalogLayout.popularMovies') : t('lib.catalogLayout.popularSeries')) : source.catalog.name;
     const hidden = layout.hidden[source.key];
     return {
       source,

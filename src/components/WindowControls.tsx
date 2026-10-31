@@ -3,6 +3,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { flushStorage } from "../lib/storage";
+import { t } from "../lib/i18n";
 
 export const native = isTauri();
 
@@ -74,21 +75,21 @@ export function WindowControls({ onError }: { onError: (message: string) => void
   const run = (action: "minimize" | "toggleMaximize" | "close") =>
     void getCurrentWindow()
       [action]()
-      .catch(() => onError("La ventana no ha respondido a la acción."));
+      .catch(() => onError(t("window.noResponse")));
   return (
     <div className="window-controls">
-      <button aria-label="Minimizar" title="Minimizar" tabIndex={-1} onClick={() => run("minimize")}>
+      <button aria-label={t("window.minimize")} title={t("window.minimize")} tabIndex={-1} onClick={() => run("minimize")}>
         <Glyph kind="min" />
       </button>
       <button
-        aria-label={maximized ? "Restaurar" : "Maximizar"}
-        title={maximized ? "Restaurar" : "Maximizar"}
+        aria-label={maximized ? t("window.restore") : t("window.maximize")}
+        title={maximized ? t("window.restore") : t("window.maximize")}
         tabIndex={-1}
         onClick={() => run("toggleMaximize")}
       >
         <Glyph kind={maximized ? "restore" : "max"} />
       </button>
-      <button className="close" aria-label="Cerrar Vela" title="Cerrar" tabIndex={-1} onClick={() => run("close")}>
+      <button className="close" aria-label={t("window.closeVela")} title={t("common.close")} tabIndex={-1} onClick={() => run("close")}>
         <Glyph kind="close" />
       </button>
     </div>

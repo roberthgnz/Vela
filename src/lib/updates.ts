@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { storage } from "./storage";
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
+import { t } from "./i18n";
 
 /**
  * Application updates (desktop only). The Rust side checks the release `latest.json`, verifies
@@ -30,7 +31,7 @@ function set(next: Partial<UpdateState>) {
 }
 
 function message(error: unknown): string {
-  return error instanceof Error ? error.message : typeof error === "string" ? error : "No se pudo completar la actualización.";
+  return error instanceof Error ? error.message : typeof error === "string" ? error : t("lib.updates.failed");
 }
 
 export const updates = {

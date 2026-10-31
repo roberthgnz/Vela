@@ -50,17 +50,18 @@ import { native, WindowControls } from "./components/WindowControls";
 import { sourceHistory } from "./lib/sourceHistory";
 import { useStorageStatus } from "./lib/storage";
 import { updates } from "./lib/updates";
+import { t } from "./lib/i18n";
 
 const primary = [
-  { id: "home", label: "Inicio", icon: Home, shortcut: "Ctrl 1" },
-  { id: "movies", label: "Películas", icon: Film, shortcut: "Ctrl 2" },
-  { id: "series", label: "Series", icon: Tv, shortcut: "Ctrl 3" },
-  { id: "library", label: "Biblioteca", icon: Library, shortcut: "Ctrl 4" },
+  { id: "home", label: t("nav.home"), icon: Home, shortcut: "Ctrl 1" },
+  { id: "movies", label: t("nav.movies"), icon: Film, shortcut: "Ctrl 2" },
+  { id: "series", label: t("nav.series"), icon: Tv, shortcut: "Ctrl 3" },
+  { id: "library", label: t("nav.library"), icon: Library, shortcut: "Ctrl 4" },
 ] as const;
 const secondary = [
-  ...(downloadsAvailable ? [{ id: "downloads", label: "Descargas", icon: DownloadIcon, shortcut: "" } as const] : []),
-  { id: "addons", label: "Addons", icon: Puzzle, shortcut: "" },
-  { id: "settings", label: "Ajustes", icon: Settings, shortcut: "Ctrl ," },
+  ...(downloadsAvailable ? [{ id: "downloads", label: t("nav.downloads"), icon: DownloadIcon, shortcut: "" } as const] : []),
+  { id: "addons", label: t("nav.addons"), icon: Puzzle, shortcut: "" },
+  { id: "settings", label: t("nav.settings"), icon: Settings, shortcut: "Ctrl ," },
 ] as const;
 
 type Toast = { id: number; message: string; tone: "ok" | "error" };
@@ -167,7 +168,7 @@ export default function App() {
       await openExternal(
         stream.externalUrl || `https://www.youtube.com/watch?v=${encodeURIComponent(stream.ytId!)}`,
       );
-      notify("Fuente abierta en el navegador.");
+      notify(t("app.openedInBrowser"));
       return;
     }
     sourceHistory.mark(meta.type, meta.id, videoId, stream, "opened");
@@ -200,7 +201,7 @@ export default function App() {
         subtitles: target.subtitles,
       });
       sourceHistory.mark(meta.type, meta.id, videoId, stream, "played");
-      notify(launch.ipc ? `Abierto en ${externalPlayerName(launch)}. Vela guardará el progreso al cerrarlo.` : "Fuente abierta en el reproductor externo.");
+      notify(launch.ipc ? t("app.openedIn", { player: externalPlayerName(launch) }) : t("app.openedExternal"));
       return;
     }
     setPreparing(null);
@@ -238,7 +239,7 @@ export default function App() {
       externalUrl: item.url,
       headers: item.headers,
       serviceUrl: prefs.serviceUrl,
-      note: "Archivo descargado",
+      note: t("app.downloadedFile"),
       episode: item.episode,
       resume,
     });
@@ -295,7 +296,7 @@ export default function App() {
     const showSources = () => {
       setPreparing(null);
       go({ name: "detail", meta: current.meta, addonUrl: current.addonUrl, videoId: episode.id, sources: true });
-      notify(`Elige una fuente para ${episodeCode(episode)}.`);
+      notify(t("app.chooseSource", { episode: episodeCode(episode) }));
     };
     try {
       // Returning from the player shows the episode that was playing.
@@ -319,13 +320,13 @@ export default function App() {
   useEffect(
     () =>
       onExternalClosed((event) => {
-        const position = event.position !== undefined ? ` en ${clock(event.position)}` : "";
+        const position = event.position !== undefined ? t("app.closedAt", { time: clock(event.position) }) : "";
         notify(
           event.finished
-            ? `Has terminado ${event.meta.name}${nextEpisode(event.meta, event.videoId) ? "; el siguiente episodio queda en «Seguir viendo»" : ""}.`
+            ? t(nextEpisode(event.meta, event.videoId) ? "app.finishedNext" : "app.finished", { name: event.meta.name })
             : event.ipc
-              ? `Reproductor cerrado${position}. Progreso guardado.`
-              : "Reproductor externo cerrado.",
+              ? t("app.playerClosed", { position })
+              : t("app.externalClosed"),
         );
         void account.sync();
       }),
@@ -432,18 +433,18 @@ export default function App() {
       shortcut: item.shortcut,
       run: () => section(item.id),
     })),
-    { id: "addons", label: "Addons", icon: <Puzzle size={15} />, run: () => section("addons") },
+    { id: "addons", label: t("nav.addons"), icon: <Puzzle size={15} />, run: () => section("addons") },
     {
       id: "install",
-      label: "Añadir addon",
+      label: t("app.addAddon"),
       icon: <Plus size={15} />,
       run: () => {
         section("addons");
         setInstallRequest((value) => value + 1);
       },
     },
-    { id: "settings", label: "Ajustes", icon: <Settings size={15} />, shortcut: "Ctrl ,", run: () => section("settings") },
-    { id: "shortcuts", label: "Atajos de teclado", icon: <Keyboard size={15} />, shortcut: "F1", run: () => setShortcutsOpen(true) },
+    { id: "settings", label: t("nav.settings"), icon: <Settings size={15} />, shortcut: "Ctrl ,", run: () => section("settings") },
+    { id: "shortcuts", label: t("app.shortcuts"), icon: <Keyboard size={15} />, shortcut: "F1", run: () => setShortcutsOpen(true) },
   ];
   const detailAddon: InstalledAddon | undefined =
     route.name === "detail" ? metaAddon(prefs.addons, route.meta, route.addonUrl) : undefined;
@@ -468,8 +469,8 @@ export default function App() {
         <div className="titlebar-start" data-tauri-drag-region>
           <button
             className="titlebar-button"
-            aria-label={sidebar === "expanded" ? "Ocultar barra lateral" : "Mostrar barra lateral"}
-            title="Barra lateral (Ctrl B)"
+            aria-label={sidebar === "expanded" ? t("app.hideSidebar") : t("app.showSidebar")}
+            title={t("app.sidebarTitle")}
             onClick={() => setSidebar(sidebar === "expanded" ? "collapsed" : "expanded")}
           >
             <PanelLeft size={16} strokeWidth={1.75} />
@@ -479,17 +480,17 @@ export default function App() {
             <span data-tauri-drag-region>Vela</span>
           </span>
           <div className="history-buttons">
-            <button className="titlebar-button" aria-label="Atrás" title="Atrás (Alt ←)" disabled={!nav.canBack} onClick={back}>
+            <button className="titlebar-button" aria-label={t("app.historyBack")} title={t("app.historyBackTitle")} disabled={!nav.canBack} onClick={back}>
               <ChevronLeft size={17} strokeWidth={1.75} />
             </button>
-            <button className="titlebar-button" aria-label="Adelante" title="Adelante (Alt →)" disabled={!nav.canForward} onClick={forward}>
+            <button className="titlebar-button" aria-label={t("app.historyForward")} title={t("app.historyForwardTitle")} disabled={!nav.canForward} onClick={forward}>
               <ChevronRight size={17} strokeWidth={1.75} />
             </button>
           </div>
         </div>
-        <button className="search-trigger" aria-label="Buscar" aria-keyshortcuts="Control+K" onClick={() => setSearchOpen(true)}>
+        <button className="search-trigger" aria-label={t("common.search")} aria-keyshortcuts="Control+K" onClick={() => setSearchOpen(true)}>
           <Search size={14} />
-          <span>Buscar películas y series</span>
+          <span>{t("app.searchPlaceholder")}</span>
           <kbd>Ctrl K</kbd>
         </button>
         <div className="titlebar-end" data-tauri-drag-region>
@@ -497,19 +498,19 @@ export default function App() {
         </div>
       </header>
       <aside className="sidebar">
-        <nav aria-label="Principal" className="nav-group">
+        <nav aria-label={t("app.navPrimary")} className="nav-group">
           {primary.map(navButton)}
         </nav>
         <div className="sidebar-spacer" />
-        <nav aria-label="Configuración" className="nav-group">
+        <nav aria-label={t("app.navSecondary")} className="nav-group">
           {secondary.map(navButton)}
         </nav>
         {profileState.profiles.length > 1 && currentProfile ? (
           <button
             className="nav-item account-item"
             aria-haspopup="menu"
-            aria-label={`Perfil: ${currentProfile.name}`}
-            title="Cambiar de perfil"
+            aria-label={t("app.profileLabel", { name: currentProfile.name })}
+            title={t("app.switchProfile")}
             onClick={(event) => {
               const rect = event.currentTarget.getBoundingClientRect();
               menu.open(
@@ -522,14 +523,14 @@ export default function App() {
                     onSelect: () => openProfile(pinGate, profile),
                   })),
                   "separator" as const,
-                  { label: "Administrar perfiles", icon: <Users size={15} />, onSelect: () => openSettings("profiles") },
+                  { label: t("app.manageProfiles"), icon: <Users size={15} />, onSelect: () => openSettings("profiles") },
                   {
-                    label: accountState.user ? "Cuenta de Stremio" : "Iniciar sesión en Stremio",
+                    label: accountState.user ? t("app.stremioAccount") : t("app.signInStremio"),
                     icon: <CircleUserRound size={15} />,
                     onSelect: () => openSettings("account"),
                   },
                 ],
-                "Perfiles",
+                t("app.profiles"),
               );
             }}
           >
@@ -538,13 +539,13 @@ export default function App() {
           </button>
         ) : (() => {
           const user = accountState.status === "signed-in" ? accountState.user : undefined;
-          const state = accountState.syncing ? "Sincronizando…" : accountState.error ? "Error de sincronización" : "Stremio conectado";
+          const state = accountState.syncing ? t("app.syncing") : accountState.error ? t("app.syncError") : t("app.connected");
           return (
             <button
               className="nav-item account-item"
               onClick={() => openSettings("account")}
-              title={user ? `${user.email} · ${state}` : "Conectar la cuenta de Stremio"}
-              aria-label={user ? `Cuenta de Stremio: ${user.email}. ${state}` : "Iniciar sesión en Stremio"}
+              title={user ? `${user.email} · ${state}` : t("app.connectAccount")}
+              aria-label={user ? t("app.accountLabel", { email: user.email, state }) : t("app.signInStremio")}
             >
               {user ? (
                 <span className={`account-initial ${accountState.error ? "error" : ""}`} aria-hidden="true">
@@ -553,7 +554,7 @@ export default function App() {
               ) : (
                 <CircleUserRound size={17} strokeWidth={1.75} />
               )}
-              <span>{user ? user.email : "Iniciar sesión"}</span>
+              <span>{user ? user.email : t("app.signIn")}</span>
             </button>
           );
         })()}
@@ -565,10 +566,10 @@ export default function App() {
             <ErrorState
               message={
                 storageStatus.backend === "desktop"
-                  ? `No se pudo guardar en la base de datos de Vela (${storageStatus.error}). Vela lo reintentará; si el problema sigue, los cambios se perderán al cerrar.`
+                  ? t("app.storageWriteError", { error: String(storageStatus.error) })
                   : storageStatus.error
-                    ? `La base de datos de Vela no se pudo abrir (${storageStatus.error}). Los datos se guardan mientras tanto en el almacenamiento de WebView2.`
-                    : "No se pudo guardar en este equipo. Los cambios se conservarán solo mientras Vela siga abierta."
+                    ? t("app.storageOpenError", { error: storageStatus.error })
+                    : t("app.storageError")
               }
             />
           </div>
@@ -640,8 +641,8 @@ export default function App() {
         />
       )}
       {shortcutsOpen && (
-        <Dialog title="Atajos de teclado" onClose={() => setShortcutsOpen(false)} className="compact-dialog wide">
-          <h2>Atajos de teclado</h2>
+        <Dialog title={t("app.shortcuts")} onClose={() => setShortcutsOpen(false)} className="compact-dialog wide">
+          <h2>{t("app.shortcuts")}</h2>
           <ShortcutTable seekShort={prefs.player.seekShort} seekLong={prefs.player.seekLong} />
         </Dialog>
       )}
@@ -678,7 +679,7 @@ export default function App() {
             <span>{toast.message}</span>
             <button
               className="icon-button"
-              aria-label="Cerrar aviso"
+              aria-label={t("app.closeToast")}
               onClick={() => setToasts((items) => items.filter((item) => item.id !== toast.id))}
             >
               <X size={13} />

@@ -7,6 +7,7 @@ import { episodeCode } from "./episodes";
 import { resolvePlayback } from "./playback";
 import { streamQuality } from "./streams";
 import { errorMessage } from "./utils";
+import { locale, t } from "./i18n";
 
 /**
  * Downloaded videos, desktop only. Rust moves the bytes (see `downloads.rs`); this list says
@@ -135,8 +136,8 @@ export const downloads = {
     episode?: Episode;
     serviceUrl: string;
   }): Promise<Download> {
-    if (!downloadsAvailable) throw new Error("Las descargas necesitan la aplicación de escritorio.");
-    if (input.stream.externalUrl || input.stream.ytId) throw new Error("Esta fuente se abre en el navegador y no se puede descargar.");
+    if (!downloadsAvailable) throw new Error(t("downloads.lib.desktopOnly"));
+    if (input.stream.externalUrl || input.stream.ytId) throw new Error(t("downloads.lib.browserOnly"));
     // Same resolution as an external player: the original URL (or Stremio Service's, for
     // torrents) and the headers the source needs.
     const target = await resolvePlayback(input.meta, input.stream, input.serviceUrl, { episode: input.episode, external: true });
@@ -201,5 +202,5 @@ export function formatBytes(bytes: number): string {
     value /= 1024;
     unit++;
   }
-  return `${value.toLocaleString("es", { maximumFractionDigits: value < 10 && unit > 0 ? 1 : 0 })} ${units[unit]}`;
+  return `${value.toLocaleString(locale(), { maximumFractionDigits: value < 10 && unit > 0 ? 1 : 0 })} ${units[unit]}`;
 }

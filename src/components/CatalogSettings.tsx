@@ -3,8 +3,9 @@ import { homeRows, moveRow, renameRow, toggleRow } from "../lib/catalogLayout";
 import { getCatalogSources } from "../lib/protocol";
 import { preferencesStore, usePreferences } from "../lib/store";
 import { Switch } from "./Primitives";
+import { t } from "../lib/i18n";
 
-const typeLabel: Record<string, string> = { movie: "Películas", series: "Series", channel: "Canales", tv: "TV" };
+const typeLabel: Record<string, string> = { movie: t("common.movies"), series: t("common.seriesPlural"), channel: t("common.channels"), tv: t("common.tv") };
 
 /** Home catalogs of the active profile: order, visibility and names. */
 export function CatalogSettings() {
@@ -17,7 +18,7 @@ export function CatalogSettings() {
       <div className="settings-card">
         <div className="settings-row">
           <div className="settings-row-text">
-            <p>Ningún addon activo ofrece catálogos para Inicio.</p>
+            <p>{t("catalogSettings.empty")}</p>
           </div>
         </div>
       </div>
@@ -25,13 +26,13 @@ export function CatalogSettings() {
   }
   return (
     <div className="settings-card">
-      <ol className="catalog-list" aria-label="Catálogos de Inicio">
+      <ol className="catalog-list" aria-label={t("catalogSettings.list")}>
         {rows.map((row, index) => (
           <li key={row.source.key} className={`catalog-item ${row.visible ? "" : "hidden"}`}>
             <div className="catalog-move">
               <button
                 className="icon-button small"
-                aria-label={`Subir ${row.title}`}
+                aria-label={t("catalogSettings.moveUp", { title: row.title })}
                 disabled={index === 0}
                 onClick={() => preferencesStore.setCatalogLayout(moveRow(rows, layout, row.source.key, -1))}
               >
@@ -39,7 +40,7 @@ export function CatalogSettings() {
               </button>
               <button
                 className="icon-button small"
-                aria-label={`Bajar ${row.title}`}
+                aria-label={t("catalogSettings.moveDown", { title: row.title })}
                 disabled={index === rows.length - 1}
                 onClick={() => preferencesStore.setCatalogLayout(moveRow(rows, layout, row.source.key, 1))}
               >
@@ -49,7 +50,7 @@ export function CatalogSettings() {
             <div className="catalog-name">
               <input
                 className="input"
-                aria-label={`Nombre de ${row.defaultTitle}`}
+                aria-label={t("catalogSettings.name", { title: row.defaultTitle })}
                 // Keyed by the stored name so a reset elsewhere refreshes the field.
                 key={layout.names[row.source.key] ?? ""}
                 defaultValue={layout.names[row.source.key] ?? ""}
@@ -66,7 +67,7 @@ export function CatalogSettings() {
             </div>
             <Switch
               checked={row.visible}
-              label={`Mostrar ${row.title} en Inicio`}
+              label={t("catalogSettings.show", { title: row.title })}
               onChange={() => preferencesStore.setCatalogLayout(toggleRow(layout, row))}
             />
           </li>
@@ -74,14 +75,14 @@ export function CatalogSettings() {
       </ol>
       <div className="settings-row">
         <div className="settings-row-text">
-          <p>Cada perfil tiene su propia disposición. Los nombres también se usan al explorar.</p>
+          <p>{t("catalogSettings.hint")}</p>
         </div>
         <button
           className="button secondary"
           disabled={!custom}
           onClick={() => preferencesStore.setCatalogLayout({ order: [], hidden: {}, names: {} })}
         >
-          Restablecer
+          {t("catalogSettings.reset")}
         </button>
       </div>
     </div>

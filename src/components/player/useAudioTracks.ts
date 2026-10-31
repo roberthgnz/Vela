@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type Hls from "hls.js";
 import type { PlayerPreferences } from "../../lib/contracts";
+import { t } from "../../lib/i18n";
 import { normalizeLanguage, pickByLanguage } from "../../lib/languages";
 import type { Probe } from "../../lib/streamingServer";
 import { numbered, trackName, type Track, type VideoWithAudioTracks } from "./shared";
@@ -37,7 +38,7 @@ export function useAudioTracks(options: {
             key: `file-audio:${index}`,
             label: trackName(stream.language ?? "", stream.title),
             lang: normalizeLanguage(stream.language),
-            detail: [stream.codec.toUpperCase(), stream.channels ? `${stream.channels} canales` : ""].filter(Boolean).join(" · "),
+            detail: [stream.codec.toUpperCase(), stream.channels ? t("player.channels", { count: stream.channels }) : ""].filter(Boolean).join(" · "),
             origin: "embedded" as const,
             index: stream.id ?? index,
             codec: stream.codec,

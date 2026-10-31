@@ -1,6 +1,7 @@
 import type { LibraryEntry, MediaItem } from "./contracts";
 import { mediaKey } from "./store";
 import type { TasteState } from "./taste";
+import { t } from "./i18n";
 
 /**
  * Vela's recommendation engine: a hybrid ranker in the spirit of a streaming service's home page.
@@ -49,14 +50,14 @@ const genreAliases: Record<string, Genre[]> = {
 
 /** Spanish name of each genre and how a row says «because you like…». */
 const genreNames: Record<Genre, [label: string, phrase: string]> = {
-  Action: ["Acción", "la acción"], Adventure: ["Aventura", "la aventura"], Animation: ["Animación", "la animación"],
-  Biography: ["Biografía", "las biografías"], Comedy: ["Comedia", "la comedia"], Crime: ["Crimen", "el cine criminal"],
-  Documentary: ["Documental", "los documentales"], Drama: ["Drama", "el drama"], Family: ["Familia", "los títulos familiares"],
-  Fantasy: ["Fantasía", "la fantasía"], History: ["Historia", "la historia"], Horror: ["Terror", "el terror"],
-  Music: ["Música", "la música"], Mystery: ["Misterio", "el misterio"], Romance: ["Romance", "el romance"],
-  "Sci-Fi": ["Ciencia ficción", "la ciencia ficción"], Sport: ["Deporte", "el deporte"], Thriller: ["Suspense", "el suspense"],
-  War: ["Bélica", "el cine bélico"], Western: ["Western", "el western"], "Reality-TV": ["Reality", "los realities"],
-  "Talk-Show": ["Talk show", "los talk shows"], "Game-Show": ["Concursos", "los concursos"],
+  Action: [t("recommend.genre.action"), t("recommend.genre.action.phrase")], Adventure: [t("recommend.genre.adventure"), t("recommend.genre.adventure.phrase")], Animation: [t("recommend.genre.animation"), t("recommend.genre.animation.phrase")],
+  Biography: [t("recommend.genre.biography"), t("recommend.genre.biography.phrase")], Comedy: [t("recommend.genre.comedy"), t("recommend.genre.comedy.phrase")], Crime: [t("recommend.genre.crime"), t("recommend.genre.crime.phrase")],
+  Documentary: [t("recommend.genre.documentary"), t("recommend.genre.documentary.phrase")], Drama: [t("recommend.genre.drama"), t("recommend.genre.drama.phrase")], Family: [t("recommend.genre.family"), t("recommend.genre.family.phrase")],
+  Fantasy: [t("recommend.genre.fantasy"), t("recommend.genre.fantasy.phrase")], History: [t("recommend.genre.history"), t("recommend.genre.history.phrase")], Horror: [t("recommend.genre.horror"), t("recommend.genre.horror.phrase")],
+  Music: [t("recommend.genre.music"), t("recommend.genre.music.phrase")], Mystery: [t("recommend.genre.mystery"), t("recommend.genre.mystery.phrase")], Romance: [t("recommend.genre.romance"), t("recommend.genre.romance.phrase")],
+  "Sci-Fi": [t("recommend.genre.sciFi"), t("recommend.genre.sciFi.phrase")], Sport: [t("recommend.genre.sport"), t("recommend.genre.sport.phrase")], Thriller: [t("recommend.genre.thriller"), t("recommend.genre.thriller.phrase")],
+  War: [t("recommend.genre.war"), t("recommend.genre.war.phrase")], Western: [t("recommend.genre.western"), t("recommend.genre.western.phrase")], "Reality-TV": [t("recommend.genre.reality"), t("recommend.genre.reality.phrase")],
+  "Talk-Show": [t("recommend.genre.talkShow"), t("recommend.genre.talkShow.phrase")], "Game-Show": [t("recommend.genre.gameShow"), t("recommend.genre.gameShow.phrase")],
 };
 
 export function genreLabel(genre: Genre): string {
@@ -66,7 +67,7 @@ export function genreLabel(genre: Genre): string {
 /** «te gusta el drama», «te gustan los documentales». */
 export function likesGenre(genre: Genre): string {
   const phrase = genrePhrase(genre);
-  return `${/^(los|las) /.test(phrase) ? "te gustan" : "te gusta"} ${phrase}`;
+  return t(/^(los|las) /.test(phrase) ? "recommend.likesPlural" : "recommend.likes", { phrase });
 }
 
 export function genrePhrase(genre: Genre): string {
@@ -572,7 +573,7 @@ export function composeHome(
 
   // The billboard title is already the first thing on the page.
   const top = diversify(ranked.filter((item) => item.score > 0 && item.key !== hero?.key), size);
-  add({ id: "top", kind: "top", title: "Elegidos para ti" }, take(top, 6));
+  add({ id: "top", kind: "top", title: t("recommend.top") }, take(top, 6));
 
   const positive = seeds.filter((seed) => seed.weight > 0);
   // Recent, strong seeds lead «Porque viste…»; each one only once.
@@ -636,32 +637,32 @@ export function composeHome(
     while (genreRows.length) {
       const row = genreRows.shift()!;
       const items = take(row.items, 6);
-      if (items) return add({ id: `genre:${row.genre}`, kind: "genre", title: `Porque ${likesGenre(row.genre)}` }, items);
+      if (items) return add({ id: `genre:${row.genre}`, kind: "genre", title: t("recommend.becauseGenre", { likes: likesGenre(row.genre) }) }, items);
     }
   };
   seedRow();
   genreRow();
   seedRow();
-  add({ id: "gems", kind: "gems", title: "Joyas ocultas" }, take(gems, 6));
-  if (person) add({ id: `person:${person}`, kind: "person", title: `Más de ${person}` }, take(personItems, 5));
+  add({ id: "gems", kind: "gems", title: t("recommend.gems") }, take(gems, 6));
+  if (person) add({ id: `person:${person}`, kind: "person", title: t("recommend.moreFrom", { name: person }) }, take(personItems, 5));
   genreRow();
-  add({ id: "new", kind: "new", title: "Novedades" }, take(recent, 6));
+  add({ id: "new", kind: "new", title: t("recommend.new") }, take(recent, 6));
   seedRow();
   genreRow();
   return { hero, rows, seeds, taste, ranked };
 }
 
 function because(origin: SeedOrigin, name: string): string {
-  return `${origin === "played" ? "Porque viste" : origin === "liked" ? "Porque te gustó" : "Porque añadiste"} ${name}`;
+  return t(origin === "played" ? "recommend.becauseWatched" : origin === "liked" ? "recommend.becauseLiked" : "recommend.becauseAdded", { name });
 }
 
 /** One line on why a title is recommended. */
 export function reasonText(reason: Reason): string {
   if (reason.kind === "seed") return because(reason.origin, reason.name);
-  if (reason.kind === "person") return `Porque te gusta ${reason.name}`;
+  if (reason.kind === "person") return t("recommend.becauseLikePerson", { name: reason.name });
   if (reason.kind === "genre") {
     const text = likesGenre(reason.genre);
     return text[0].toUpperCase() + text.slice(1);
   }
-  return "Muy bien valorada";
+  return t("recommend.highlyRated");
 }

@@ -1,6 +1,7 @@
 import type { LibraryEntry, MediaItem, VideoState } from "./contracts";
 import { bitfieldOrder, decodeWatched, encodeWatched } from "./watched";
 import { postJson, requestJson } from "./transport";
+import { t } from "./i18n";
 
 /**
  * Stremio account API, as used by stremio-core (branch development, checked 2026-10-29):
@@ -53,10 +54,10 @@ export class StremioApiError extends Error {
 }
 
 function friendly(code: number, message: string): string {
-  if (code === 1 && /session/i.test(message)) return "La sesión de Stremio ha caducado. Vuelve a iniciar sesión.";
-  if (/password|passphrase|wrong/i.test(message)) return "Correo o contraseña incorrectos.";
-  if (/user not found|no user/i.test(message)) return "No existe ninguna cuenta de Stremio con ese correo.";
-  return `Stremio respondió: ${message}`;
+  if (code === 1 && /session/i.test(message)) return t("lib.stremio.sessionExpired");
+  if (/password|passphrase|wrong/i.test(message)) return t("lib.stremio.wrongCredentials");
+  if (/user not found|no user/i.test(message)) return t("lib.stremio.noUser");
+  return t("lib.stremio.replied", { message });
 }
 
 async function call<T>(method: string, body: Record<string, unknown>): Promise<T> {
@@ -64,14 +65,14 @@ async function call<T>(method: string, body: Record<string, unknown>): Promise<T
   try {
     response = await postJson(`${API_URL}${method}`, body);
   } catch (error) {
-    throw new Error(`No se pudo conectar con la cuenta de Stremio. ${error instanceof Error ? error.message : ""}`.trim());
+    throw new Error(t("lib.stremio.connectFailed", { details: error instanceof Error ? error.message : "" }).trim());
   }
   const envelope = (response ?? {}) as { result?: T; error?: { code?: number; message?: string } };
   if (envelope.error) {
     const code = Number(envelope.error.code ?? 0);
     throw new StremioApiError(code, friendly(code, String(envelope.error.message ?? "error desconocido")));
   }
-  if (!("result" in envelope)) throw new Error("La API de Stremio devolvió una respuesta inesperada.");
+  if (!("result" in envelope)) throw new Error(t("lib.stremio.unexpected"));
   return envelope.result as T;
 }
 
@@ -107,7 +108,7 @@ export type LinkCode = { code: string; link: string; qrcode: string };
 
 export async function createLink(): Promise<LinkCode> {
   const response = (await requestJson(`${LINK_URL}create?type=Create`)) as { result?: LinkCode };
-  if (!response?.result?.code || !response.result.link) throw new Error("No se pudo crear el código de vinculación.");
+  if (!response?.result?.code || !response.result.link) throw new Error(t("lib.stremio.linkCodeFailed"));
   return response.result;
 }
 
@@ -118,7 +119,7 @@ export async function readLink(code: string): Promise<string | null> {
   )) as { result?: { authKey?: string }; error?: { code?: number } };
   if (response?.result?.authKey) return response.result.authKey;
   if (response?.error?.code === 101) return null;
-  throw new Error("La vinculación con Stremio no ha respondido como se esperaba.");
+  throw new Error(t("lib.stremio.linkFailed"));
 }
 
 /* ---------- Library synchronization ---------- */

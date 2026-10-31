@@ -16,14 +16,15 @@ import { errorMessage } from "../lib/utils";
 import type { OpenMedia } from "./HomeView";
 import { MediaCard, PosterSkeletons, type CardMenu } from "./MediaCard";
 import { EmptyState, ErrorState, Segmented, Spinner } from "./Primitives";
+import { plural, t } from "../lib/i18n";
 
 const densities = ["comfortable", "compact"] as const;
 
-const filterNames: Record<string, string> = { genre: "Género", year: "Año", sort: "Orden", language: "Idioma", country: "País" };
+const filterNames: Record<string, string> = { genre: t("browse.filter.genre"), year: t("browse.filter.year"), sort: t("browse.filter.sort"), language: t("browse.filter.language"), country: t("browse.filter.country") };
 
 function filterLabel(name: string, options: string[] = []): string {
   // Cinemeta's «by year» catalogs offer years through their `genre` extra.
-  if (options.length && options.every((option) => /^\d{4}$/.test(option))) return "Año";
+  if (options.length && options.every((option) => /^\d{4}$/.test(option))) return t("browse.filter.year");
   return filterNames[name] ?? name.charAt(0).toLocaleUpperCase("es") + name.slice(1);
 }
 
@@ -41,12 +42,12 @@ export function DensityToggle({
 }) {
   return (
     <Segmented
-      label="Tamaño de los carteles"
+      label={t("browse.posterSize")}
       value={value}
       onChange={onChange}
       options={[
-        { value: "comfortable", label: <LayoutGrid size={14} />, title: "Carteles grandes" },
-        { value: "compact", label: <Grid3X3 size={14} />, title: "Carteles pequeños" },
+        { value: "comfortable", label: <LayoutGrid size={14} />, title: t("browse.largePosters") },
+        { value: "compact", label: <Grid3X3 size={14} />, title: t("browse.smallPosters") },
       ]}
     />
   );
@@ -102,7 +103,7 @@ export function BrowseView({
     }),
   );
   const toTop = () => document.getElementById("main")?.scrollTo({ top: 0 });
-  const title = type === "movie" ? "Películas" : "Series";
+  const title = type === "movie" ? t("nav.movies") : t("nav.series");
   return (
     <div className="page">
       <header className="page-header">
@@ -110,9 +111,9 @@ export function BrowseView({
         <div className="toolbar">
           {source && (
             <label className="select">
-              <span className="select-label">Catálogo</span>
+              <span className="select-label">{t("browse.catalog")}</span>
               <select
-                aria-label="Catálogo"
+                aria-label={t("browse.catalog")}
                 value={source.key}
                 onChange={(event) => {
                   setSourceKey(event.target.value);
@@ -139,7 +140,7 @@ export function BrowseView({
                   toTop();
                 }}
               >
-                {!filter.required && <option value="">Todos</option>}
+                {!filter.required && <option value="">{t("browse.all")}</option>}
                 {filter.options.map((value) => (
                   <option key={value} value={value}>
                     {value}
@@ -148,57 +149,57 @@ export function BrowseView({
               </select>
             </label>
           ))}
-          {!filters.some((filter) => filterLabel(filter.name, filter.options) === "Año") && (
+          {!filters.some((filter) => filterLabel(filter.name, filter.options) === t("browse.filter.year")) && (
             <label className="select">
-              <span className="select-label">Año</span>
-              <select aria-label="Año" value={decade} onChange={(event) => setDecade(event.target.value)}>
-                <option value="">Todos</option>
+              <span className="select-label">{t("browse.filter.year")}</span>
+              <select aria-label={t("browse.filter.year")} value={decade} onChange={(event) => setDecade(event.target.value)}>
+                <option value="">{t("browse.all")}</option>
                 {decades.map((value) => (
                   <option key={value} value={value}>
-                    Años {value.slice(2)}
+                    {t("browse.decade", { short: value.slice(2) })}
                   </option>
                 ))}
-                <option value="older">Antes de 1980</option>
+                <option value="older">{t("browse.before1980")}</option>
               </select>
             </label>
           )}
           <label className="select">
-            <span className="select-label">Valoración</span>
-            <select aria-label="Valoración" value={String(minRating)} onChange={(event) => setMinRating(Number(event.target.value))}>
-              <option value="0">Todas</option>
+            <span className="select-label">{t("browse.rating")}</span>
+            <select aria-label={t("browse.rating")} value={String(minRating)} onChange={(event) => setMinRating(Number(event.target.value))}>
+              <option value="0">{t("browse.allRatings")}</option>
               {[6, 7, 8].map((value) => (
                 <option key={value} value={value}>
-                  ★ {value} o más
+                  {t("browse.ratingAtLeast", { value })}
                 </option>
               ))}
             </select>
           </label>
           <label className="select">
-            <span className="select-label">Orden</span>
+            <span className="select-label">{t("browse.filter.sort")}</span>
             <select
-              aria-label="Orden"
-              title="Ordena los títulos ya cargados del catálogo"
+              aria-label={t("browse.filter.sort")}
+              title={t("browse.sortTitle")}
               value={refine.sort}
               onChange={(event) => setOrder(event.target.value)}
             >
-              <option value="relevance">Del catálogo</option>
-              <option value="newest">Más recientes</option>
-              <option value="oldest">Más antiguos</option>
-              <option value="rating">Mejor valorados</option>
+              <option value="relevance">{t("browse.sort.relevance")}</option>
+              <option value="newest">{t("browse.sort.newest")}</option>
+              <option value="oldest">{t("browse.sort.oldest")}</option>
+              <option value="rating">{t("browse.sort.rating")}</option>
             </select>
           </label>
           {categories && (
             <label className="select">
-              <span className="select-label">Contenido</span>
+              <span className="select-label">{t("browse.content")}</span>
               <select
-                aria-label="Contenido"
-                title="Según la clasificación por edad de TMDB"
+                aria-label={t("browse.content")}
+                title={t("browse.contentTitle")}
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
               >
-                <option value="all">Todo</option>
-                <option value="sfw">Apto (SFW)</option>
-                <option value="nsfw">Adultos (NSFW, +18)</option>
+                <option value="all">{t("browse.content.all")}</option>
+                <option value="sfw">{t("browse.content.sfw")}</option>
+                <option value="nsfw">{t("browse.content.nsfw")}</option>
               </select>
             </label>
           )}
@@ -212,7 +213,7 @@ export function BrowseView({
                 setContent("all");
               }}
             >
-              Quitar filtros
+              {t("browse.clearFilters")}
             </button>
           )}
           <DensityToggle value={density} onChange={setDensity} />
@@ -233,11 +234,11 @@ export function BrowseView({
       ) : (
         <EmptyState
           icon={<Puzzle size={20} />}
-          title={`No hay catálogos de ${title.toLowerCase()}`}
-          description="Activa o instala un addon que publique este tipo de catálogo."
+          title={t(type === "movie" ? "browse.noCatalogs.movie" : "browse.noCatalogs.series")}
+          description={t("browse.noCatalogsDescription")}
           action={
             <button className="button primary" onClick={onAddons}>
-              Gestionar addons
+              {t("home.manageAddons")}
             </button>
           }
         />
@@ -339,7 +340,7 @@ function CatalogGrid({
     return (
       <div className="page-body">
         <ErrorState
-          title="No se pudo cargar el catálogo"
+          title={t("browse.loadError")}
           message={errorMessage(query.error)}
           retry={() => void query.refetch()}
         />
@@ -348,15 +349,15 @@ function CatalogGrid({
   if (query.isSuccess && loaded.length && !items.length && !hasNextPage && !pending && !moreToShow)
     return (
       <EmptyState
-        title="Ningún título con estos filtros"
-        description={`Ninguno de los ${loaded.length} títulos del catálogo cumple el año o la valoración elegidos.`}
+        title={t("browse.noMatches")}
+        description={plural(loaded.length, "browse.noMatchesDescription.one", "browse.noMatchesDescription.other")}
       />
     );
   if (query.isSuccess && !loaded.length)
     return (
       <EmptyState
-        title="Sin títulos"
-        description="Este catálogo no devuelve resultados para el filtro actual."
+        title={t("browse.empty")}
+        description={t("browse.emptyDescription")}
       />
     );
   return (
@@ -386,7 +387,7 @@ function CatalogGrid({
             onClick={() => (moreToShow ? setShown((value) => value + BATCH) : void query.fetchNextPage())}
           >
             {query.isFetchingNextPage || pending ? <Spinner /> : null}
-            {pending ? "Comprobando clasificaciones" : query.isFetchingNextPage ? "Cargando" : "Cargar más"}
+            {pending ? t("browse.checkingRatings") : query.isFetchingNextPage ? t("browse.loading") : t("browse.loadMore")}
           </button>
         </div>
       )}

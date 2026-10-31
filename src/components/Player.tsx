@@ -20,6 +20,7 @@ import {
 import type { Episode, MediaItem } from "../lib/contracts";
 import { episodeCode, nextEpisode } from "../lib/episodes";
 import { externalPlayerName, playExternally } from "../lib/externalPlayback";
+import { formatNumber, t } from "../lib/i18n";
 import { log } from "../lib/log";
 import { readMkvChapters, type Chapter } from "../lib/mkvChapters";
 import { activeSegment, skipMarks, skipSegments, useSeriesMarks } from "../lib/skipSegments";
@@ -68,14 +69,14 @@ function CoverArt({ meta }: { meta: MediaItem }) {
 export function PreparingPlayer({ meta, episode, onClose }: { meta: MediaItem; episode?: Episode; onClose: () => void }) {
   const { fullscreen } = useWindowState();
   return (
-    <Dialog title={`Preparando ${meta.name}`} onClose={onClose} className="player-dialog preparing" hideClose>
+    <Dialog title={t("player.preparingTitle", { name: meta.name })} onClose={onClose} className="player-dialog preparing" hideClose>
       <div className="player" data-status="loading">
         <div className="player-loading cover" role="status">
           <CoverArt meta={meta} />
-          <span>Preparando la fuente…</span>
+          <span>{t("player.preparingSource")}</span>
         </div>
         <div className="player-top" data-tauri-drag-region>
-          <button className="player-icon" aria-label="Volver" title="Volver (Esc)" onClick={onClose}>
+          <button className="player-icon" aria-label={t("common.back")} title={t("player.backTitle")} onClick={onClose}>
             <ArrowLeft size={20} />
           </button>
           <div className="player-title" data-tauri-drag-region>
@@ -161,7 +162,7 @@ export function Player({
     onSwitching: () => {
       setStatus("loading");
       setWaitingSince(Date.now());
-      showFlash("Cambiando a la conversión de Stremio Service");
+      showFlash(t("player.switchingToConversion"));
     },
     onHlsAudioSwitched: (key) => audio.setAudioKey(key),
   });
@@ -272,7 +273,7 @@ export function Player({
     const element = video.current;
     if (!element) return;
     const kind = element.paused || element.ended ? "play" : "pause";
-    if (kind === "play") void element.play().catch(() => setNotice("Pulsa reproducir para iniciar el vídeo."));
+    if (kind === "play") void element.play().catch(() => setNotice(t("player.pressPlay")));
     else element.pause();
     showPulse(kind);
   };
@@ -287,10 +288,10 @@ export function Player({
     const nextVolume = Math.max(0, Math.min(1, Math.round(value * 100) / 100));
     setVolume(nextVolume);
     setMuted(nextVolume === 0);
-    showFlash(`Volumen ${Math.round(nextVolume * 100)} %`);
+    showFlash(t("player.volumeFlash", { percent: Math.round(nextVolume * 100) }));
   };
   const toggleFullscreen = () =>
-    void setFullscreen(surface.current, !fullscreen).catch(() => setNotice("No se pudo cambiar a pantalla completa."));
+    void setFullscreen(surface.current, !fullscreen).catch(() => setNotice(t("player.fullscreenFailed")));
   const external = async () => {
     setExternalBusy(true);
     try {
@@ -304,7 +305,7 @@ export function Player({
         stream: playing.stream,
       });
       video.current?.pause();
-      showFlash(launch.ipc ? `Abierto en ${externalPlayerName(launch)} · Vela guardará el progreso` : "Abierto en el reproductor externo");
+      showFlash(launch.ipc ? t("player.openedIn", { player: externalPlayerName(launch) }) : t("player.openedExternal"));
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -336,7 +337,7 @@ export function Player({
     const element = video.current;
     if (!element || !skip) return;
     element.currentTime = Math.min(skip.end, Number.isFinite(element.duration) ? element.duration : skip.end);
-    showFlash(skip.kind === "intro" ? "Intro saltada" : "Créditos saltados");
+    showFlash(skip.kind === "intro" ? t("player.introSkipped") : t("player.creditsSkipped"));
     wake();
   };
 
@@ -363,13 +364,13 @@ export function Player({
         seekBy,
         volumeBy: (delta) => changeVolume((muted ? 0 : volume) + delta),
         toggleMute: () => {
-          showFlash(muted ? `Volumen ${Math.round(volume * 100)} %` : "Silenciado");
+          showFlash(muted ? t("player.volumeFlash", { percent: Math.round(volume * 100) }) : t("player.muted"));
           setMuted((value) => !value);
         },
         toStart: () => {
           if (!element) return;
           element.currentTime = 0;
-          showFlash("Inicio");
+          showFlash(t("player.toStart"));
         },
         toEnd: () => {
           if (element) element.currentTime = Math.max(0, element.duration - 1);
@@ -381,7 +382,7 @@ export function Player({
         speedStep: (direction) => {
           const nextRate = stepSpeed(rate, direction);
           changeRate(nextRate);
-          showFlash(`Velocidad ${nextRate.toLocaleString("es")}×`);
+          showFlash(t("player.speedFlash", { rate: formatNumber(nextRate) }));
         },
         toggleFullscreen,
         cycleSubtitles,
@@ -390,7 +391,7 @@ export function Player({
           const index = audioTracks.findIndex((track) => track.key === audioKey);
           const nextTrack = audioTracks[(index + 1) % audioTracks.length];
           chooseAudio(nextTrack);
-          showFlash(`Audio: ${nextTrack.label}`);
+          showFlash(t("player.audioFlash", { track: nextTrack.label }));
         },
         nextEpisode: () => {
           if (next) playNext(next);
@@ -412,7 +413,7 @@ export function Player({
   } as CSSProperties;
   const busy = status === "loading" || status === "buffering";
   return (
-    <Dialog title={`Reproduciendo ${playing.meta.name}`} onClose={close} className="player-dialog" hideClose>
+    <Dialog title={t("player.playingTitle", { name: playing.meta.name })} onClose={close} className="player-dialog" hideClose>
       <div
         ref={surface}
         className={`player ${idle && status === "playing" && !popover ? "idle" : ""}`}
@@ -425,7 +426,7 @@ export function Player({
           autoPlay
           playsInline
           preload="auto"
-          aria-label={`Vídeo: ${playing.meta.name}`}
+          aria-label={t("player.videoLabel", { name: playing.meta.name })}
           onLoadedMetadata={(event) => {
             const element = event.currentTarget;
             element.volume = volume;
@@ -463,7 +464,7 @@ export function Player({
               onStarted?.();
             }
             setStatus("playing");
-            setNotice((value) => (value === "Pulsa reproducir para iniciar el vídeo." ? "" : value));
+            setNotice((value) => (value === t("player.pressPlay") ? "" : value));
           }}
           onPause={(event) => {
             const element = event.currentTarget;
@@ -509,13 +510,13 @@ export function Player({
           </div>
         )}
         <div className="player-top" data-tauri-drag-region>
-          <button className="player-icon" aria-label="Volver" title="Volver (Esc)" onClick={close}>
+          <button className="player-icon" aria-label={t("common.back")} title={t("player.backTitle")} onClick={close}>
             <ArrowLeft size={20} />
           </button>
           <div className="player-title" data-tauri-drag-region>
             <strong data-tauri-drag-region>{playing.meta.name}</strong>
             <span data-tauri-drag-region>
-              {[episodeLine, playing.stream.addonName, quality, converting && "Convertido por Stremio Service"]
+              {[episodeLine, playing.stream.addonName, quality, converting && t("player.convertedByService")]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
@@ -527,15 +528,15 @@ export function Player({
             {status === "loading" ? <CoverArt meta={playing.meta} /> : <LoaderCircle className="spin" size={34} strokeWidth={1.5} />}
             <span>
               {status === "buffering"
-                ? "Cargando más vídeo…"
+                ? t("player.loadingMore")
                 : converting && !playing.transcodedBecause
-                  ? "Convirtiendo con Stremio Service"
-                  : playing.note || "Cargando"}
+                  ? t("player.converting")
+                  : playing.note || t("player.loading")}
             </span>
             {swarm && (
               <span
                 className="player-swarm"
-                title="Pares que aceptaron la conexión, de los que han encontrado los trackers y la DHT. Muchos de los anunciados no responden, y Stremio Service mantiene como mucho unas decenas de conexiones a la vez."
+                title={t("player.swarmHint")}
               >
                 {describeTorrent(swarm.stats)}
               </span>
@@ -544,22 +545,22 @@ export function Player({
               <div className="player-slow">
                 <p>
                   {starved
-                    ? `El torrent no está recibiendo datos (${swarm!.stats.unchoked} de ${swarm!.stats.peers} pares envían). Puede que no tenga fuentes suficientes; prueba otra.`
-                    : "La fuente está tardando en responder."}
+                    ? t("player.torrentStarved", { unchoked: swarm!.stats.unchoked, peers: swarm!.stats.peers })
+                    : t("player.slowSource")}
                 </p>
                 <div>
                   {infoHash && (
                     <button className="button small subtle" onClick={onClose}>
-                      Elegir otra fuente
+                      {t("player.chooseOtherSource")}
                     </button>
                   )}
                   {playing.transcodeUrl && !converting && !infoHash && (
                     <button className="button small subtle" onClick={() => switchToConversion({})}>
-                      Probar con Stremio Service
+                      {t("player.tryService")}
                     </button>
                   )}
                   <button className="button small subtle" disabled={externalBusy} onClick={() => void external()}>
-                    Abrir en reproductor externo
+                    {t("player.openExternal")}
                   </button>
                 </div>
               </div>
@@ -576,13 +577,13 @@ export function Player({
           <div className="player-notice" role="status">
             <span>{notice}</span>
             <button className="button small subtle" onClick={() => setNotice("")}>
-              Cerrar
+              {t("common.close")}
             </button>
           </div>
         )}
         {resumed && !error && (
           <div className="player-resume">
-            Reanudado en {clock(playing.resume)}
+            {t("player.resumedAt", { time: clock(playing.resume) })}
             <button
               className="button small subtle"
               onClick={() => {
@@ -590,19 +591,19 @@ export function Player({
                 setResumed(false);
               }}
             >
-              Empezar desde el principio
+              {t("player.startOver")}
             </button>
           </div>
         )}
         {skip && (
           <button className="button player-skip" onClick={skipSegment} aria-keyshortcuts="S">
-            <SkipForward size={15} /> {skip.kind === "intro" ? "Saltar intro" : "Saltar créditos"}
+            <SkipForward size={15} /> {skip.kind === "intro" ? t("player.skipIntro") : t("player.skipCredits")}
           </button>
         )}
         {showNext && next && (
-          <section className="player-next" aria-label="Siguiente episodio">
+          <section className="player-next" aria-label={t("player.nextEpisode")}>
             <span className="player-next-label">
-              {countdown !== null ? `Siguiente episodio en ${countdown} s` : "Siguiente episodio"}
+              {countdown !== null ? t("player.nextEpisodeIn", { seconds: countdown }) : t("player.nextEpisode")}
             </span>
             <strong>
               {episodeCode(next)}
@@ -610,23 +611,23 @@ export function Player({
             </strong>
             <div>
               <button className="button primary small" data-autofocus onClick={() => playNext(next)}>
-                <SkipForward size={14} /> Ver ahora
+                <SkipForward size={14} /> {t("player.watchNow")}
               </button>
               <button className="button small subtle" onClick={() => setNextDismissed(true)}>
-                {countdown !== null ? "Cancelar" : "Ocultar"}
+                {countdown !== null ? t("common.cancel") : t("player.hide")}
               </button>
             </div>
           </section>
         )}
         {error && (
           <div className="player-error" role="alert">
-            <h2>No se puede reproducir aquí</h2>
+            <h2>{t("player.cannotPlay")}</h2>
             <p>{error}</p>
             <div>
               {playing.transcodeUrl && !converting && (
                 <button className="button primary" onClick={() => switchToConversion({})}>
                   <RefreshCw size={15} />
-                  Convertir con Stremio Service
+                  {t("player.convertWithService")}
                 </button>
               )}
               <button
@@ -635,10 +636,10 @@ export function Player({
                 onClick={() => void external()}
               >
                 <MonitorPlay size={15} />
-                Abrir en reproductor externo
+                {t("player.openExternal")}
               </button>
               <button className="button secondary" onClick={onClose}>
-                Elegir otra fuente
+                {t("player.chooseOtherSource")}
               </button>
             </div>
           </div>
@@ -703,8 +704,8 @@ export function Player({
               <span className="seek-fill" style={{ width: `${percent}%` }} />
             </div>
             <input
-              aria-label="Posición de reproducción"
-              aria-valuetext={`${clock(time)} de ${clock(duration)}`}
+              aria-label={t("player.seekPosition")}
+              aria-valuetext={t("player.timeOf", { time: clock(time), duration: clock(duration) })}
               type="range"
               min="0"
               max={duration || 1}
@@ -725,8 +726,8 @@ export function Player({
           <div className="player-row">
             <button
               className="player-icon"
-              aria-label={status === "playing" || status === "buffering" ? "Pausar" : "Reproducir"}
-              title={status === "playing" ? "Pausar (K)" : "Reproducir (K)"}
+              aria-label={status === "playing" || status === "buffering" ? t("player.pause") : t("player.play")}
+              title={status === "playing" ? t("player.pauseKey") : t("player.playKey")}
               onClick={toggle}
             >
               {status === "playing" || status === "buffering" ? (
@@ -737,16 +738,16 @@ export function Player({
             </button>
             <button
               className="player-icon"
-              aria-label={`Retroceder ${settings.seekLong} segundos`}
-              title={`Retroceder ${settings.seekLong} s (J)`}
+              aria-label={t("player.rewindLabel", { seconds: settings.seekLong })}
+              title={t("player.rewindTitle", { seconds: settings.seekLong })}
               onClick={() => seekBy(-settings.seekLong)}
             >
               <RotateCcw size={18} />
             </button>
             <button
               className="player-icon"
-              aria-label={`Avanzar ${settings.seekLong} segundos`}
-              title={`Avanzar ${settings.seekLong} s (L)`}
+              aria-label={t("player.forwardLabel", { seconds: settings.seekLong })}
+              title={t("player.forwardTitle", { seconds: settings.seekLong })}
               onClick={() => seekBy(settings.seekLong)}
             >
               <RotateCw size={18} />
@@ -754,8 +755,8 @@ export function Player({
             {next && onNext && (
               <button
                 className="player-icon"
-                aria-label={`Siguiente episodio: ${episodeCode(next)}`}
-                title={`Siguiente episodio (N) · ${episodeCode(next)}`}
+                aria-label={t("player.nextEpisodeLabel", { code: episodeCode(next) })}
+                title={t("player.nextEpisodeTitle", { code: episodeCode(next) })}
                 onClick={() => playNext(next)}
               >
                 <SkipForward size={18} />
@@ -764,15 +765,15 @@ export function Player({
             <div className="volume">
               <button
                 className="player-icon"
-                aria-label={muted ? "Activar sonido" : "Silenciar"}
-                title={muted ? "Activar sonido (M)" : "Silenciar (M)"}
+                aria-label={muted ? t("player.unmute") : t("player.mute")}
+                title={muted ? t("player.unmuteKey") : t("player.muteKey")}
                 onClick={() => setMuted(!muted)}
               >
                 <VolumeIcon size={19} />
               </button>
               <input
                 type="range"
-                aria-label="Volumen"
+                aria-label={t("player.volume")}
                 min="0"
                 max="1"
                 step="0.05"
@@ -787,15 +788,15 @@ export function Player({
             <span className="player-spacer" />
             <button
               className={`player-icon ${subtitleKey || audioTracks.length > 1 ? "active" : ""} ${popover?.kind === "tracks" ? "pressed" : ""}`}
-              aria-label="Audio y subtítulos"
+              aria-label={t("player.audioAndSubtitles")}
               aria-expanded={popover?.kind === "tracks"}
               aria-haspopup="dialog"
               title={
                 activeSubtitle
-                  ? `Subtítulos: ${activeSubtitle.label} (C)`
+                  ? t("player.subtitlesTitle", { track: activeSubtitle.label })
                   : subtitleTracks.length || audioTracks.length > 1
-                    ? "Audio y subtítulos (C)"
-                    : "No hay pistas adicionales"
+                    ? t("player.audioAndSubtitlesKey")
+                    : t("player.noExtraTracks")
               }
               onClick={(event) => openPopover("tracks", event.currentTarget)}
             >
@@ -803,10 +804,10 @@ export function Player({
             </button>
             <button
               className={`player-icon ${rate !== 1 ? "active" : ""} ${popover?.kind === "speed" ? "pressed" : ""}`}
-              aria-label="Velocidad de reproducción"
+              aria-label={t("player.playbackSpeed")}
               aria-haspopup="dialog"
               aria-expanded={popover?.kind === "speed"}
-              title="Velocidad"
+              title={t("player.speed")}
               onClick={(event) => openPopover("speed", event.currentTarget)}
             >
               {rate !== 1 ? <span className="rate">{rate}×</span> : <Gauge size={19} />}
@@ -814,8 +815,8 @@ export function Player({
             {native && (
               <button
                 className="player-icon"
-                aria-label="Abrir en reproductor externo"
-                title="Abrir en reproductor externo"
+                aria-label={t("player.openExternal")}
+                title={t("player.openExternal")}
                 disabled={externalBusy}
                 onClick={() => void external()}
               >
@@ -824,8 +825,8 @@ export function Player({
             )}
             <button
               className="player-icon"
-              aria-label={fullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
-              title={fullscreen ? "Salir de pantalla completa (F)" : "Pantalla completa (F)"}
+              aria-label={fullscreen ? t("player.exitFullscreen") : t("player.fullscreen")}
+              title={fullscreen ? t("player.exitFullscreenKey") : t("player.fullscreenKey")}
               onClick={toggleFullscreen}
             >
               {fullscreen ? <Minimize size={19} /> : <Maximize size={19} />}

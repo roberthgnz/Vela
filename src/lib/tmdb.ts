@@ -4,6 +4,7 @@ import type { Episode, MediaItem } from "./contracts";
 import { preferencesStore, usePreferences } from "./store";
 import { provideTmdbContext } from "./tmdbCatalogs";
 import { deleteSecret, getSecret, requestJson, setSecret } from "./transport";
+import { t } from "./i18n";
 
 /**
  * Translated metadata from The Movie Database (TMDB API v3), looked up by IMDb id.
@@ -138,11 +139,11 @@ export const tmdb = {
   async save(value: string) {
     const trimmed = value.trim();
     if (!validTmdbKey(trimmed))
-      throw new Error("La clave de API de TMDB tiene 32 caracteres hexadecimales (no es el «token de lectura»).");
+      throw new Error(t("lib.tmdb.keyFormat"));
     try {
       await requestJson(url("/configuration", {}, trimmed));
     } catch {
-      throw new Error("TMDB no ha aceptado la clave. Comprueba que la has copiado entera.");
+      throw new Error(t("lib.tmdb.keyRejected"));
     }
     await setSecret(secretName, trimmed);
     key = trimmed;

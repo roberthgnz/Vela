@@ -3,6 +3,7 @@ import { storage } from "./storage";
 import { createAttempts, hashPin, isPinHash, verifyPin, type PinHash } from "./pin";
 import { sourceHistory, sourcesKey } from "./sourceHistory";
 import { MAIN_PROFILE, preferencesStore } from "./store";
+import { t } from "./i18n";
 
 /**
  * Local profiles, like Stremio's «Who's watching?». Each profile has its own library, progress,
@@ -46,9 +47,9 @@ function read(): Saved {
       .filter((profile) => profile && typeof profile.id === "string" && typeof profile.name === "string" && profile.name.trim())
       .map(({ pin, ...profile }) => (isPinHash(pin) ? { ...profile, pin } : profile));
     if (profiles.some((profile) => profile.id === MAIN_PROFILE)) return { profiles, last: value?.last };
-    return { profiles: [{ id: MAIN_PROFILE, name: "Principal", color: profileColors[0] }, ...profiles], last: value?.last };
+    return { profiles: [{ id: MAIN_PROFILE, name: t("profiles.mainName"), color: profileColors[0] }, ...profiles], last: value?.last };
   } catch {
-    return { profiles: [{ id: MAIN_PROFILE, name: "Principal", color: profileColors[0] }] };
+    return { profiles: [{ id: MAIN_PROFILE, name: t("profiles.mainName"), color: profileColors[0] }] };
   }
 }
 
@@ -90,11 +91,11 @@ async function check(id: string, pin: string) {
   const profile = saved.profiles.find((item) => item.id === id);
   if (!profile?.pin) return;
   const wait = attempts.wait(id);
-  if (wait) throw new Error(`Demasiados intentos. Espera ${Math.ceil(wait / 1000)} s.`);
+  if (wait) throw new Error(t("profiles.tooManyAttempts", { seconds: Math.ceil(wait / 1000) }));
   if (!(await verifyPin(pin, profile.pin))) {
     attempts.fail(id);
     const locked = attempts.wait(id);
-    throw new Error(locked ? `PIN incorrecto. Espera ${Math.ceil(locked / 1000)} s.` : "PIN incorrecto.");
+    throw new Error(locked ? t("profiles.wrongPinWait", { seconds: Math.ceil(locked / 1000) }) : t("profiles.wrongPin"));
   }
   attempts.succeed(id);
 }
@@ -111,7 +112,7 @@ export const profiles = {
   select(id: string) {
     const profile = saved.profiles.find((item) => item.id === id);
     if (!profile) return;
-    if (profile.pin) throw new Error(`«${profile.name}» tiene PIN.`);
+    if (profile.pin) throw new Error(t("profiles.hasPinError", { name: profile.name }));
     activate(id);
   },
   locked(id: string): boolean {
@@ -144,19 +145,19 @@ export const profiles = {
   },
   create(name: string, color = profileColors[saved.profiles.length % profileColors.length]): Profile {
     const value = clean(name);
-    if (!value) throw new Error("Escribe un nombre para el perfil.");
-    if (saved.profiles.length >= MAX_PROFILES) throw new Error(`Puedes tener hasta ${MAX_PROFILES} perfiles.`);
+    if (!value) throw new Error(t("profiles.nameRequired"));
+    if (saved.profiles.length >= MAX_PROFILES) throw new Error(t("profiles.maxProfiles", { max: MAX_PROFILES }));
     if (saved.profiles.some((profile) => profile.name.toLocaleLowerCase("es") === value.toLocaleLowerCase("es")))
-      throw new Error("Ya hay un perfil con ese nombre.");
+      throw new Error(t("profiles.nameTaken"));
     const profile = { id: crypto.randomUUID().slice(0, 8), name: value, color };
     save({ ...saved, profiles: [...saved.profiles, profile] });
     return profile;
   },
   update(id: string, change: Partial<Pick<Profile, "name" | "color" | "kids">> & ContentChange) {
     const name = change.name === undefined ? undefined : clean(change.name);
-    if (name === "") throw new Error("Escribe un nombre para el perfil.");
+    if (name === "") throw new Error(t("profiles.nameRequired"));
     if (name && saved.profiles.some((profile) => profile.id !== id && profile.name.toLocaleLowerCase("es") === name.toLocaleLowerCase("es")))
-      throw new Error("Ya hay un perfil con ese nombre.");
+      throw new Error(t("profiles.nameTaken"));
     save({
       ...saved,
       profiles: saved.profiles.map((profile) =>

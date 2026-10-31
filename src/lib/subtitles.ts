@@ -1,5 +1,6 @@
 import type { Subtitle } from "./contracts";
 import { normalizeLanguage } from "./languages";
+import { t } from "./i18n";
 
 /** A timed line drawn by Vela's overlay. `top` places it at the top of the frame (ASS \an7–9, VTT line:0). */
 export type Cue = { start: number; end: number; text: string; top?: boolean };
@@ -147,9 +148,9 @@ function parseAss(text: string): { cues: Cue[]; skipped: number } {
 
 export function parseSubtitle(text: string): ParsedSubtitles {
   const format = detectFormat(text);
-  if (!format) throw new SubtitleError("El archivo no tiene un formato de subtítulos reconocible (SRT, WebVTT o ASS).");
+  if (!format) throw new SubtitleError(t("lib.subtitles.unknownFormat"));
   const { cues, skipped } = format === "ass" ? parseAss(text) : parseBlocks(text);
-  if (!cues.length) throw new SubtitleError("El archivo de subtítulos está vacío o dañado.");
+  if (!cues.length) throw new SubtitleError(t("lib.subtitles.empty"));
   cues.sort((a, b) => a.start - b.start || a.end - b.end);
   return { format, cues, skipped, raw: text };
 }

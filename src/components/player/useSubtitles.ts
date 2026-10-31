@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import type Hls from "hls.js";
 import type JASSUB from "jassub";
 import type { PlayerPreferences, Subtitle } from "../../lib/contracts";
+import { formatNumber, t } from "../../lib/i18n";
 import { languageLabel, normalizeLanguage, pickByLanguage } from "../../lib/languages";
 import { log } from "../../lib/log";
 import { getSubtitles } from "../../lib/protocol";
@@ -182,7 +183,7 @@ export function useSubtitles(options: {
               video.current?.currentTime ?? 0,
               controller.signal,
             );
-            if (!collected.length && !controller.signal.aborted) throw new Error("La pista no contiene subtítulos.");
+            if (!collected.length && !controller.signal.aborted) throw new Error(t("player.subs.emptyTrack"));
           }
         }
         if (controller.signal.aborted) return;
@@ -193,13 +194,13 @@ export function useSubtitles(options: {
           } catch (failure) {
             // Styled rendering is optional: the plain cues remain.
             log.warn("player: ASS renderer unavailable", failure);
-            setNotice("Los estilos ASS no están disponibles; se muestran como texto.");
+            setNotice(t("player.subs.assUnavailable"));
           }
         }
       } catch (cause) {
         if (controller.signal.aborted) return;
         setSubtitleKey("");
-        setNotice(`No se pudieron cargar los subtítulos. ${errorMessage(cause)}`);
+        setNotice(t("player.subs.loadFailed", { reason: errorMessage(cause) }));
       } finally {
         if (loading.current === controller) setSubtitleBusy(false);
       }
@@ -264,7 +265,7 @@ export function useSubtitles(options: {
     (value: number) => {
       const next = Math.round(value * 10) / 10;
       setDelay(next);
-      showFlash(`Desfase de subtítulos ${next > 0 ? "+" : ""}${next.toLocaleString("es", { minimumFractionDigits: 1 })} s`);
+      showFlash(t("player.subs.delayFlash", { delay: `${next > 0 ? "+" : ""}${formatNumber(next, { minimumFractionDigits: 1 })}` }));
     },
     [showFlash],
   );
@@ -275,7 +276,7 @@ export function useSubtitles(options: {
     const index = subtitleTracks.findIndex((track) => track.key === subtitleKey);
     const nextTrack = subtitleTracks[index + 1] ?? null;
     void chooseSubtitle(nextTrack);
-    showFlash(nextTrack ? `Subtítulos: ${nextTrack.label}` : "Subtítulos desactivados");
+    showFlash(nextTrack ? t("player.subs.flash", { track: nextTrack.label }) : t("player.subs.off"));
   }, [chooseSubtitle, showFlash, subtitleKey, subtitleTracks]);
 
   const activeSubtitle = subtitleTracks.find((track) => track.key === subtitleKey);

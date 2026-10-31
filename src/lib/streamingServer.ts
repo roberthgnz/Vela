@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { Episode, ResolvedStream, Subtitle } from "./contracts";
 import { postJson, requestJson } from "./transport";
+import { plural, t } from "./i18n";
 
 /**
  * Client for the Stremio streaming server (Stremio Service / the server bundled with Stremio).
@@ -57,23 +58,23 @@ const MB = 1048576;
  */
 export const torrentProfiles: Record<TorrentProfile, { label: string; title: string; values: TorrentLimits }> = {
   soft: {
-    label: "Suave",
-    title: "1,6 MB/s y 35 conexiones: deja red libre y no satura el router",
+    label: t("lib.server.profile.soft"),
+    title: t("lib.server.profile.softTitle"),
     values: { btMaxConnections: 35, btHandshakeTimeout: 20000, btRequestTimeout: 4000, btDownloadSpeedSoftLimit: Math.round(1.6 * MB), btDownloadSpeedHardLimit: Math.round(1.6 * MB), btMinPeersForStable: 5 },
   },
   default: {
-    label: "Normal",
-    title: "Lo que trae Stremio: 2,5–3,5 MB/s y 55 conexiones",
+    label: t("lib.server.profile.default"),
+    title: t("lib.server.profile.defaultTitle"),
     values: { btMaxConnections: 55, btHandshakeTimeout: 20000, btRequestTimeout: 4000, btDownloadSpeedSoftLimit: 2.5 * MB, btDownloadSpeedHardLimit: 3.5 * MB, btMinPeersForStable: 5 },
   },
   fast: {
-    label: "Rápido",
-    title: "Hasta 37,5 MB/s y 200 conexiones",
+    label: t("lib.server.profile.fast"),
+    title: t("lib.server.profile.fastTitle"),
     values: { btMaxConnections: 200, btHandshakeTimeout: 20000, btRequestTimeout: 4000, btDownloadSpeedSoftLimit: 4 * MB, btDownloadSpeedHardLimit: 37.5 * MB, btMinPeersForStable: 10 },
   },
   ultra: {
-    label: "Máximo",
-    title: "Hasta 75 MB/s y 400 conexiones: puede saturar routers domésticos",
+    label: t("lib.server.profile.ultra"),
+    title: t("lib.server.profile.ultraTitle"),
     values: { btMaxConnections: 400, btHandshakeTimeout: 25000, btRequestTimeout: 6000, btDownloadSpeedSoftLimit: 8 * MB, btDownloadSpeedHardLimit: 75 * MB, btMinPeersForStable: 10 },
   },
 };
@@ -88,14 +89,14 @@ export function torrentProfileOf(values: Record<string, unknown>): TorrentProfil
 export async function torrentProfile(serviceUrl: string): Promise<TorrentProfile | undefined> {
   const settings = await requestJson(`${base(serviceUrl)}/settings`, AbortSignal.timeout(4000));
   const values = (settings as { values?: Record<string, unknown> } | null)?.values;
-  if (!values) throw new Error("El servidor no devolvió sus ajustes.");
+  if (!values) throw new Error(t("lib.server.noSettings"));
   return torrentProfileOf(values);
 }
 
 /** Saves the preset in the server's settings, which Stremio shares. Other settings are kept. */
 export async function setTorrentProfile(serviceUrl: string, profile: TorrentProfile): Promise<void> {
   const reply = await postJson(`${base(serviceUrl)}/settings`, torrentProfiles[profile].values);
-  if (!(reply as { success?: unknown } | null)?.success) throw new Error("El servidor no guardó el perfil.");
+  if (!(reply as { success?: unknown } | null)?.success) throw new Error(t("lib.server.profileNotSaved"));
 }
 
 /** The server answers /settings at once when it runs; a hung or unrelated host should not hold playback back. */
@@ -193,8 +194,8 @@ export async function prepareTorrent(
   } catch (error) {
     throw new Error(
       /timed out|tiempo/i.test(errorText(error))
-        ? "El torrent no ha respondido: el servicio no encontró pares ni metadatos a tiempo. Prueba otra fuente."
-        : `Stremio Service no pudo preparar el torrent (${errorText(error)}).`,
+        ? t("lib.server.torrentTimeout")
+        : t("lib.server.torrentFailed", { error: errorText(error) }),
     );
   }
   const result = (response ?? {}) as { guessedFileIdx?: unknown; files?: unknown };
@@ -206,11 +207,11 @@ export async function prepareTorrent(
     : [];
   const fileIdx = knownIndex ? stream.fileIdx! : result.guessedFileIdx;
   if (typeof fileIdx !== "number" || !Number.isInteger(fileIdx) || fileIdx < 0)
-    throw new Error("El servicio no encontró ningún archivo de vídeo en este torrent.");
+    throw new Error(t("lib.server.noVideoFile"));
   const file = files[fileIdx];
-  if (files.length && !file) throw new Error("El índice de archivo de la fuente no existe en este torrent.");
+  if (files.length && !file) throw new Error(t("lib.server.badFileIndex"));
   if (file && !videoExtensions.test(file.name))
-    throw new Error(`El archivo seleccionado (${file.name}) no es un vídeo. Prueba otra fuente.`);
+    throw new Error(t("lib.server.notVideo", { name: file.name }));
   const subtitles = files.flatMap((item, index) => {
     if (!/\.(srt|vtt)$/i.test(item.name)) return [];
     const code = /\.([a-z]{2,3}(?:-[a-z]{2})?)\.(?:srt|vtt)$/i.exec(item.name)?.[1];
@@ -247,9 +248,9 @@ export function describeTorrent(stats: TorrentStats): string {
   // Incoming connections are not among the found addresses, so `peers` can exceed `found`.
   const peers =
     stats.found > stats.peers
-      ? `${stats.peers} de ${stats.found} pares conectados`
-      : `${stats.peers} ${stats.peers === 1 ? "par conectado" : "pares conectados"}`;
-  return `${peers} · ${speed} · ${downloaded} descargados`;
+      ? t("lib.server.peersOf", { peers: stats.peers, found: stats.found })
+      : plural(stats.peers, "lib.server.peers.one", "lib.server.peers.other");
+  return t("lib.server.torrentSummary", { peers, speed, downloaded });
 }
 
 /** Routes a URL through the server so it can add the request/response headers an addon requires. */
@@ -296,7 +297,7 @@ export async function probe(serviceUrl: string, mediaUrl: string, signal?: Abort
     `${base(serviceUrl)}/hlsv2/probe?${new URLSearchParams({ mediaURL: mediaUrl })}`,
     signal,
   )) as Probe;
-  if (!result?.format || !Array.isArray(result.streams)) throw new Error("Respuesta de sondeo no válida.");
+  if (!result?.format || !Array.isArray(result.streams)) throw new Error(t("lib.server.badProbe"));
   return result;
 }
 
@@ -304,16 +305,16 @@ export async function probe(serviceUrl: string, mediaUrl: string, signal?: Abort
 export function probeProblems(result: Probe, capabilities: Capabilities): string[] {
   const problems: string[] = [];
   if (!capabilities.formats.some((format) => result.format.name.includes(format)))
-    problems.push(`contenedor ${result.format.name.split(",")[0]}`);
+    problems.push(t("lib.server.problem.container", { name: result.format.name.split(",")[0] }));
   for (const stream of result.streams) {
     if (stream.track === "video" && !capabilities.videoCodecs.includes(stream.codec))
-      problems.push(`vídeo ${stream.codec.toUpperCase()}`);
+      problems.push(t("lib.server.problem.video", { codec: stream.codec.toUpperCase() }));
     if (stream.track === "audio" && !capabilities.audioCodecs.includes(stream.codec))
-      problems.push(`audio ${stream.codec.toUpperCase()}`);
+      problems.push(t("lib.server.problem.audio", { codec: stream.codec.toUpperCase() }));
   }
   const audio = result.streams.filter((stream) => stream.track === "audio");
   if (audio.length && !audio.some((stream) => capabilities.audioCodecs.includes(stream.codec)))
-    problems.push("ninguna pista de audio compatible");
+    problems.push(t("lib.server.problem.noAudio"));
   return [...new Set(problems)];
 }
 
@@ -368,7 +369,7 @@ export async function readSubtitleRendition(
       start += duration;
     }
   }
-  if (!segments.length) throw new Error("La pista de subtítulos está vacía.");
+  if (!segments.length) throw new Error(t("lib.server.emptySubtitles"));
   // One request at a time: the converter cancels a segment when another is requested meanwhile
   // ("Segment is canceled", checked with server 4.22.3). Start where the video is, then go back.
   const first = Math.max(0, segments.findLastIndex((segment) => segment.start <= from));
@@ -387,7 +388,7 @@ export async function readSubtitleRendition(
     if (text === undefined) failures++;
     else onPart(text);
   }
-  if (failures === segments.length) throw new Error("Stremio Service no pudo extraer esta pista de subtítulos.");
+  if (failures === segments.length) throw new Error(t("lib.server.subtitlesFailed"));
 }
 
 export function subtitleUrl(serviceUrl: string, url: string): string {

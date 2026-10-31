@@ -6,6 +6,7 @@ import { ageLimits, managementGuard, MAX_PROFILES, profileColors, profiles, useP
 import { useTmdbConfigured } from "../lib/tmdb";
 import { MAIN_PROFILE } from "../lib/store";
 import { errorMessage } from "../lib/utils";
+import { t } from "../lib/i18n";
 import { Dialog, Segmented, Spinner, Switch, useMenu } from "./Primitives";
 import { WindowControls } from "./WindowControls";
 
@@ -36,7 +37,7 @@ function arrows(event: KeyboardEvent<HTMLElement>) {
 }
 
 function allowsAdultLabel(profile: Profile): string {
-  return profile.showAdult && !profile.kids ? "Adultos" : "";
+  return profile.showAdult && !profile.kids ? t("profiles.adult") : "";
 }
 
 /** A field for a PIN: digits only, hidden, submitted as soon as it is complete. */
@@ -111,7 +112,7 @@ export function usePinGate(onError?: (message: string) => void) {
       <h2>{request.title}</h2>
       {request.description && <p>{request.description}</p>}
       <div className="pin-row">
-        <PinField label={`PIN de ${request.profile.name}`} onComplete={(pin) => void submit(pin)} disabled={busy} />
+        <PinField label={t("profiles.pinOf", { name: request.profile.name })} onComplete={(pin) => void submit(pin)} disabled={busy} />
         {busy && <Spinner />}
       </div>
       <p className="form-error" role="alert">
@@ -119,7 +120,7 @@ export function usePinGate(onError?: (message: string) => void) {
       </p>
       <div className="form-actions">
         <button className="button secondary" onClick={() => setRequest(null)}>
-          Cancelar
+          {t("common.cancel")}
         </button>
       </div>
     </Dialog>
@@ -131,7 +132,7 @@ export function usePinGate(onError?: (message: string) => void) {
 export function openProfile(gate: ReturnType<typeof usePinGate>, profile: Profile, then?: () => void) {
   gate.ask({
     profile,
-    title: `PIN de ${profile.name}`,
+    title: t("profiles.pinOf", { name: profile.name }),
     action: async (pin) => {
       if (profile.pin) await profiles.unlock(profile.id, pin);
       else profiles.select(profile.id);
@@ -165,14 +166,14 @@ export function ProfilePicker({ onManage }: { onManage: () => void }) {
       <div className="profile-picker-bar" data-tauri-drag-region>
         <WindowControls onError={() => {}} />
       </div>
-      <h1 id="profile-picker-title">¿Quién está viendo?</h1>
+      <h1 id="profile-picker-title">{t("profiles.whoIsWatching")}</h1>
       <div className="profile-list" ref={ref}>
         {list.map((profile) => (
           <button
             key={profile.id}
             className="profile-choice"
             data-profile
-            aria-label={profile.pin ? `${profile.name} (con PIN)` : profile.name}
+            aria-label={profile.pin ? t("profiles.withPin", { name: profile.name }) : profile.name}
             onKeyDown={arrows}
             onClick={() => openProfile(gate, profile)}
           >
@@ -185,7 +186,7 @@ export function ProfilePicker({ onManage }: { onManage: () => void }) {
             <span className="profile-avatar add" style={{ width: 84, height: 84 }}>
               <Plus size={28} strokeWidth={1.5} />
             </span>
-            <span>Añadir</span>
+            <span>{t("common.add")}</span>
           </button>
         )}
       </div>
@@ -200,8 +201,8 @@ export function ProfilePicker({ onManage }: { onManage: () => void }) {
           <input
             className="input"
             autoFocus
-            aria-label="Nombre del perfil"
-            placeholder="Nombre"
+            aria-label={t("profiles.nameLabel")}
+            placeholder={t("profiles.namePlaceholder")}
             maxLength={24}
             value={name}
             aria-invalid={Boolean(error)}
@@ -211,10 +212,10 @@ export function ProfilePicker({ onManage }: { onManage: () => void }) {
             }}
           />
           <button className="button primary" disabled={!name.trim()}>
-            Crear
+            {t("profiles.create")}
           </button>
           <button type="button" className="button subtle" onClick={() => (setAdding(false), setName(""), setError(""))}>
-            Cancelar
+            {t("common.cancel")}
           </button>
           {error && <p className="form-error" role="alert">{error}</p>}
         </form>
@@ -222,7 +223,7 @@ export function ProfilePicker({ onManage }: { onManage: () => void }) {
       {!adding && error && <p className="form-error" role="alert">{error}</p>}
       {manager && (
         <button className="link-button profile-manage" onClick={() => openProfile(gate, manager, onManage)}>
-          Administrar perfiles
+          {t("profiles.manage")}
         </button>
       )}
       {gate.element}
@@ -237,10 +238,10 @@ function PinEditor({ profile, onClose, notify }: { profile: Profile; onClose: ()
   const [first, setFirst] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const title = profile.pin ? `Cambiar el PIN de ${profile.name}` : `Definir un PIN para ${profile.name}`;
+  const title = profile.pin ? t("profiles.changePinTitle", { name: profile.name }) : t("profiles.setPinTitle", { name: profile.name });
   const finish = async (pin: string) => {
     if (pin !== first) {
-      setError("Los PIN no coinciden. Escríbelo de nuevo.");
+      setError(t("profiles.pinMismatch"));
       setFirst("");
       setStep("new");
       return;
@@ -248,7 +249,7 @@ function PinEditor({ profile, onClose, notify }: { profile: Profile; onClose: ()
     setBusy(true);
     try {
       await profiles.setPin(profile.id, pin, current);
-      notify(profile.pin ? `PIN de «${profile.name}» cambiado.` : `«${profile.name}» pedirá su PIN al abrirse.`);
+      notify(profile.pin ? t("profiles.pinChanged", { name: profile.name }) : t("profiles.pinSet", { name: profile.name }));
       onClose();
     } catch (cause) {
       setError(errorMessage(cause));
@@ -263,15 +264,15 @@ function PinEditor({ profile, onClose, notify }: { profile: Profile; onClose: ()
       <h2>{title}</h2>
       <p>
         {step === "current"
-          ? "Escribe el PIN actual."
+          ? t("profiles.enterCurrentPin")
           : step === "new"
-            ? `Elige ${PIN_LENGTH} cifras. Vela lo pedirá al abrir el perfil, al cambiar su PIN y al eliminarlo.`
-            : "Escríbelo otra vez para confirmarlo."}
+            ? t("profiles.chooseDigits", { length: PIN_LENGTH })
+            : t("profiles.confirmAgain")}
       </p>
       <div className="pin-row">
         <PinField
           key={step}
-          label={step === "current" ? "PIN actual" : step === "new" ? "PIN nuevo" : "Confirma el PIN nuevo"}
+          label={step === "current" ? t("profiles.currentPin") : step === "new" ? t("profiles.newPin") : t("profiles.confirmNewPin")}
           disabled={busy}
           onComplete={(pin) => {
             setError("");
@@ -293,10 +294,10 @@ function PinEditor({ profile, onClose, notify }: { profile: Profile; onClose: ()
       <p className="form-error" role="alert">
         {error}
       </p>
-      <p className="settings-note">El PIN evita que otros abran el perfil en este equipo; no cifra sus datos.</p>
+      <p className="settings-note">{t("profiles.pinNote")}</p>
       <div className="form-actions">
         <button className="button secondary" onClick={onClose}>
-          Cancelar
+          {t("common.cancel")}
         </button>
       </div>
     </Dialog>
@@ -309,67 +310,65 @@ function ContentDialog({ profile, onClose }: { profile: Profile; onClose: () => 
   const configured = useTmdbConfigured();
   const limit = live.maxAge === undefined ? "none" : String(live.maxAge);
   return (
-    <Dialog title={`Contenido de ${live.name}`} onClose={onClose} className="compact-dialog wide content-dialog" hideClose>
-      <h2>Contenido de «{live.name}»</h2>
+    <Dialog title={t("profiles.contentOf", { name: live.name })} onClose={onClose} className="compact-dialog wide content-dialog" hideClose>
+      <h2>{t("profiles.contentOfQuoted", { name: live.name })}</h2>
       <div className="content-option">
         <div>
-          <strong>Contenido para adultos</strong>
+          <strong>{t("profiles.adultContent")}</strong>
           <p>
-            Addons que se declaran para adultos y títulos que TMDB marca como pornográficos.
-            {live.kids ? " Los perfiles infantiles nunca lo muestran." : ""}
+            {t("profiles.adultContentHelp")}
+            {live.kids ? t("profiles.kidsNeverAdult") : ""}
           </p>
         </div>
         <Switch
           checked={Boolean(live.showAdult) && !live.kids}
-          label="Mostrar contenido para adultos"
+          label={t("profiles.showAdult")}
           disabled={live.kids}
           onChange={() => profiles.update(live.id, { showAdult: !live.showAdult })}
         />
       </div>
       <div className="content-option column">
         <div>
-          <strong>Edad máxima</strong>
+          <strong>{t("profiles.maxAge")}</strong>
           <p>
-            Oculta en Inicio, Explorar y la búsqueda los títulos clasificados para más edad, y no deja abrirlos. Usa la
-            clasificación de España en TMDB (o la de EE. UU. si no hay).
+            {t("profiles.maxAgeHelp")}
           </p>
         </div>
         <Segmented
-          label="Edad máxima"
+          label={t("profiles.maxAge")}
           value={limit}
           onChange={(value) => profiles.update(live.id, { maxAge: value === "none" ? null : Number(value) })}
           options={[
-            { value: "none", label: <span className="segment-text">Sin límite</span>, title: "Sin límite" },
+            { value: "none", label: <span className="segment-text">{t("profiles.noLimit")}</span>, title: t("profiles.noLimit") },
             ...ageLimits.map((age) => ({
               value: String(age),
-              label: <span className="segment-text">{age === 18 ? "+18" : `Hasta ${age}`}</span>,
-              title: age === 18 ? "Todo salvo contenido para adultos" : `Títulos para ${age} años o menos`,
+              label: <span className="segment-text">{age === 18 ? "+18" : t("profiles.upTo", { age })}</span>,
+              title: age === 18 ? t("profiles.allButAdult") : t("profiles.titlesForAge", { age }),
               disabled: !configured,
             })),
           ]}
         />
-        {!configured && <p className="status">Necesita una clave de TMDB (Ajustes › Información).</p>}
+        {!configured && <p className="status">{t("profiles.needsTmdb")}</p>}
       </div>
       {live.maxAge !== undefined && (
         <div className="content-option">
           <div>
-            <strong>Títulos sin clasificar</strong>
-            <p>Muchos títulos no tienen clasificación en ningún país. Ocultarlos es más seguro para niños.</p>
+            <strong>{t("profiles.unrated")}</strong>
+            <p>{t("profiles.unratedHelp")}</p>
           </div>
           <Switch
             checked={Boolean(live.hideUnrated)}
-            label="Ocultar títulos sin clasificar"
+            label={t("profiles.hideUnrated")}
             onChange={() => profiles.update(live.id, { hideUnrated: !live.hideUnrated })}
           />
         </div>
       )}
       <p className="settings-note">
-        Para que nadie cambie estos límites, pon un PIN al perfil «Principal»: desde un perfil infantil hará falta para
-        administrar los perfiles.
+        {t("profiles.lockNote")}
       </p>
       <div className="form-actions">
         <button className="button primary" data-autofocus onClick={onClose}>
-          Hecho
+          {t("profiles.done")}
         </button>
       </div>
     </Dialog>
@@ -404,13 +403,13 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
       <div className="settings-card">
         <div className="settings-row profile-guard">
           <Lock size={16} />
-          <span>Para administrar los perfiles desde un perfil infantil hace falta el PIN de «{guard.name}».</span>
+          <span>{t("profiles.guard", { name: guard.name })}</span>
           <button
             className="button secondary small"
             onClick={() =>
               gate.ask({
                 profile: guard,
-                title: `PIN de ${guard.name}`,
+                title: t("profiles.pinOf", { name: guard.name }),
                 action: async (pin) => {
                   await profiles.verify(guard.id, pin);
                   setUnlocked(true);
@@ -418,7 +417,7 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
               })
             }
           >
-            Introducir PIN
+            {t("profiles.enterPin")}
           </button>
         </div>
         {gate.element}
@@ -430,23 +429,23 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
     menu.open(
       { x: rect.left, y: rect.bottom + 4 },
       [
-        { label: "Cambiar PIN", onSelect: () => setEditingPin(profile) },
+        { label: t("profiles.changePin"), onSelect: () => setEditingPin(profile) },
         {
-          label: "Quitar PIN",
+          label: t("profiles.removePin"),
           danger: true,
           onSelect: () =>
             gate.ask({
               profile,
-              title: `Quitar el PIN de ${profile.name}`,
-              description: "Escribe el PIN actual. El perfil se abrirá sin pedirlo.",
+              title: t("profiles.removePinTitle", { name: profile.name }),
+              description: t("profiles.removePinHelp"),
               action: async (pin) => {
                 await profiles.setPin(profile.id, null, pin);
-                notify(`«${profile.name}» ya no pide PIN.`);
+                notify(t("profiles.pinRemoved", { name: profile.name }));
               },
             }),
         },
       ],
-      `PIN de ${profile.name}`,
+      t("profiles.pinOf", { name: profile.name }),
     );
   };
   return (
@@ -455,20 +454,20 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
         <div className="settings-row profile-row" key={profile.id}>
           <button
             className="profile-color-button"
-            aria-label={`Color de ${profile.name}`}
+            aria-label={t("profiles.colorOf", { name: profile.name })}
             aria-haspopup="menu"
-            title="Cambiar color"
+            title={t("profiles.changeColor")}
             onClick={(event) => {
               const rect = event.currentTarget.getBoundingClientRect();
               menu.open(
                 { x: rect.left, y: rect.bottom + 4 },
                 profileColors.map((color, index) => ({
-                  label: ["Lima", "Azul", "Melocotón", "Lavanda", "Turquesa", "Rosa", "Arena", "Verde"][index],
+                  label: [t("profiles.color.lime"), t("profiles.color.blue"), t("profiles.color.peach"), t("profiles.color.lavender"), t("profiles.color.teal"), t("profiles.color.pink"), t("profiles.color.sand"), t("profiles.color.green")][index],
                   icon: <span className="profile-swatch" style={{ background: color }} />,
                   checked: profile.color === color,
                   onSelect: () => profiles.update(profile.id, { color }),
                 })),
-                `Color de ${profile.name}`,
+                t("profiles.colorOf", { name: profile.name }),
               );
             }}
           >
@@ -476,7 +475,7 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
           </button>
           <input
             className="input profile-name"
-            aria-label={`Nombre del perfil ${profile.name}`}
+            aria-label={t("profiles.nameOf", { name: profile.name })}
             defaultValue={profile.name}
             maxLength={24}
             key={profile.name}
@@ -485,12 +484,12 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
           />
           <span className="profile-meta">
             {[
-              profile.id === active ? "En uso" : "",
-              profile.kids ? "Infantil" : "",
-              profile.pin ? "Con PIN" : "",
-              profile.maxAge !== undefined ? (profile.maxAge === 18 ? "+18" : `Hasta ${profile.maxAge}`) : "",
+              profile.id === active ? t("profiles.inUse") : "",
+              profile.kids ? t("profiles.kids") : "",
+              profile.pin ? t("profiles.hasPin") : "",
+              profile.maxAge !== undefined ? (profile.maxAge === 18 ? "+18" : t("profiles.upTo", { age: profile.maxAge })) : "",
               allowsAdultLabel(profile),
-              linked === profile.id && accountState.user ? `Cuenta de Stremio` : "",
+              linked === profile.id && accountState.user ? t("profiles.stremioAccount") : "",
             ]
               .filter(Boolean)
               .join(" · ")}
@@ -500,16 +499,16 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
               <button
                 className={`chip ${profile.kids ? "selected" : ""}`}
                 aria-pressed={Boolean(profile.kids)}
-                title="Solo catálogos infantiles en Inicio, Explorar y la búsqueda"
+                title={t("profiles.kidsTitle")}
                 onClick={() => profiles.update(profile.id, { kids: !profile.kids })}
               >
-                Infantil
+                {t("profiles.kids")}
               </button>
             )}
             <button
               className={`chip ${profile.pin ? "selected" : ""}`}
               aria-haspopup={profile.pin ? "menu" : "dialog"}
-              title={profile.pin ? "Cambiar o quitar el PIN" : "Pedir un PIN al abrir este perfil"}
+              title={profile.pin ? t("profiles.pinTitleSet") : t("profiles.pinTitleUnset")}
               onClick={(event) => pinMenu(profile, event.currentTarget)}
             >
               <Lock size={12} /> PIN
@@ -517,22 +516,22 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
             <button
               className={`chip ${profile.maxAge !== undefined ? "selected" : ""}`}
               aria-haspopup="dialog"
-              title="Contenido para adultos y edad máxima"
+              title={t("profiles.contentTitle")}
               onClick={() => setEditingContent(profile)}
             >
-              <ShieldCheck size={12} /> Contenido
+              <ShieldCheck size={12} /> {t("profiles.content")}
             </button>
             {profile.id !== active && (
               <button
                 className="button subtle small"
-                onClick={() => openProfile(gate, profile, () => notify(`Perfil: ${profile.name}`))}
+                onClick={() => openProfile(gate, profile, () => notify(t("profiles.switched", { name: profile.name })))}
               >
-                Usar
+                {t("profiles.use")}
               </button>
             )}
             {profile.id !== MAIN_PROFILE && profile.id !== active && (
               <button className="button subtle small danger-text" onClick={() => setRemoving(profile)}>
-                Eliminar
+                {t("common.delete")}
               </button>
             )}
           </div>
@@ -546,7 +545,7 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
             try {
               const profile = profiles.create(name);
               setName("");
-              notify(`Perfil «${profile.name}» creado.`);
+              notify(t("profiles.created", { name: profile.name }));
             } catch (cause) {
               setError(errorMessage(cause));
             }
@@ -557,8 +556,8 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
           </span>
           <input
             className="input profile-name"
-            aria-label="Nombre del nuevo perfil"
-            placeholder="Nuevo perfil"
+            aria-label={t("profiles.newNameLabel")}
+            placeholder={t("profiles.newPlaceholder")}
             maxLength={24}
             value={name}
             onChange={(event) => (setName(event.target.value), setError(""))}
@@ -566,27 +565,25 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
           <span className="profile-meta">{error && <span className="status error">{error}</span>}</span>
           <div className="profile-actions">
             <button className="button secondary small" disabled={!name.trim()}>
-              Añadir
+              {t("common.add")}
             </button>
           </div>
         </form>
       )}
       <p className="settings-note">
-        Cada perfil tiene su biblioteca, su progreso, sus vistos y sus preferencias de reproducción. Los addons y los servicios
-        son comunes. La cuenta de Stremio se sincroniza solo con el perfil desde el que se inició sesión. Con un PIN en
-        «Principal», un perfil infantil necesita ese PIN para administrar los perfiles.
+        {t("profiles.note")}
       </p>
       {menu.element}
       {gate.element}
       {editingPin && <PinEditor profile={editingPin} notify={notify} onClose={() => setEditingPin(null)} />}
       {editingContent && <ContentDialog profile={editingContent} onClose={() => setEditingContent(null)} />}
       {removing && (
-        <Dialog title="Eliminar perfil" onClose={() => setRemoving(null)} className="compact-dialog" hideClose>
-          <h2>¿Eliminar «{removing.name}»?</h2>
-          <p>Se borrarán su biblioteca, su progreso y sus preferencias de este equipo. Esta acción no se puede deshacer.</p>
+        <Dialog title={t("profiles.removeTitle")} onClose={() => setRemoving(null)} className="compact-dialog" hideClose>
+          <h2>{t("profiles.removeQuestion", { name: removing.name })}</h2>
+          <p>{t("profiles.removeWarning")}</p>
           <div className="form-actions">
             <button className="button secondary" data-autofocus onClick={() => setRemoving(null)}>
-              Cancelar
+              {t("common.cancel")}
             </button>
             <button
               className="button danger"
@@ -595,16 +592,16 @@ export function ProfileSettings({ notify }: { notify: (message: string) => void 
                 setRemoving(null);
                 gate.ask({
                   profile,
-                  title: `Eliminar «${profile.name}»`,
-                  description: "Escribe su PIN para eliminarlo.",
+                  title: t("profiles.removeNamed", { name: profile.name }),
+                  description: t("profiles.removePinPrompt"),
                   action: async (pin) => {
                     await profiles.remove(profile.id, pin);
-                    notify(`Perfil «${profile.name}» eliminado.`);
+                    notify(t("profiles.removed", { name: profile.name }));
                   },
                 });
               }}
             >
-              Eliminar perfil
+              {t("profiles.removeTitle")}
             </button>
           </div>
         </Dialog>

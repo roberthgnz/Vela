@@ -1,9 +1,10 @@
 import type { ResolvedStream } from "./contracts";
+import { locale, t } from "./i18n";
 
 export type StreamKind = "direct" | "hls" | "torrent" | "external" | "youtube";
 
 export const kindLabel: Record<StreamKind, string> = {
-  direct: "Directo",
+  direct: t("streams.kind.direct"),
   hls: "HLS",
   torrent: "Torrent",
   external: "Web",
@@ -56,9 +57,9 @@ export function streamTags(stream: ResolvedStream): string[] {
 export function streamWarnings(stream: ResolvedStream): string[] {
   const warnings: string[] = [];
   if (Object.keys(stream.behaviorHints?.proxyHeaders?.request || {}).length)
-    warnings.push("Requiere cabeceras HTTP especiales");
+    warnings.push(t("streams.warning.headers"));
   if (stream.behaviorHints?.notWebReady)
-    warnings.push("El addon indica que no es compatible con reproductores web");
+    warnings.push(t("streams.warning.notWebReady"));
   return warnings;
 }
 
@@ -74,18 +75,18 @@ const metadataLine = /👤|💾|⚙/u;
 
 /** Torrent addons such as Torrentio mark audio languages with country flags. */
 const flagLanguages: Record<string, string> = {
-  GB: "Inglés", US: "Inglés", ES: "Español (España)", MX: "Español (Latinoamérica)", AR: "Español (Latinoamérica)",
-  FR: "Francés", DE: "Alemán", IT: "Italiano", PT: "Portugués", BR: "Portugués (Brasil)", RU: "Ruso", UA: "Ucraniano",
-  JP: "Japonés", KR: "Coreano", CN: "Chino", TW: "Chino (Taiwán)", HK: "Chino (Hong Kong)", IN: "Hindi",
-  NL: "Neerlandés", PL: "Polaco", TR: "Turco", SE: "Sueco", NO: "Noruego", DK: "Danés", FI: "Finés", CZ: "Checo",
-  HU: "Húngaro", GR: "Griego", RO: "Rumano", BG: "Búlgaro", RS: "Serbio", HR: "Croata", IL: "Hebreo", SA: "Árabe",
-  TH: "Tailandés", VN: "Vietnamita", ID: "Indonesio", MY: "Malayo", PH: "Filipino", IR: "Persa", LT: "Lituano",
-  LV: "Letón", EE: "Estonio", SK: "Eslovaco", SI: "Esloveno",
+  GB: t("streams.lang.english"), US: t("streams.lang.english"), ES: t("streams.lang.spanishSpain"), MX: t("streams.lang.spanishLatam"), AR: t("streams.lang.spanishLatam"),
+  FR: t("streams.lang.french"), DE: t("streams.lang.german"), IT: t("streams.lang.italian"), PT: t("streams.lang.portuguese"), BR: t("languages.portugueseBrazil"), RU: t("streams.lang.russian"), UA: t("streams.lang.ukrainian"),
+  JP: t("streams.lang.japanese"), KR: t("streams.lang.korean"), CN: t("streams.lang.chinese"), TW: t("streams.lang.chineseTaiwan"), HK: t("streams.lang.chineseHongKong"), IN: t("streams.lang.hindi"),
+  NL: t("streams.lang.dutch"), PL: t("streams.lang.polish"), TR: t("streams.lang.turkish"), SE: t("streams.lang.swedish"), NO: t("streams.lang.norwegian"), DK: t("streams.lang.danish"), FI: t("streams.lang.finnish"), CZ: t("streams.lang.czech"),
+  HU: t("streams.lang.hungarian"), GR: t("streams.lang.greek"), RO: t("streams.lang.romanian"), BG: t("streams.lang.bulgarian"), RS: t("streams.lang.serbian"), HR: t("streams.lang.croatian"), IL: t("streams.lang.hebrew"), SA: t("streams.lang.arabic"),
+  TH: t("streams.lang.thai"), VN: t("streams.lang.vietnamese"), ID: t("streams.lang.indonesian"), MY: t("streams.lang.malay"), PH: t("streams.lang.filipino"), IR: t("streams.lang.persian"), LT: t("streams.lang.lithuanian"),
+  LV: t("streams.lang.latvian"), EE: t("streams.lang.estonian"), SK: t("streams.lang.slovak"), SI: t("streams.lang.slovenian"),
 };
 
 const regionNames = (() => {
   try {
-    return new Intl.DisplayNames(["es"], { type: "region" });
+    return new Intl.DisplayNames([locale()], { type: "region" });
   } catch {
     return undefined;
   }

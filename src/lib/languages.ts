@@ -3,6 +3,8 @@
  * in media files (Matroska tags, HLS `LANGUAGE`) and in Vela's preferences (ISO 639-2/T).
  */
 
+import { locale, t } from "./i18n";
+
 const twoLetter: Record<string, string> = {
   ar: "ara", bg: "bul", ca: "cat", cs: "ces", da: "dan", de: "deu", el: "ell", en: "eng", es: "spa", et: "est",
   eu: "eus", fa: "fas", fi: "fin", fr: "fra", gl: "glg", he: "heb", hi: "hin", hr: "hrv", hu: "hun", id: "ind",
@@ -49,7 +51,7 @@ export function sameLanguage(a: string | null | undefined, b: string | null | un
 
 const displayNames = (() => {
   try {
-    return new Intl.DisplayNames(["es"], { type: "language" });
+    return new Intl.DisplayNames([locale()], { type: "language" });
   } catch {
     return undefined;
   }
@@ -59,20 +61,20 @@ const toBcp47: Record<string, string> = Object.fromEntries(
   Object.entries(twoLetter).map(([short, long]) => [long, short]),
 );
 
-/** Human name in Spanish ("Inglés", "Portugués (Brasil)"); unknown codes are returned as given. */
+/** Human name in the interface language ("Inglés", "Portugués (Brasil)"); unknown codes are returned as given. */
 export function languageLabel(code: string): string {
   const raw = code.trim();
-  if (!raw) return "Desconocido";
+  if (!raw) return t("languages.unknown");
   const lower = raw.toLowerCase();
-  if (lower === "pob" || lower === "pt-br") return "Portugués (Brasil)";
-  if (lower === "und" || lower === "unk") return "Idioma no indicado";
+  if (lower === "pob" || lower === "pt-br") return t("languages.portugueseBrazil");
+  if (lower === "und" || lower === "unk") return t("languages.unspecified");
   const normalized = normalizeLanguage(raw);
   const candidate = toBcp47[normalized] ?? normalized;
   if (!/^[a-z]{2,3}$/.test(candidate)) return raw;
   try {
     const name = displayNames?.of(candidate);
     if (name && name.toLowerCase() !== candidate.toLowerCase())
-      return name.charAt(0).toLocaleUpperCase("es") + name.slice(1);
+      return name.charAt(0).toLocaleUpperCase(locale()) + name.slice(1);
   } catch {
     /* Unknown codes are shown as provided by the addon. */
   }

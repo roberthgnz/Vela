@@ -7,6 +7,7 @@ import type { InstalledAddon } from "../lib/contracts";
 import { loadManifest, normalizeManifestUrl } from "../lib/protocol";
 import { preferencesStore, usePreferences } from "../lib/store";
 import { addonHost, errorMessage, safeImage } from "../lib/utils";
+import { plural, t } from "../lib/i18n";
 import {
   anchorFrom,
   Dialog,
@@ -18,10 +19,10 @@ import {
 } from "./Primitives";
 
 const capabilityLabels: Record<string, string> = {
-  catalog: "Catálogos",
-  meta: "Metadatos",
-  stream: "Fuentes",
-  subtitles: "Subtítulos",
+  catalog: t("addons.capability.catalog"),
+  meta: t("addons.capability.meta"),
+  stream: t("addons.capability.stream"),
+  subtitles: t("addons.capability.subtitles"),
 };
 
 function AddonIcon({ addon }: { addon: InstalledAddon }) {
@@ -70,22 +71,22 @@ export function AddonsView({
     <div className="page">
       <header className="page-header">
         <h1>
-          Addons <span className="count">{prefs.addons.length}</span>
+          {t("nav.addons")} <span className="count">{prefs.addons.length}</span>
         </h1>
         <div className="toolbar">
           <button className="button primary" onClick={() => setInstallOpen(true)}>
             <Plus size={15} />
-            Añadir addon
+            {t("addons.add")}
           </button>
         </div>
       </header>
-      <div className="page-tabs" role="tablist" aria-label="Filtrar addons">
+      <div className="page-tabs" role="tablist" aria-label={t("addons.filterLabel")}>
         {(
           [
-            ["all", "Todos", prefs.addons.length],
-            ["on", "Activos", active],
-            ["off", "Desactivados", prefs.addons.length - active],
-            ...(accountState.status === "signed-in" ? ([["account", "Cuenta Stremio", null]] as const) : []),
+            ["all", t("addons.filter.all"), prefs.addons.length],
+            ["on", t("addons.filter.on"), active],
+            ["off", t("addons.filter.off"), prefs.addons.length - active],
+            ...(accountState.status === "signed-in" ? ([["account", t("addons.filter.account"), null]] as const) : []),
           ] as const
         ).map(([value, label, count]) => (
           <button
@@ -123,7 +124,7 @@ export function AddonsView({
                   <h3>{addon.manifest.name}</h3>
                   <span className="addon-version">v{addon.manifest.version}</span>
                   <p className="addon-description" title={addon.manifest.description}>
-                    {addon.manifest.description || "Sin descripción."}
+                    {addon.manifest.description || t("addons.noDescription")}
                   </p>
                   <div className="addon-meta">
                     {capabilities.map((name) => (
@@ -138,31 +139,31 @@ export function AddonsView({
                   <div className="addon-controls">
                     <Switch
                       checked={addon.enabled}
-                      label={`${addon.enabled ? "Desactivar" : "Activar"} ${addon.manifest.name}`}
+                      label={t(addon.enabled ? "addons.disable" : "addons.enable", { name: addon.manifest.name })}
                       onChange={() => preferencesStore.toggleAddon(addon.manifestUrl)}
                     />
                     <button
                       className="icon-button"
-                      aria-label={`Más opciones de ${addon.manifest.name}`}
+                      aria-label={t("addons.moreOptionsOf", { name: addon.manifest.name })}
                       aria-haspopup="menu"
-                      title="Más opciones"
+                      title={t("addons.moreOptions")}
                       onClick={(event) =>
                         menu.open(
                           anchorFrom(event.currentTarget, "end"),
                           [
                             {
-                              label: "Copiar URL del manifiesto",
+                              label: t("addons.copyManifestUrl"),
                               icon: <Clipboard size={15} />,
                               disabled: addon.manifestUrl.startsWith("vela:"),
                               onSelect: () =>
                                 void navigator.clipboard
                                   .writeText(addon.manifestUrl)
-                                  .then(() => notify("URL copiada."))
-                                  .catch(() => notify("No se pudo copiar al portapapeles.")),
+                                  .then(() => notify(t("addons.urlCopied")))
+                                  .catch(() => notify(t("addons.copyFailed"))),
                             },
                             "separator",
                             {
-                              label: "Eliminar",
+                              label: t("common.delete"),
                               icon: <Trash2 size={15} />,
                               danger: true,
                               onSelect: () => setRemoving(addon),
@@ -183,47 +184,47 @@ export function AddonsView({
         {filter !== "account" && !list.length && (
           <EmptyState
             icon={<Puzzle size={20} />}
-            title={prefs.addons.length ? "Ningún addon en esta vista" : "No hay addons instalados"}
-            description="Los addons aportan catálogos, metadatos, fuentes y subtítulos."
+            title={prefs.addons.length ? t("addons.emptyFiltered") : t("addons.emptyNone")}
+            description={t("addons.emptyDescription")}
             action={
               <button className="button primary" onClick={() => setInstallOpen(true)}>
-                <Plus size={15} /> Añadir addon
+                <Plus size={15} /> {t("addons.add")}
               </button>
             }
           />
         )}
         <p className="footnote">
-          Cada addon lo mantiene su autor y recibe las consultas que haces. Desactivar o eliminar un addon no borra tu biblioteca ni tu progreso.
+          {t("addons.footnote")}
         </p>
       </div>
       {installOpen && (
         <InstallDialog
           onClose={() => setInstallOpen(false)}
-          onInstalled={(addon) => notify(`${addon.manifest.name} instalado.`)}
+          onInstalled={(addon) => notify(t("addons.installedNamed", { name: addon.manifest.name }))}
         />
       )}
       {removing && (
         <Dialog
-          title={`Eliminar ${removing.manifest.name}`}
+          title={t("addons.removeTitle", { name: removing.manifest.name })}
           onClose={() => setRemoving(null)}
           className="compact-dialog"
           hideClose
         >
-          <h2>¿Eliminar {removing.manifest.name}?</h2>
-          <p>Dejará de aparecer en Vela. Tu biblioteca y tu progreso se conservan.</p>
+          <h2>{t("addons.removeQuestion", { name: removing.manifest.name })}</h2>
+          <p>{t("addons.removeWarning")}</p>
           <div className="form-actions">
             <button className="button secondary" data-autofocus onClick={() => setRemoving(null)}>
-              Cancelar
+              {t("common.cancel")}
             </button>
             <button
               className="button danger"
               onClick={() => {
                 preferencesStore.removeAddon(removing.manifestUrl);
-                notify(`${removing.manifest.name} eliminado.`);
+                notify(t("addons.removed", { name: removing.manifest.name }));
                 setRemoving(null);
               }}
             >
-              Eliminar addon
+              {t("addons.remove")}
             </button>
           </div>
         </Dialog>
@@ -250,9 +251,9 @@ function InstallDialog({
     },
   });
   return (
-    <Dialog title="Añadir addon" onClose={onClose} className="compact-dialog">
-      <h2>Añadir addon</h2>
-      <p>Pega la dirección de su manifiesto. Vela lo validará antes de instalarlo.</p>
+    <Dialog title={t("addons.add")} onClose={onClose} className="compact-dialog">
+      <h2>{t("addons.add")}</h2>
+      <p>{t("addons.installIntro")}</p>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -260,7 +261,7 @@ function InstallDialog({
         }}
       >
         <label className="field-label" htmlFor="addon-url">
-          URL del addon
+          {t("addons.urlLabel")}
         </label>
         <input
           id="addon-url"
@@ -271,7 +272,7 @@ function InstallDialog({
           autoComplete="off"
           spellCheck={false}
           required
-          placeholder="https://ejemplo.com/manifest.json"
+          placeholder={t("addons.urlPlaceholder")}
           value={url}
           aria-describedby="addon-url-hint"
           onChange={(event) => {
@@ -280,7 +281,7 @@ function InstallDialog({
           }}
         />
         <span className="field-hint" id="addon-url-hint">
-          Admite enlaces HTTPS y enlaces de instalación stremio://
+          {t("addons.urlHint")}
         </span>
         {install.isError && (
           <p className="form-error" role="alert">
@@ -289,11 +290,11 @@ function InstallDialog({
         )}
         <div className="form-actions">
           <button className="button secondary" type="button" onClick={onClose}>
-            Cancelar
+            {t("common.cancel")}
           </button>
           <button className="button primary" disabled={install.isPending || !url.trim()} type="submit">
             {install.isPending ? <Spinner /> : <Plus size={15} />}
-            Instalar addon
+            {t("addons.install")}
           </button>
         </div>
       </form>
@@ -329,20 +330,20 @@ function AccountAddons({ userId, notify }: { userId: string; notify: (message: s
       }
     }
     setBusy((value) => value.filter((url) => !descriptors.some((item) => item.transportUrl === url)));
-    if (count) notify(count === 1 ? "Addon instalado desde tu cuenta." : `${count} addons instalados desde tu cuenta.`);
+    if (count) notify(plural(count, "addons.installedFromAccount.one", "addons.installedFromAccount.other"));
   };
-  if (query.isPending) return <p className="panel-status"><Spinner /> Leyendo los addons de tu cuenta…</p>;
+  if (query.isPending) return <p className="panel-status"><Spinner /> {t("addons.readingAccount")}</p>;
   if (query.isError)
-    return <ErrorState title="No se pudieron leer los addons de la cuenta" message={errorMessage(query.error)} retry={() => void query.refetch()} />;
+    return <ErrorState title={t("addons.accountError")} message={errorMessage(query.error)} retry={() => void query.refetch()} />;
   return (
     <>
       <div className="list-toolbar">
         <p>
-          {query.data.length} addons en tu cuenta · {missing.length} sin instalar en Vela. Instalar aquí no cambia tu cuenta.
+          {t("addons.accountSummary", { total: query.data.length, missing: missing.length })}
         </p>
         {missing.length > 0 && (
           <button className="button secondary" disabled={busy.length > 0} onClick={() => void install(missing)}>
-            <Download size={14} /> Instalar los {missing.length} que faltan
+            <Download size={14} /> {t("addons.installMissing", { count: missing.length })}
           </button>
         )}
       </div>
@@ -363,19 +364,19 @@ function AccountAddons({ userId, notify }: { userId: string; notify: (message: s
               <h3>{descriptor.manifest.name}</h3>
               <span className="addon-version">{descriptor.manifest.version ? `v${descriptor.manifest.version}` : ""}</span>
               <p className="addon-description" title={failure || descriptor.manifest.description}>
-                {failure ? <span className="status error">{failure}</span> : descriptor.manifest.description || "Sin descripción."}
+                {failure ? <span className="status error">{failure}</span> : descriptor.manifest.description || t("addons.noDescription")}
               </p>
               <div className="addon-meta">
-                {descriptor.flags?.official && <span className="tag">Oficial</span>}
-                {descriptor.flags?.protected && <span className="tag">Protegido</span>}
+                {descriptor.flags?.official && <span className="tag">{t("addons.official")}</span>}
+                {descriptor.flags?.protected && <span className="tag">{t("addons.protected")}</span>}
                 <span className="addon-host">{addonHost(descriptor.transportUrl)}</span>
               </div>
               <div className="addon-controls">
                 {isInstalled ? (
-                  <span className="status ok"><Check size={14} /> Instalado</span>
+                  <span className="status ok"><Check size={14} /> {t("addons.installed")}</span>
                 ) : (
                   <button className="button secondary small" disabled={loading} onClick={() => void install([descriptor])}>
-                    {loading ? <Spinner /> : <Download size={13} />} Instalar
+                    {loading ? <Spinner /> : <Download size={13} />} {t("addons.installOne")}
                   </button>
                 )}
               </div>

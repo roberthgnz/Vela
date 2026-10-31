@@ -11,6 +11,7 @@ import { mediaKey, usePreferences } from "../lib/store";
 import { errorMessage, yearOf } from "../lib/utils";
 import { typeLabel } from "./MediaCard";
 import { Artwork, Dialog, EmptyState, ErrorState, Spinner } from "./Primitives";
+import { plural, t } from "../lib/i18n";
 
 export type Command = {
   id: string;
@@ -75,7 +76,7 @@ export function SearchPalette({
         .filter((result) => result.status === "fulfilled")
         .map((result) => result.value);
       if (!valid.length && results.length)
-        throw new Error("Los catálogos no han respondido. Prueba de nuevo.");
+        throw new Error(t("search.noResponse"));
       const found = new Set<string>();
       return valid
         .flatMap(({ source, items }) => items.map((meta) => ({ meta, addon: source.addon })))
@@ -113,13 +114,13 @@ export function SearchPalette({
         .filter((group) => group.items.length)
     : [];
   return (
-    <Dialog title="Buscar" className="palette" onClose={onClose} hideClose>
+    <Dialog title={t("common.search")} className="palette" onClose={onClose} hideClose>
       <div className="palette-field">
         <Search size={17} />
         <input
           type="search"
-          aria-label="Buscar películas y series"
-          placeholder="Buscar películas, series o comandos"
+          aria-label={t("app.searchPlaceholder")}
+          placeholder={t("search.placeholder")}
           autoFocus
           data-autofocus
           autoComplete="off"
@@ -139,13 +140,13 @@ export function SearchPalette({
         {query.isFetching && <Spinner />}
         <kbd>Esc</kbd>
       </div>
-      <div className="palette-filters" role="group" aria-label="Filtros de búsqueda">
-        <div className="palette-types" role="group" aria-label="Tipo">
+      <div className="palette-filters" role="group" aria-label={t("search.filters")}>
+        <div className="palette-types" role="group" aria-label={t("search.type")}>
           {(
             [
-              ["all", "Todo"],
-              ["movie", "Películas"],
-              ["series", "Series"],
+              ["all", t("library.tab.all")],
+              ["movie", t("nav.movies")],
+              ["series", t("nav.series")],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -160,49 +161,49 @@ export function SearchPalette({
         </div>
         <select
           className="palette-select"
-          aria-label="Año"
+          aria-label={t("browse.filter.year")}
           value={filters.decade}
           data-active={Boolean(filters.decade) || undefined}
           onChange={(event) => filter({ decade: event.target.value })}
         >
-          <option value="">Cualquier año</option>
+          <option value="">{t("search.anyYear")}</option>
           {decades.map((decade) => (
             <option key={decade} value={decade}>
-              Años {decade.slice(2)}
+              {t("browse.decade", { short: decade.slice(2) })}
             </option>
           ))}
-          <option value="older">Antes de 1980</option>
+          <option value="older">{t("browse.before1980")}</option>
         </select>
         <select
           className="palette-select"
-          aria-label="Orden"
+          aria-label={t("browse.filter.sort")}
           value={filters.sort}
           data-active={filters.sort !== "relevance" || undefined}
           onChange={(event) => filter({ sort: event.target.value as SearchFilters["sort"] })}
         >
-          <option value="relevance">Más relevantes</option>
-          <option value="newest">Más recientes</option>
-          <option value="oldest">Más antiguos</option>
+          <option value="relevance">{t("search.sort.relevance")}</option>
+          <option value="newest">{t("browse.sort.newest")}</option>
+          <option value="oldest">{t("browse.sort.oldest")}</option>
         </select>
         {categories && (
           <select
             className="palette-select"
-            aria-label="Contenido"
-            title="Según la clasificación por edad de TMDB"
+            aria-label={t("browse.content")}
+            title={t("browse.contentTitle")}
             value={content}
             data-active={content !== "all" || undefined}
             onChange={(event) => setContent(event.target.value as ContentCategory)}
           >
-            <option value="all">Todo el contenido</option>
-            <option value="sfw">Apto (SFW)</option>
-            <option value="nsfw">Adultos (NSFW, +18)</option>
+            <option value="all">{t("search.allContent")}</option>
+            <option value="sfw">{t("browse.content.sfw")}</option>
+            <option value="nsfw">{t("browse.content.nsfw")}</option>
           </select>
         )}
         {(activeFilters(filters) > 0 || content !== "all") && (
           <button
             className="icon-button palette-clear"
-            aria-label="Quitar filtros"
-            title="Quitar filtros"
+            aria-label={t("browse.clearFilters")}
+            title={t("browse.clearFilters")}
             onClick={() => {
               setFilters(noSearchFilters);
               setContent("all");
@@ -226,9 +227,9 @@ export function SearchPalette({
               <ErrorState message={errorMessage(query.error)} retry={() => void query.refetch()} />
             ) : groups.length ? (
               groups.map((group) => (
-                <section key={group.type} aria-label={group.type === "series" ? "Series" : group.type === "movie" ? "Películas" : "Otros"}>
+                <section key={group.type} aria-label={group.type === "series" ? t("nav.series") : group.type === "movie" ? t("nav.movies") : t("common.others")}>
                   <h3 className="palette-group">
-                    {group.type === "series" ? "Series" : group.type === "movie" ? "Películas" : "Otros"}
+                    {group.type === "series" ? t("nav.series") : group.type === "movie" ? t("nav.movies") : t("common.others")}
                     <span>{group.items.length}</span>
                   </h3>
                   {group.items.map(({ meta, addon }) => (
@@ -236,7 +237,7 @@ export function SearchPalette({
                       key={mediaKey(meta.type, meta.id)}
                       className="palette-item"
                       data-palette-item
-                      aria-label={`Ver ${meta.name}`}
+                      aria-label={t("library.open", { name: meta.name })}
                       onKeyDown={moveFocus}
                       onClick={() => {
                         searchHistory.add(search);
@@ -268,8 +269,8 @@ export function SearchPalette({
                 <EmptyState
                   compact
                   icon={<Search size={18} />}
-                  title="Ningún resultado con estos filtros"
-                  description={`Hay ${query.data.length} resultados para «${search}» sin filtros.`}
+                  title={t("search.noFilteredResults")}
+                  description={plural(query.data.length, "search.unfilteredCount.one", "search.unfilteredCount.other", { query: search })}
                   action={
                     <button
                       className="button secondary small"
@@ -278,7 +279,7 @@ export function SearchPalette({
                         setContent("all");
                       }}
                     >
-                      Quitar filtros
+                      {t("browse.clearFilters")}
                     </button>
                   }
                 />
@@ -286,11 +287,11 @@ export function SearchPalette({
                 <EmptyState
                   compact
                   icon={<Search size={18} />}
-                  title="No encontramos resultados"
+                  title={t("search.noResults")}
                   description={
                     sources.length
-                      ? `Ningún catálogo devuelve resultados para «${search}».`
-                      : "No hay ningún catálogo activo con búsqueda."
+                      ? t("search.noCatalogResults", { query: search })
+                      : t("search.noSearchCatalogs")
                   }
                 />
               )
@@ -298,11 +299,11 @@ export function SearchPalette({
           </>
         )}
         {!input.trim() && recent.length > 0 && (
-          <section aria-label="Búsquedas recientes">
+          <section aria-label={t("search.recentSearches")}>
             <h3 className="palette-group">
-              Recientes
+              {t("search.recent")}
               <button className="link-button palette-forget" onClick={() => searchHistory.clear()}>
-                Borrar historial
+                {t("search.clearHistory")}
               </button>
             </h3>
             {recent.map((text) => (
@@ -310,7 +311,7 @@ export function SearchPalette({
                 <button
                   className="palette-item command"
                   data-palette-item
-                  aria-label={`Buscar ${text}`}
+                  aria-label={t("search.searchFor", { text })}
                   onKeyDown={moveFocus}
                   onClick={(event) => {
                     setInput(text);
@@ -326,8 +327,8 @@ export function SearchPalette({
                 </button>
                 <button
                   className="icon-button palette-remove"
-                  aria-label={`Quitar «${text}» del historial`}
-                  title="Quitar del historial"
+                  aria-label={t("search.removeFromHistoryName", { text })}
+                  title={t("search.removeFromHistory")}
                   onClick={() => searchHistory.remove(text)}
                 >
                   <X size={14} />
@@ -337,8 +338,8 @@ export function SearchPalette({
           </section>
         )}
         {matchingCommands.length > 0 && (
-          <section aria-label="Comandos">
-            <h3 className="palette-group">Ir a</h3>
+          <section aria-label={t("search.commands")}>
+            <h3 className="palette-group">{t("search.goTo")}</h3>
             {matchingCommands.map((command) => (
               <button
                 key={command.id}
@@ -360,13 +361,13 @@ export function SearchPalette({
           </section>
         )}
         {search.length < 2 && !matchingCommands.length && (
-          <EmptyState compact icon={<Search size={18} />} title="Escribe al menos dos letras" description="La búsqueda consulta los catálogos activos." />
+          <EmptyState compact icon={<Search size={18} />} title={t("search.typeMore")} description={t("search.typeMoreDescription")} />
         )}
       </div>
       <footer className="palette-footer">
-        <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
-        <span><kbd>Intro</kbd> abrir</span>
-        <span><kbd>Esc</kbd> cerrar</span>
+        <span><kbd>↑</kbd><kbd>↓</kbd> {t("search.navigate")}</span>
+        <span><kbd>{t("search.enterKey")}</kbd> {t("search.open")}</span>
+        <span><kbd>Esc</kbd> {t("search.close")}</span>
       </footer>
     </Dialog>
   );
