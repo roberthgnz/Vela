@@ -20,6 +20,7 @@
     "allow-native-transport",
     "allow-downloads",
     "allow-storage",
+    "allow-logging",
     "allow-desktop-services"
   ]
 }

@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   Captions,
+  ClipboardCopy,
   DatabaseBackup,
   FolderOpen,
   Globe,
@@ -36,7 +37,8 @@ import {
   torrentProfiles,
   type TorrentProfile,
 } from "../lib/streamingServer";
-import { backupStorage, revealStorage, storageInfo, useStorageStatus } from "../lib/storage";
+import { logFolder, logTail, revealLog, saveReport } from "../lib/log";
+import { backupStorage, getStorageStatus, revealStorage, storageInfo, useStorageStatus } from "../lib/storage";
 import { formatBytes } from "../lib/downloads";
 import { openExternal } from "../lib/transport";
 import { errorMessage, motion } from "../lib/utils";
@@ -108,6 +110,58 @@ function Row({
       </div>
       {children && <div className="settings-row-control">{children}</div>}
     </div>
+  );
+}
+
+/** What a bug report needs: versions, where the data is, and the end of the log. Nothing is sent. */
+async function diagnosticReport(): Promise<string> {
+  const status = getStorageStatus();
+  const info = await storageInfo().catch(() => null);
+  const tail = await logTail().catch((error: unknown) => `(log unavailable: ${errorMessage(error)})`);
+  const lines = [
+    `Vela ${__APP_VERSION__}`,
+    `Fecha: ${new Date().toISOString()}`,
+    `Navegador: ${navigator.userAgent}`,
+    `Pantalla: ${window.screen.width}×${window.screen.height} @${window.devicePixelRatio}`,
+    `Almacenamiento: ${status.backend}${status.error ? ` (error: ${status.error})` : ""}${info ? `, ${info.keys} registros, ${formatBytes(info.size)}, ${info.backups.length} copias` : ""}`,
+    `Stremio Service: ${(await serviceInstalled().catch(() => false)) ? "instalado" : "no encontrado"}`,
+    "",
+    "--- vela.log (final) ---",
+    tail.trimEnd(),
+  ];
+  return lines.join("\n");
+}
+
+function DiagnosticsRows({ notify }: { notify: (message: string) => void }) {
+  const folder = useQuery({ queryKey: ["log-folder"], queryFn: logFolder, staleTime: Infinity });
+  const copy = useMutation({
+    // WebView2's clipboard needs a focused document and may never answer; after a moment the
+    // report is saved as a text file in the logs folder and shown in Explorer instead.
+    mutationFn: async () => {
+      const report = await diagnosticReport();
+      const copied = await Promise.race([
+        navigator.clipboard.writeText(report).then(() => true, () => false),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1500)),
+      ]);
+      if (copied) return "Diagnóstico copiado al portapapeles.";
+      const path = await saveReport(report);
+      return `Diagnóstico guardado en ${path}.`;
+    },
+    onSuccess: notify,
+    onError: (error) => notify(errorMessage(error)),
+  });
+  return (
+    <Row
+      label="Diagnóstico"
+      description={`Versiones, estado del almacenamiento y el final del registro de errores (${folder.data || "carpeta logs"}). No se envía nada: pégalo en un issue si algo falla.`}
+    >
+      <button className="button secondary" onClick={() => copy.mutate()} disabled={copy.isPending}>
+        {copy.isPending ? <Spinner /> : <ClipboardCopy size={14} />} Copiar diagnóstico
+      </button>
+      <button className="button subtle" onClick={() => void revealLog().catch((error) => notify(errorMessage(error)))}>
+        <FolderOpen size={14} /> Abrir carpeta
+      </button>
+    </Row>
   );
 }
 
@@ -567,6 +621,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
             <div className="settings-card">
               <Row label={`Vela ${__APP_VERSION__}`} description="Cliente de escritorio independiente compatible con el protocolo de addons de Stremio. No es una aplicación oficial de Stremio." />
               {updates.supported() && <UpdateRows />}
+              {native && <DiagnosticsRows notify={notify} />}
               <Row
                 label="Privacidad"
                 description="Tu biblioteca se guarda localmente. Cada addon recibe las consultas que le haces; Vela no envía datos a otros servicios."

@@ -170,6 +170,9 @@ pub async fn download_start(
             }
             Err(error) => {
                 let cancelled = cancel.load(Ordering::Relaxed);
+                if !cancelled {
+                    crate::logging::log_warn!("download {id} failed: {error}");
+                }
                 let _ = app.emit(
                     "download-failed",
                     serde_json::json!({ "id": id, "error": error, "cancelled": cancelled }),

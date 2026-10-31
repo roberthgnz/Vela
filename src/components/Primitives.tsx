@@ -1,13 +1,53 @@
 import {
+  Component,
   useCallback,
   useLayoutEffect,
   useRef,
   useState,
+  type ErrorInfo,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
 import { AlertTriangle, Film, LoaderCircle, RotateCw, X } from "lucide-react";
+import { log } from "../lib/log";
 import { safeImage } from "../lib/utils";
+
+/**
+ * Keeps one view's crash from blanking the whole window. The error is logged with the component
+ * stack; «Reintentar» mounts the children again. Pass a `resetKey` (the route, say) so that
+ * navigating away clears the error on its own.
+ */
+export class ErrorBoundary extends Component<
+  { name: string; resetKey?: unknown; children: ReactNode },
+  { error?: Error }
+> {
+  state: { error?: Error } = {};
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    log.error(`${this.props.name} crashed`, `${error.name}: ${error.message}${info.componentStack ?? ""}`);
+  }
+
+  componentDidUpdate(previous: { resetKey?: unknown }) {
+    if (this.state.error && previous.resetKey !== this.props.resetKey) this.setState({ error: undefined });
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="banner">
+        <ErrorState
+          title="Esta parte de Vela ha fallado"
+          message={`${this.state.error.message}. El resto sigue funcionando; el detalle está en Ajustes › Acerca de › Copiar diagnóstico.`}
+          retry={() => this.setState({ error: undefined })}
+        />
+      </div>
+    );
+  }
+}
 
 export function Artwork({
   src,

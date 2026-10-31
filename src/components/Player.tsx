@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { log } from "../lib/log";
 import { storage } from "../lib/storage";
 import {
   ArrowLeft,
@@ -1084,7 +1085,11 @@ export function Player({
             setIdle(false);
             finish();
           }}
-          onError={(event) => setError(mediaErrorMessage(event.currentTarget.error))}
+          onError={(event) => {
+            const media = event.currentTarget.error;
+            log.warn(`player: media error code ${media?.code ?? "?"}`, media?.message || undefined);
+            setError(mediaErrorMessage(media));
+          }}
           onClick={() => (popover ? setPopover(null) : toggle())}
           onDoubleClick={toggleFullscreen}
         />

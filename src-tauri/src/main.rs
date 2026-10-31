@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod clock;
 mod downloads;
+mod logging;
 mod mpv;
 mod proxy;
 mod secrets;
@@ -323,14 +325,22 @@ fn main() {
         .manage(downloads::Downloads::new().expect("could not initialize downloads"))
         .manage(service::Service::default())
         .setup(|app| {
+            if let Ok(dir) = app.path().app_data_dir() {
+                logging::init(&dir);
+            }
+            logging::log_info!("Vela {} starting", app.package_info().version);
             match storage::open(app.handle()) {
                 Ok(storage) => {
-                    if let Err(error) = storage.backup_if_due() {
-                        eprintln!("vela: daily backup failed: {error}");
+                    match storage.backup_if_due() {
+                        Ok(Some(path)) => {
+                            logging::log_info!("daily backup written to {}", path.display())
+                        }
+                        Ok(None) => {}
+                        Err(error) => logging::log_warn!("daily backup failed: {error}"),
                     }
                     app.manage(storage);
                 }
-                Err(error) => eprintln!("vela: database unavailable: {error}"),
+                Err(error) => logging::log_error!("database unavailable: {error}"),
             }
             webview::create_main_window(app.handle())?;
             Ok(())
@@ -373,6 +383,11 @@ fn main() {
             storage::storage_info,
             storage::storage_backup,
             storage::storage_reveal,
+            logging::log_write,
+            logging::log_tail,
+            logging::log_folder,
+            logging::log_reveal,
+            logging::log_save_report,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_delete,
@@ -387,6 +402,7 @@ fn main() {
                 if let Some(storage) = app.try_state::<storage::Storage>() {
                     storage.checkpoint();
                 }
+                logging::log_info!("Vela exiting");
             }
         });
 }

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { log } from "./log";
 
 /**
  * Where Vela keeps its data on this device. The interface reads and writes synchronously, as it
@@ -66,7 +67,9 @@ export function createDesktopStorage(writer: Writer, backend: Backend = "desktop
     } catch (error) {
       // Keep the failed changes unless a newer one replaced them meanwhile.
       for (const change of batch) if (!pending.has(change.key)) pending.set(change.key, change.value);
-      setStatus({ error: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      if (status.error !== message) log.error(`storage write failed (${batch.length} changes kept for retry)`, message);
+      setStatus({ error: message });
       timer = setTimeout(schedule, RETRY_DELAY);
     }
   }
@@ -119,6 +122,7 @@ export function createDesktopStorage(writer: Writer, backend: Backend = "desktop
       const note = JSON.stringify({ from: "localStorage", at: new Date().toISOString(), keys: copied.length });
       data.set(MIGRATION_KEY, note);
       pending.set(MIGRATION_KEY, note);
+      log.info(`storage: copied ${copied.length} keys from localStorage`);
       setStatus({ migrated: true });
       await this.flush();
     },
@@ -224,6 +228,7 @@ export async function initStorage(): Promise<void> {
   } catch (error) {
     active = fallback;
     unavailable = { ...fallbackStatus, error: error instanceof Error ? error.message : String(error) };
+    log.error("storage: database unavailable, using localStorage", unavailable.error);
   }
 }
 

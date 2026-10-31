@@ -20,6 +20,10 @@ node dev/validation-addon.mjs        # addon en http://127.0.0.1:7010/manifest.j
 
 Los torrents, la conversión de formatos y los subtítulos incrustados necesitan el servidor de streaming que instala Stremio (`http://127.0.0.1:11470`).
 
+## Informar de un error
+
+Adjunta el informe de Ajustes › Acerca de › «Copiar diagnóstico» (versiones, estado del almacenamiento y el final de `logs/vela.log`). Revísalo antes: el registro no incluye URL de addons ni claves, pero sí nombres de archivos y mensajes de error.
+
 ## Antes de abrir un pull request
 
 ```powershell

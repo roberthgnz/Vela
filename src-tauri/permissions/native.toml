@@ -17,3 +17,8 @@ commands.allow = ["service_installed", "service_start", "hardware_decoding_get",
 identifier = "allow-storage"
 description = "Allow the main window to read and write Vela's own database in the app data folder, make a copy of it and show the folder with its backups in Explorer."
 commands.allow = ["storage_load", "storage_write", "storage_info", "storage_backup", "storage_reveal"]
+
+[[permission]]
+identifier = "allow-logging"
+description = "Allow the main window to append lines to Vela's own log file, read its end for the diagnostic report and show the folder with the log files in Explorer."
+commands.allow = ["log_write", "log_tail", "log_folder", "log_reveal", "log_save_report"]

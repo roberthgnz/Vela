@@ -40,7 +40,7 @@ import { DownloadsView } from "./components/DownloadsView";
 import { downloads, downloadsAvailable, type Download } from "./lib/downloads";
 import type { CardMenu } from "./components/MediaCard";
 import { Player, PreparingPlayer, type Playing } from "./components/Player";
-import { Dialog, ErrorState, useMenu } from "./components/Primitives";
+import { Dialog, ErrorBoundary, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
 import { UpdateNotice } from "./components/UpdateNotice";
@@ -573,6 +573,7 @@ export default function App() {
             />
           </div>
         )}
+        <ErrorBoundary name={`view ${route.name}`} resetKey={route}>
         {route.name === "home" && (
           <HomeView
             onOpen={openMedia}
@@ -624,6 +625,7 @@ export default function App() {
             notify={notify}
           />
         )}
+        </ErrorBoundary>
       </main>
       </RouteStateProvider>
       {searchOpen && (
@@ -644,6 +646,7 @@ export default function App() {
         </Dialog>
       )}
       {playing && (
+        <ErrorBoundary name="player" resetKey={playing}>
         <Player
           key={`${playing.videoId}|${playing.url}`}
           playing={playing}
@@ -657,6 +660,7 @@ export default function App() {
             void account.sync();
           }}
         />
+        </ErrorBoundary>
       )}
       {menu.element}
       <UpdateNotice />
