@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const transport = vi.hoisted(() => ({ postJson: vi.fn(), requestJson: vi.fn() }));
 vi.mock('./transport', () => transport);
 
-import { describeTorrent, ensureService, isLocalService, peerSources, prepareTorrent, removeTorrent, setTorrentProfile, suggestedProfile, torrentProfileOf, torrentProfiles, probeProblems, proxyUrl, torrentStats, torrentUrl, transcodeUrl } from './streamingServer';
+import { describeTorrent, ensureService, isLocalService, mediaCapabilities, peerSources, prepareTorrent, removeTorrent, setTorrentProfile, suggestedProfile, torrentProfileOf, torrentProfiles, probeProblems, proxyUrl, torrentStats, torrentUrl, transcodeUrl } from './streamingServer';
 
 const hash = '08ada5a7a6183aae1e09d831df6748d566095a10';
 const files = ['Sintel.de.srt', 'Sintel.en.srt', 'Sintel.es.srt', 'Sintel.fr.srt', 'Sintel.it.srt', 'Sintel.mp4', 'poster.jpg']
@@ -76,7 +76,24 @@ describe('streaming server client', () => {
     expect(url.pathname).toMatch(/^\/hlsv2\/[a-f0-9]{24}\/master\.m3u8$/);
     expect(url.searchParams.get('mediaURL')).toBe('http://127.0.0.1:11470/x/1');
     expect(url.searchParams.getAll('videoCodecs')).toEqual(['h264', 'vp9']);
-    expect(url.searchParams.get('maxAudioChannels')).toBe('2');
+    // Surround is kept: the channels the player takes, not a stereo mix.
+    expect(url.searchParams.get('maxAudioChannels')).toBe('8');
+    const stereo = new URL(transcodeUrl('http://127.0.0.1:11470', 'http://x/1', { ...capabilities, maxAudioChannels: 2 }));
+    expect(stereo.searchParams.get('maxAudioChannels')).toBe('2');
+  });
+
+  it('counts HEVC only when WebView2 answers that it surely plays it', () => {
+    const hevc = 'video/mp4; codecs="hvc1.1.6.L153.B0"';
+    const answers: Record<string, string> = { [hevc]: 'probably' };
+    vi.stubGlobal('document', { createElement: () => ({ canPlayType: (mime: string) => answers[mime] ?? '' }) });
+    try {
+      expect(mediaCapabilities().videoCodecs).toEqual(['h264', 'hevc']);
+      answers[hevc] = 'maybe';
+      expect(mediaCapabilities().videoCodecs).toEqual(['h264']);
+      expect(mediaCapabilities().maxAudioChannels).toBe(8);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

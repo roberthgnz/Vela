@@ -162,7 +162,7 @@ export const es = {
   "settings.audio.alternativeHint": "Se usa si no hay pista en el idioma preferido.",
   // Settings: playback
   "settings.playback.builtIn": "Reproductor integrado",
-  "settings.playback.builtInHint": "Reproduce MP4, WebM y MKV con H.264, VP9 o AV1 y listas HLS, con varias pistas de audio. HEVC, DTS o TrueHD necesitan la conversión de Stremio Service o un reproductor externo.",
+  "settings.playback.builtInHint": "Reproduce MP4, WebM y MKV con H.264, VP9 o AV1 (y HEVC si el equipo lo decodifica) y listas HLS, con varias pistas de audio. DTS, TrueHD o HEVC sin soporte del equipo necesitan la conversión de Stremio Service o un reproductor externo.",
   "settings.playback.seekShort": "Salto corto",
   "settings.playback.seekShortHint": "Flechas izquierda y derecha.",
   "settings.playback.seekLong": "Salto largo",

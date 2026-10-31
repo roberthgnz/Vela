@@ -160,7 +160,7 @@ export const en: Record<keyof typeof es, string> = {
   "settings.audio.alternativeHint": "Used when there is no track in the preferred language.",
   // Settings: playback
   "settings.playback.builtIn": "Built-in player",
-  "settings.playback.builtInHint": "Plays MP4, WebM and MKV with H.264, VP9 or AV1, and HLS playlists, with multiple audio tracks. HEVC, DTS or TrueHD need Stremio Service's conversion or an external player.",
+  "settings.playback.builtInHint": "Plays MP4, WebM and MKV with H.264, VP9 or AV1 (and HEVC when this computer decodes it), and HLS playlists, with multiple audio tracks. DTS, TrueHD, or HEVC the computer can't decode, need Stremio Service's conversion or an external player.",
   "settings.playback.seekShort": "Short skip",
   "settings.playback.seekShortHint": "Left and right arrows.",
   "settings.playback.seekLong": "Long skip",

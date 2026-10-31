@@ -296,11 +296,16 @@ export type Capabilities = {
   maxAudioChannels: number;
 };
 
-/** What WebView2/Chromium decodes natively. HEVC is excluded because support depends on hardware and extensions. */
+/**
+ * What WebView2/Chromium decodes natively. HEVC depends on the hardware and on Windows' HEVC
+ * extensions, so it counts only when WebView2 answers "probably" for 4K Main (level 5.1): then the
+ * file plays as it is (and a conversion copies its video) instead of being re-encoded to H.264.
+ */
 export function mediaCapabilities(): Capabilities {
   const video = typeof document === "undefined" ? undefined : document.createElement("video");
   const can = (mime: string) => Boolean(video?.canPlayType(mime));
   const videoCodecs = ["h264"];
+  if (video?.canPlayType('video/mp4; codecs="hvc1.1.6.L153.B0"') === "probably") videoCodecs.push("hevc");
   if (can('video/webm; codecs="vp8"')) videoCodecs.push("vp8");
   if (can('video/webm; codecs="vp9"') || can('video/mp4; codecs="vp09.00.10.08"')) videoCodecs.push("vp9");
   if (can('video/mp4; codecs="av01.0.05M.08"')) videoCodecs.push("av1");
@@ -344,7 +349,8 @@ export function transcodeUrl(serviceUrl: string, mediaUrl: string, capabilities:
   const query = new URLSearchParams([["mediaURL", mediaUrl]]);
   for (const codec of capabilities.videoCodecs) query.append("videoCodecs", codec);
   for (const codec of capabilities.audioCodecs) query.append("audioCodecs", codec);
-  query.set("maxAudioChannels", "2");
+  // Surround stays surround (WebView2 mixes it down for stereo outputs itself).
+  query.set("maxAudioChannels", String(capabilities.maxAudioChannels));
   return `${base(serviceUrl)}/hlsv2/${id}/master.m3u8?${query}`;
 }
 
