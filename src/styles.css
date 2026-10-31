@@ -3958,3 +3958,73 @@ kbd {
   min-height: 0;
   background: #000;
 }
+
+/* Calendar of the saved series' episodes */
+.calendar {
+  display: grid;
+  gap: 26px;
+}
+.calendar-day h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.calendar-day.today h2 {
+  color: var(--accent);
+}
+.calendar-day ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.calendar-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  text-align: left;
+}
+.calendar-item:hover,
+.calendar-item:focus-visible {
+  background: var(--hover);
+}
+.calendar-day.past .calendar-item {
+  opacity: 0.72;
+}
+.calendar-art {
+  flex: none;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.calendar-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.calendar-text strong,
+.calendar-text span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.calendar-text span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.calendar-when {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+}

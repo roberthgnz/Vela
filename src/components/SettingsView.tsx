@@ -59,7 +59,7 @@ import { compareText, formatDateTime, languageSetting, plural, setLanguage, t, t
 export function shortcutList(seekShort = 5, seekLong = 10): [string, string][] {
   return [
     ["Ctrl K  ·  /", t("settings.shortcuts.search")],
-    ["Ctrl 1–4", t("settings.shortcuts.sections")],
+    ["Ctrl 1–5", t("settings.shortcuts.sections")],
     ["Ctrl ,", t("nav.settings")],
     ["Ctrl B", t("settings.shortcuts.sidebar")],
     ["Alt ←  ·  Alt →", t("settings.shortcuts.history")],

@@ -8,6 +8,7 @@ export type Section =
   | "movies"
   | "series"
   | "library"
+  | "calendar"
   | "downloads"
   | "addons"
   | "settings";
