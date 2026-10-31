@@ -22,3 +22,8 @@ commands.allow = ["storage_load", "storage_write", "storage_info", "storage_back
 identifier = "allow-logging"
 description = "Allow the main window to append lines to Vela's own log file, read its end for the diagnostic report and show the folder with the log files in Explorer."
 commands.allow = ["log_write", "log_tail", "log_folder", "log_reveal", "log_save_report"]
+
+[[permission]]
+identifier = "allow-torrents"
+description = "Allow the main window to open torrents with Vela's own engine, read their swarm statistics and release them; the files are served only on 127.0.0.1 behind a secret path and deleted afterwards."
+commands.allow = ["torrent_prepare", "torrent_stats", "torrent_release"]

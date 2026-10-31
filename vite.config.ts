@@ -6,7 +6,8 @@ import pkg from "./package.json" with { type: "json" };
 export default defineConfig({
   plugins: [react(), addonProxyPlugin()],
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
-  server: { host: "127.0.0.1", port: 1430, strictPort: true },
+  // Agent worktrees and scratch output live inside the project; they must not reload the app.
+  server: { host: "127.0.0.1", port: 1430, strictPort: true, watch: { ignored: ["**/.claude/**", "**/.tmp/**", "**/src-tauri/target/**"] } },
   preview: { host: "127.0.0.1", port: 1431, strictPort: true },
   clearScreen: false,
   // JASSUB locates its worker and WebAssembly files relative to its own module.

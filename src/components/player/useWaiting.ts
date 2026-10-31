@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { torrentStats, type TorrentStats } from "../../lib/streamingServer";
+import { velaTorrentStats } from "../../lib/torrentEngine";
 
 /** A wait longer than this gets an explanation and alternatives instead of an endless spinner. */
 const SLOW_AFTER = 15_000;
@@ -22,13 +23,13 @@ export function useSlowWait(waiting: boolean, since: number): boolean {
 export type Swarm = { stats: TorrentStats; stalledSince?: number };
 
 /** Polls the torrent's swarm while waiting, and says when no data arrives. */
-export function useTorrentSwarm(infoHash: string | undefined, serviceUrl: string, waiting: boolean) {
+export function useTorrentSwarm(infoHash: string | undefined, serviceUrl: string, waiting: boolean, engine: "vela" | "service" = "service") {
   const [swarm, setSwarm] = useState<Swarm | null>(null);
   useEffect(() => {
     if (!infoHash || !waiting) return;
     let active = true;
     const read = () =>
-      void torrentStats(serviceUrl, infoHash)
+      void (engine === "vela" ? velaTorrentStats(infoHash) : torrentStats(serviceUrl, infoHash))
         .then((stats) => {
           if (!active) return;
           setSwarm((previous) => {
@@ -43,7 +44,7 @@ export function useTorrentSwarm(infoHash: string | undefined, serviceUrl: string
       active = false;
       clearInterval(timer);
     };
-  }, [infoHash, serviceUrl, waiting]);
+  }, [engine, infoHash, serviceUrl, waiting]);
   const starved = Boolean(swarm?.stalledSince && Date.now() - swarm.stalledSince > STARVED_AFTER);
   return { swarm, starved };
 }

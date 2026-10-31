@@ -32,7 +32,7 @@ impl Drop for HeaderProxy {
 }
 
 /// 128 unguessable bits from the OS-seeded keys of the standard library's hasher.
-fn token() -> String {
+pub(crate) fn token() -> String {
     let part = || {
         let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
         hasher.write_u128(
@@ -85,7 +85,7 @@ pub async fn serve(target: Url, headers: BTreeMap<String, String>) -> Result<Hea
     Ok(HeaderProxy { url, task })
 }
 
-async fn read_head(socket: &mut TcpStream) -> Option<String> {
+pub(crate) async fn read_head(socket: &mut TcpStream) -> Option<String> {
     let mut head = Vec::new();
     let mut buffer = [0; 2048];
     while !head.windows(4).any(|window| window == b"\r\n\r\n") {
@@ -98,7 +98,7 @@ async fn read_head(socket: &mut TcpStream) -> Option<String> {
     String::from_utf8(head).ok()
 }
 
-async fn reply(socket: &mut TcpStream, status: &str) -> std::io::Result<()> {
+pub(crate) async fn reply(socket: &mut TcpStream, status: &str) -> std::io::Result<()> {
     socket
         .write_all(
             format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")

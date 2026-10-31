@@ -43,6 +43,7 @@ import { formatBytes } from "../lib/downloads";
 import { openExternal } from "../lib/transport";
 import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
+import { TorrentEngineRow } from "./TorrentEngineRow";
 import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
 import { tmdb, useTmdbConfigured } from "../lib/tmdb";
 import { updates, useUpdates } from "../lib/updates";
@@ -529,6 +530,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-streaming" className="settings-group" aria-labelledby="settings-streaming-title">
             <h2 id="settings-streaming-title">Streaming</h2>
             <div className="settings-card">
+              {native && <TorrentEngineRow />}
               <Row
                 label="Stremio Service"
                 htmlFor="service-url"

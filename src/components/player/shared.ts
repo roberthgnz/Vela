@@ -23,6 +23,8 @@ export type Playing = {
   episode?: Episode;
   /** Optional explanation shown while the source is being prepared (for example, a torrent). */
   note?: string;
+  /** Which engine streams a torrent source (Vela's own or Stremio's server). */
+  torrentEngine?: "vela" | "service";
 };
 
 /** Audio or subtitle choice offered to the user. */

@@ -8,6 +8,7 @@ mod proxy;
 mod secrets;
 mod service;
 mod storage;
+mod torrent;
 mod transport;
 mod updater;
 mod vlc;
@@ -324,6 +325,7 @@ fn main() {
         .manage(client)
         .manage(downloads::Downloads::new().expect("could not initialize downloads"))
         .manage(service::Service::default())
+        .manage(torrent::Engine::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_data_dir() {
                 logging::init(&dir);
@@ -388,6 +390,9 @@ fn main() {
             logging::log_folder,
             logging::log_reveal,
             logging::log_save_report,
+            torrent::torrent_prepare,
+            torrent::torrent_stats,
+            torrent::torrent_release,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_delete,
@@ -399,6 +404,7 @@ fn main() {
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 app.state::<service::Service>().stop();
+                tauri::async_runtime::block_on(app.state::<torrent::Engine>().stop());
                 if let Some(storage) = app.try_state::<storage::Storage>() {
                     storage.checkpoint();
                 }

@@ -27,6 +27,7 @@ import { storage } from "../lib/storage";
 import { preferencesStore, usePreferences } from "../lib/store";
 import { describeTorrent } from "../lib/streamingServer";
 import { streamQuality } from "../lib/streams";
+import { releaseVelaTorrent } from "../lib/torrentEngine";
 import { requestRange } from "../lib/transport";
 import { clock, errorMessage, safeImage } from "../lib/utils";
 import { Dialog } from "./Primitives";
@@ -240,7 +241,12 @@ export function Player({
   const waiting = status === "loading" || status === "buffering";
   const slow = useSlowWait(waiting, waitingSince);
   const infoHash = playing.stream.infoHash && !playing.stream.url ? playing.stream.infoHash : undefined;
-  const { swarm, starved } = useTorrentSwarm(infoHash, playing.serviceUrl, waiting);
+  const { swarm, starved } = useTorrentSwarm(infoHash, playing.serviceUrl, waiting, playing.torrentEngine);
+  // Vela's engine deletes a torrent once the player is done with it (after a grace period).
+  useEffect(() => {
+    if (!infoHash || playing.torrentEngine !== "vela") return;
+    return () => releaseVelaTorrent(infoHash);
+  }, [infoHash, playing.torrentEngine]);
 
   /* ---------- Next episode ---------- */
 

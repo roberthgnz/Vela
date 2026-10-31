@@ -217,6 +217,7 @@ export default function App() {
       transcodeUrl: target.transcodeUrl,
       transcodedBecause: target.transcodedBecause,
       probe: target.probe,
+      torrentEngine: target.torrentEngine,
       serviceUrl: prefs.serviceUrl,
       note: target.note,
       episode,

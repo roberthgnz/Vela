@@ -21,6 +21,7 @@
     "allow-downloads",
     "allow-storage",
     "allow-logging",
+    "allow-torrents",
     "allow-desktop-services"
   ]
 }

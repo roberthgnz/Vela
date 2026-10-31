@@ -24,6 +24,7 @@ tauri-plugin-window-state = "=2.5.0"
 tauri-plugin-updater = { version = "=2.13.1", default-features = false, features = ["rustls-tls"] }
 rusqlite = { version = "=0.41.1", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
+librqbit = { version = "=9.1.0", default-features = false, features = ["rust-tls"] }
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "=3.6.3", default-features = false, features = ["windows-native"] }

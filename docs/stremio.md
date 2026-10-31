@@ -196,6 +196,12 @@ La versión 2 se guarda en `vela.preferences.v2`. Al arrancar, si no existe, se 
 
 Preferencias de reproducción (`player`): idiomas principal y secundario de subtítulos, activación automática, tamaño, opacidad y fondo; idioma preferido y alternativo de audio; saltos corto y largo; siguiente episodio y su cuenta atrás. Los valores se validan y acotan al leerlos.
 
+## Motor de torrents propio
+
+`src-tauri/src/torrent.rs` usa librqbit 9.1 (MIT, `rust-tls`). La sesión se crea al abrir el primer torrent: la carpeta `torrents` de la caché de la aplicación (`%LOCALAPPDATA%\com.vela.desktop`) se vacía al iniciar, la DHT guarda sus nodos en `dht.json` de esa caché (no en la carpeta propia de librqbit) y el cliente se anuncia como `Vela <versión>`. `torrent_prepare` añade el magnet en pausa con los trackers de `sources` (los `dht:` no hacen falta), espera los metadatos (60 s como máximo) y la inicialización, elige el archivo (el `fileIdx` del addon si es un vídeo; para series, el que coincide con `SxxEyy`/`NxMM`; si no, el vídeo más grande, de modo que las muestras pierden) y limita la descarga a ese archivo y a los subtítulos. Un servidor HTTP en 127.0.0.1 con un token aleatorio en la ruta (`/{token}/{hash}/{índice}`) sirve los archivos con `Range`; las lecturas de `FileStream` priorizan las piezas de la posición pedida, así que el reproductor salta sin esperar al resto. `torrent_stats` devuelve la forma de `stats.json` de Stremio (pares vivos, vistos, semillas, velocidad, bytes). Al cerrar el reproductor, `torrent_release` borra el torrent y sus datos tras 90 s (el episodio siguiente de un pack lo reutiliza); al abrir otro torrent se borran los que no se están sirviendo.
+
+Selección (`src/lib/torrentEngine.ts`, Ajustes › Streaming › Motor de torrents): «Automático» usa Stremio Service si responde o puede iniciarse y, si no, el motor de Vela; «Vela» no inicia el servidor de Stremio pero, si ya está en marcha, ofrece igualmente su conversión HLS sobre la URL local; «Stremio Service» conserva el comportamiento anterior. Verificado el 31 de octubre de 2026 con el torrent CC de Sintel de WebTorrent (`08ada5a7…`): metadatos en 0,8 s, elección automática de `Sintel.mp4` entre 11 archivos, reproducción en WebView2, salto al 60 % sin esperas, 42 pares a unos 4 MB/s.
+
 ## Reproductor integrado: estructura
 
 `Player.tsx` orquesta el elemento de vídeo y dibuja los controles; las piezas viven en `src/components/player/`: `useMediaSource` (fuente directa, HLS con hls.js o nativo, cambio a la conversión, sondeo de pistas), `useAudioTracks` (pistas nativas, de hls.js o del archivo; elección automática por idioma), `useSubtitles` (pistas de addons, HLS e incrustadas; cues, desfase, JASSUB; elección automática), `useWatchProgress` (posición cada 5 s, visto al 70 % realmente visto, fin pasado el 90 %), `useWaiting` (espera larga y enjambre del torrent), `useNextCountdown`, `useOverlay` (avisos breves, icono de play/pausa, ocultar controles), `shortcuts` (`handleShortcut` puro con la tabla de teclas y el oyente en fase de captura) y `panels` (popovers de pistas y velocidad). Los hooks reciben las referencias del vídeo y de hls.js; los callbacks que cambian en cada render se guardan en una ref para que el `ref` del vídeo no se vuelva a montar. Pruebas en jsdom: atajos, cuenta atrás, progreso, esperas, paneles y un humo del `Player` con el vídeo y `<dialog>` simulados.
@@ -273,7 +279,7 @@ Versión 0.3.0, 29 de octubre de 2026:
 2. Probar el ejecutable oficial de MPV (no solo libmpv): IPC, `--start`, cabeceras y título.
 3. Medir el cambio de audio en renditions HLS de la conversión (requiere un origen al que el servidor envíe CORS o leer el audio de otra forma).
 4. Cargar en JASSUB las fuentes adjuntas al MKV (`/hlsv2/{id}/source/attachment/{n}`) y, si procede, fuentes del sistema sin pedir permisos.
-5. Validar la selección por temporada y episodio con un torrent de temporada completa con licencia libre.
+5. Validar la selección por temporada y episodio con un torrent de temporada completa con licencia libre (con Stremio Service y con el motor de Vela).
 6. Calendario y previsualizaciones de catálogo (fase posterior).
 7. Firmar el instalador.
 
