@@ -46,6 +46,7 @@ import { EmbeddedPlayer } from "./components/EmbeddedPlayer";
 import { prefersEmbedded } from "./lib/embeddedMpv";
 import { releaseVelaTorrent } from "./lib/torrentEngine";
 import { trayIcon, useLinks } from "./lib/desktop";
+import { interfaceScale, startGamepad } from "./lib/gamepad";
 import { Dialog, ErrorBoundary, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
@@ -365,6 +366,10 @@ export default function App() {
     setInstallRequest((value) => ({ id: value.id + 1, url }));
   });
   useEffect(() => trayIcon.restore(), []);
+  useEffect(() => {
+    interfaceScale.restore();
+    startGamepad();
+  }, []);
 
   useEffect(() => {
     void account.init();

@@ -1157,4 +1157,8 @@ export const es = {
   "calendar.discover": "Explorar series",
   "calendar.empty": "Nada nuevo por ahora",
   "calendar.emptyDescription": "Ninguna de tus series ha estrenado episodios esta semana ni tiene fechas anunciadas en las próximas.",
+  "tv.scale.label": "Tamaño de la interfaz",
+  "tv.scale.hint": "Para ver Vela desde el sofá en una tele: agranda todo, también el reproductor.",
+  "tv.gamepad.label": "Mando",
+  "tv.gamepad.hint": "Con un mando conectado: cruceta o stick para moverse, A para elegir (o reproducir y pausar), B para volver, Start para reproducir o pausar, LB y RB para retroceder y avanzar, Y para buscar.",
 } as const;

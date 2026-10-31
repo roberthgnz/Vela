@@ -46,6 +46,7 @@ import { AccountSection } from "./AccountSection";
 import { TorrentEngineRow } from "./TorrentEngineRow";
 import { VideoPlayerRow } from "./VideoPlayerRow";
 import { DesktopRows } from "./DesktopRows";
+import { TvRows } from "./TvRows";
 import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
 import { tmdb, useTmdbConfigured } from "../lib/tmdb";
 import { updates, useUpdates } from "../lib/updates";
@@ -617,6 +618,9 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
 
           <section id="settings-keyboard" className="settings-group" aria-labelledby="settings-keyboard-title">
             <h2 id="settings-keyboard-title">{t("settings.section.keyboard")}</h2>
+            <div className="settings-card">
+              <TvRows />
+            </div>
             <div className="settings-card">
               <ShortcutTable seekShort={prefs.player.seekShort} seekLong={prefs.player.seekLong} />
             </div>

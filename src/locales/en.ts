@@ -1155,4 +1155,8 @@ export const en: Record<keyof typeof es, string> = {
   "calendar.discover": "Browse series",
   "calendar.empty": "Nothing new for now",
   "calendar.emptyDescription": "None of your series released episodes this week or has dates announced for the coming weeks.",
+  "tv.scale.label": "Interface size",
+  "tv.scale.hint": "For watching from the couch on a TV: makes everything bigger, the player too.",
+  "tv.gamepad.label": "Controller",
+  "tv.gamepad.hint": "With a controller connected: d-pad or stick to move, A to choose (or play and pause), B to go back, Start to play or pause, LB and RB to rewind and skip ahead, Y to search.",
 };
