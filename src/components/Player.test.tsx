@@ -33,6 +33,7 @@ vi.mock("../lib/externalPlayback", () => ({
 vi.mock("../lib/mkvChapters", () => ({ readMkvChapters: vi.fn(() => Promise.reject(new Error("not mkv"))) }));
 
 import type { Episode } from "../lib/contracts";
+import { readMkvChapters } from "../lib/mkvChapters";
 import { probe } from "../lib/streamingServer";
 import { Player, type Playing } from "./Player";
 
@@ -115,6 +116,17 @@ describe("Player", () => {
     fireEvent.pause(video);
     fireEvent.playing(video);
     expect(onStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the chapters of the file only once it plays", () => {
+    vi.mocked(readMkvChapters).mockClear();
+    const { video } = setup(movie());
+    expect(readMkvChapters).not.toHaveBeenCalled();
+    fireEvent.playing(video);
+    expect(readMkvChapters).toHaveBeenCalledTimes(1);
+    fireEvent.pause(video);
+    fireEvent.playing(video);
+    expect(readMkvChapters).toHaveBeenCalledTimes(1);
   });
 
   it("explains a decoding error, offers the alternatives and reports the failure", () => {

@@ -153,6 +153,8 @@ export function Player({
   const [resumed, setResumed] = useState(false);
   const [nextDismissed, setNextDismissed] = useState(false);
   const [chapters, setChapters] = useState<Chapter[]>([]);
+  /** The video played for the first time (the player is mounted again for every source). */
+  const [begun, setBegun] = useState(false);
   const seriesId = playing.meta.type === "series" ? playing.meta.id : "";
   const marks = useSeriesMarks(seriesId);
   const next = useMemo(() => nextEpisode(playing.meta, playing.videoId), [playing.meta, playing.videoId]);
@@ -205,8 +207,11 @@ export function Player({
 
   /* ---------- Intro and credits ---------- */
 
-  // Chapters come from the original file (not the conversion); only Matroska files are read.
+  // Chapters come from the original file (not the conversion); only Matroska files are read. Not
+  // before the video plays: for a torrent, reading the Chapters element (often far into the file)
+  // would compete with the first pieces.
   useEffect(() => {
+    if (!begun) return;
     const controller = new AbortController();
     setChapters([]);
     readMkvChapters((start, length) => requestRange(playing.url, start, length, controller.signal))
@@ -215,7 +220,7 @@ export function Player({
         /* No chapters: files that are not MKV, servers without ranges, the browser build. */
       });
     return () => controller.abort();
-  }, [playing.url]);
+  }, [begun, playing.url]);
 
   /* ---------- Window, volume and waits ---------- */
 
@@ -472,6 +477,7 @@ export function Player({
           onPlaying={() => {
             if (!started.current) {
               started.current = true;
+              setBegun(true);
               onStarted?.();
             }
             setStatus("playing");
