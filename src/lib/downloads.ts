@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Episode, MediaItem, ResolvedStream } from "./contracts";
@@ -39,7 +40,7 @@ export const downloadsAvailable = isTauri();
 
 function read(): Download[] {
   try {
-    const value = JSON.parse(localStorage.getItem(key) ?? "[]") as Download[];
+    const value = JSON.parse(storage.getItem(key) ?? "[]") as Download[];
     if (!Array.isArray(value)) return [];
     // A download that was running when Vela closed is paused; its .part file resumes it.
     return value
@@ -61,7 +62,7 @@ function all(): Download[] {
 function commit(next: Download[]) {
   items = next;
   try {
-    localStorage.setItem(key, JSON.stringify(next.map(({ speed: _speed, ...item }) => item)));
+    storage.setItem(key, JSON.stringify(next.map(({ speed: _speed, ...item }) => item)));
   } catch {
     /* Kept for this session. */
   }

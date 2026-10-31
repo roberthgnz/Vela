@@ -6,6 +6,8 @@ import {
   Download,
   ExternalLink,
   Captions,
+  DatabaseBackup,
+  FolderOpen,
   Globe,
   House,
   Info,
@@ -34,6 +36,8 @@ import {
   torrentProfiles,
   type TorrentProfile,
 } from "../lib/streamingServer";
+import { backupStorage, revealStorage, storageInfo, useStorageStatus } from "../lib/storage";
+import { formatBytes } from "../lib/downloads";
 import { openExternal } from "../lib/transport";
 import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
@@ -103,6 +107,63 @@ function Row({
         {description && <p>{description}</p>}
       </div>
       {children && <div className="settings-row-control">{children}</div>}
+    </div>
+  );
+}
+
+function when(at: number): string {
+  return new Date(at).toLocaleString("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/** The database that holds the library, profiles and preferences, and its daily copies. */
+function StorageSettings({ notify }: { notify: (message: string) => void }) {
+  const status = useStorageStatus();
+  const queryClient = useQueryClient();
+  const info = useQuery({ queryKey: ["storage-info"], queryFn: storageInfo, staleTime: 10_000 });
+  const backup = useMutation({
+    mutationFn: backupStorage,
+    onSuccess: () => {
+      notify("Copia de seguridad creada.");
+      void queryClient.invalidateQueries({ queryKey: ["storage-info"] });
+    },
+    onError: (error) => notify(errorMessage(error)),
+  });
+  const data = info.data;
+  const newest = data?.backups[0];
+  return (
+    <div className="settings-card">
+      <Row
+        label="Base de datos"
+        description={
+          status.backend !== "desktop"
+            ? `La base de datos de Vela no se pudo abrir${status.error ? ` (${status.error})` : ""}. Los datos se guardan en el almacenamiento de WebView2, como en versiones anteriores.`
+            : data
+              ? `${data.folder} · ${formatBytes(data.size)} · ${data.keys} registros${status.migrated ? " · datos copiados de la versión anterior" : ""}`
+              : "Biblioteca, perfiles y preferencias, en la carpeta de datos de la aplicación."
+        }
+      >
+        {status.backend === "desktop" && (
+          <button className="button secondary" onClick={() => void revealStorage().catch((error) => notify(errorMessage(error)))}>
+            <FolderOpen size={14} /> Abrir carpeta
+          </button>
+        )}
+      </Row>
+      {status.backend === "desktop" && (
+        <Row
+          label="Copias de seguridad"
+          description={
+            data
+              ? data.backups.length
+                ? `${data.backups.length} ${data.backups.length === 1 ? "copia" : "copias"} en «backups», la última ${newest ? when(newest.created) : ""}. Vela hace una al día al abrirse y conserva las siete más recientes.`
+                : "Vela hace una copia al día al abrirse y conserva las siete más recientes."
+              : "Una copia al día al abrir Vela; se conservan las siete más recientes."
+          }
+        >
+          <button className="button secondary" onClick={() => backup.mutate()} disabled={backup.isPending}>
+            {backup.isPending ? <Spinner /> : <DatabaseBackup size={14} />} Crear copia ahora
+          </button>
+        </Row>
+      )}
     </div>
   );
 }
@@ -491,6 +552,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
                 </button>
               </Row>
             </div>
+            {native && <StorageSettings notify={notify} />}
           </section>
 
           <section id="settings-keyboard" className="settings-group" aria-labelledby="settings-keyboard-title">

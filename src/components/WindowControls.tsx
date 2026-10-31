@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
+import { flushStorage } from "../lib/storage";
 
 export const native = isTauri();
 
@@ -42,8 +44,32 @@ export function useWindowState() {
   return state;
 }
 
+/**
+ * Rust turns every close request (the close button, Alt+F4, the taskbar) into this event so that
+ * pending writes reach the database first; the window is then destroyed from here.
+ */
+export function useCloseFlush() {
+  useEffect(() => {
+    if (!native) return;
+    let closing = false;
+    const unlisten = listen("vela://close-requested", async () => {
+      if (closing) return;
+      closing = true;
+      try {
+        await flushStorage();
+      } finally {
+        await getCurrentWindow().destroy().catch(() => {});
+      }
+    });
+    return () => {
+      void unlisten.then((stop) => stop());
+    };
+  }, []);
+}
+
 export function WindowControls({ onError }: { onError: (message: string) => void }) {
   const { maximized } = useWindowState();
+  useCloseFlush();
   if (!native) return null;
   const run = (action: "minimize" | "toggleMaximize" | "close") =>
     void getCurrentWindow()

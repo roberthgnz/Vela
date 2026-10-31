@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { storage } from "../lib/storage";
 import {
   ArrowLeft,
   Captions,
@@ -251,7 +252,7 @@ export function Player({
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [volume, setVolume] = useState(() => {
-    const saved = Number(localStorage.getItem(volumeKey));
+    const saved = Number(storage.getItem(volumeKey));
     return Number.isFinite(saved) && saved > 0 && saved <= 1 ? saved : 1;
   });
   const [muted, setMuted] = useState(false);
@@ -743,7 +744,7 @@ export function Player({
       video.current.muted = muted;
     }
     try {
-      localStorage.setItem(volumeKey, String(volume));
+      storage.setItem(volumeKey, String(volume));
     } catch {
       /* Volume persistence is optional. */
     }

@@ -5,6 +5,7 @@ mod mpv;
 mod proxy;
 mod secrets;
 mod service;
+mod storage;
 mod transport;
 mod updater;
 mod vlc;
@@ -13,7 +14,7 @@ mod webview;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 use tokio::process::Command;
 use transport::{HttpClient, checked_url};
 
@@ -321,7 +322,35 @@ fn main() {
         .manage(client)
         .manage(downloads::Downloads::new().expect("could not initialize downloads"))
         .manage(service::Service::default())
-        .setup(|app| Ok(webview::create_main_window(app.handle())?))
+        .setup(|app| {
+            match storage::open(app.handle()) {
+                Ok(storage) => {
+                    if let Err(error) = storage.backup_if_due() {
+                        eprintln!("vela: daily backup failed: {error}");
+                    }
+                    app.manage(storage);
+                }
+                Err(error) => eprintln!("vela: database unavailable: {error}"),
+            }
+            webview::create_main_window(app.handle())?;
+            Ok(())
+        })
+        // The interface flushes its pending writes, then destroys the window itself. If it does
+        // not answer (hung page), the window is destroyed anyway after a moment.
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                if window.emit("vela://close-requested", ()).is_err() {
+                    let _ = window.destroy();
+                    return;
+                }
+                let window = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                    let _ = window.destroy();
+                });
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             request_json,
             post_json,
@@ -339,6 +368,11 @@ fn main() {
             service::service_start,
             webview::hardware_decoding_get,
             webview::hardware_decoding_set,
+            storage::storage_load,
+            storage::storage_write,
+            storage::storage_info,
+            storage::storage_backup,
+            storage::storage_reveal,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_delete,
@@ -350,6 +384,9 @@ fn main() {
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 app.state::<service::Service>().stop();
+                if let Some(storage) = app.try_state::<storage::Storage>() {
+                    storage.checkpoint();
+                }
             }
         });
 }

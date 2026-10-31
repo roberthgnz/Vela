@@ -12,3 +12,8 @@ commands.allow = ["download_folder", "download_start", "download_cancel", "downl
 identifier = "allow-desktop-services"
 description = "Allow the main window to start the streaming server Stremio installs (stopped again when Vela exits) and to read and save the hardware video decoding choice, applied at the next start."
 commands.allow = ["service_installed", "service_start", "hardware_decoding_get", "hardware_decoding_set"]
+
+[[permission]]
+identifier = "allow-storage"
+description = "Allow the main window to read and write Vela's own database in the app data folder, make a copy of it and show the folder with its backups in Explorer."
+commands.allow = ["storage_load", "storage_write", "storage_info", "storage_backup", "storage_reveal"]

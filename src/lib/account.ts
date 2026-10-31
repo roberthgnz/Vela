@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import { MAIN_PROFILE, mediaKey, preferencesStore } from "./store";
 import {
   getAddonCollection,
@@ -38,7 +39,7 @@ type Persisted = {
 
 function readPersisted(): Persisted {
   try {
-    const value = JSON.parse(localStorage.getItem(storageKey) || "null") as Persisted | null;
+    const value = JSON.parse(storage.getItem(storageKey) || "null") as Persisted | null;
     if (value && typeof value === "object" && value.sync) return value;
   } catch {
     /* A damaged account cache only means the next sync starts from scratch. */
@@ -46,7 +47,7 @@ function readPersisted(): Persisted {
   return { sync: { synced: {}, removed: {} } };
 }
 
-let persisted = typeof localStorage === "undefined" ? { sync: { synced: {}, removed: {} } } : readPersisted();
+let persisted = readPersisted();
 let state: AccountState = { status: "loading", syncing: false, user: persisted.user, lastSync: persisted.lastSync };
 const listeners = new Set<() => void>();
 let applying = false;
@@ -60,7 +61,7 @@ function ownsAccount(): boolean {
 
 function save() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify(persisted));
+    storage.setItem(storageKey, JSON.stringify(persisted));
   } catch {
     /* Persisting sync metadata is best effort. */
   }

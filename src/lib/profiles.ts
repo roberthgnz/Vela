@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import { createAttempts, hashPin, isPinHash, verifyPin, type PinHash } from "./pin";
 import { sourceHistory, sourcesKey } from "./sourceHistory";
 import { MAIN_PROFILE, preferencesStore } from "./store";
@@ -40,7 +41,7 @@ export const profileColors = ["#d6ef91", "#8ec5ff", "#f5a97f", "#c6a0f6", "#8bd5
 
 function read(): Saved {
   try {
-    const value = JSON.parse(localStorage.getItem(storageKey) ?? "null") as Saved | null;
+    const value = JSON.parse(storage.getItem(storageKey) ?? "null") as Saved | null;
     const profiles = (value?.profiles ?? [])
       .filter((profile) => profile && typeof profile.id === "string" && typeof profile.name === "string" && profile.name.trim())
       .map(({ pin, ...profile }) => (isPinHash(pin) ? { ...profile, pin } : profile));
@@ -51,7 +52,7 @@ function read(): Saved {
   }
 }
 
-let saved: Saved = typeof localStorage === "undefined" ? { profiles: [] } : read();
+let saved: Saved = read();
 /** Whether a profile has been chosen in this session (the picker shows until then). */
 let chosen = saved.profiles.length <= 1 && !saved.profiles[0]?.pin;
 const attempts = createAttempts();
@@ -61,7 +62,7 @@ const listeners = new Set<() => void>();
 function save(next: Saved) {
   saved = next;
   try {
-    localStorage.setItem(storageKey, JSON.stringify(saved));
+    storage.setItem(storageKey, JSON.stringify(saved));
   } catch {
     /* Profiles still work for this session. */
   }
@@ -185,7 +186,7 @@ export const profiles = {
     await check(id, pin);
     preferencesStore.forgetProfile(id);
     try {
-      localStorage.removeItem(sourcesKey(id));
+      storage.removeItem(sourcesKey(id));
     } catch {
       /* Nothing else to remove. */
     }

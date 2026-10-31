@@ -48,6 +48,7 @@ import { openProfile, ProfileAvatar, ProfilePicker, usePinGate } from "./compone
 import { profiles, useProfiles } from "./lib/profiles";
 import { native, WindowControls } from "./components/WindowControls";
 import { sourceHistory } from "./lib/sourceHistory";
+import { useStorageStatus } from "./lib/storage";
 import { updates } from "./lib/updates";
 
 const primary = [
@@ -73,6 +74,7 @@ function editable(target: EventTarget | null): boolean {
 
 export default function App() {
   const prefs = usePreferences();
+  const storageStatus = useStorageStatus();
   const accountState = useAccount();
   const nav = useNavigation();
   const menu = useMenu();
@@ -558,9 +560,17 @@ export default function App() {
       </aside>
       <RouteStateProvider value={routeState}>
       <main id="main" className="content" ref={content} tabIndex={-1}>
-        {preferencesStore.getPersistenceError() && (
+        {(preferencesStore.getPersistenceError() || storageStatus.error) && (
           <div className="banner">
-            <ErrorState message="No se pudo guardar en este equipo. Los cambios se conservarán solo mientras Vela siga abierta." />
+            <ErrorState
+              message={
+                storageStatus.backend === "desktop"
+                  ? `No se pudo guardar en la base de datos de Vela (${storageStatus.error}). Vela lo reintentará; si el problema sigue, los cambios se perderán al cerrar.`
+                  : storageStatus.error
+                    ? `La base de datos de Vela no se pudo abrir (${storageStatus.error}). Los datos se guardan mientras tanto en el almacenamiento de WebView2.`
+                    : "No se pudo guardar en este equipo. Los cambios se conservarán solo mientras Vela siga abierta."
+              }
+            />
           </div>
         )}
         {route.name === "home" && (

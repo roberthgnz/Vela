@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { storage } from "./storage";
 
 const prefix = "vela.ui.";
 
@@ -10,7 +11,7 @@ export function useUiSetting<T extends string>(
 ): [T, (value: T) => void] {
   const [value, setValue] = useState<T>(() => {
     try {
-      const saved = localStorage.getItem(prefix + key) as T | null;
+      const saved = storage.getItem(prefix + key) as T | null;
       return saved && allowed.includes(saved) ? saved : fallback;
     } catch {
       return fallback;
@@ -20,7 +21,7 @@ export function useUiSetting<T extends string>(
     (next: T) => {
       setValue(next);
       try {
-        localStorage.setItem(prefix + key, next);
+        storage.setItem(prefix + key, next);
       } catch {
         /* Interface preferences are optional. */
       }

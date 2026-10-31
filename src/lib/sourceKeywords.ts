@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import type { ResolvedStream } from "./contracts";
 
 /**
@@ -37,7 +38,7 @@ export function matchesKeywords(stream: ResolvedStream, filter: SourceKeywords):
 
 function read(): SourceKeywords {
   try {
-    const value = JSON.parse(localStorage.getItem(key) ?? "null") as Partial<SourceKeywords> | null;
+    const value = JSON.parse(storage.getItem(key) ?? "null") as Partial<SourceKeywords> | null;
     const list = (items: unknown) => (Array.isArray(items) ? parseKeywords(items.filter((item) => typeof item === "string").join(",")) : []);
     return value && typeof value === "object" ? { include: list(value.include), exclude: list(value.exclude) } : empty;
   } catch {
@@ -55,7 +56,7 @@ export const sourceKeywords = {
   set(value: SourceKeywords) {
     current = { include: parseKeywords(value.include.join(",")), exclude: parseKeywords(value.exclude.join(",")) };
     try {
-      localStorage.setItem(key, JSON.stringify(current));
+      storage.setItem(key, JSON.stringify(current));
     } catch {
       /* Kept for this session. */
     }

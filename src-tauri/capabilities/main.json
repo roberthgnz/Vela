@@ -13,11 +13,13 @@
     "core:window:allow-start-dragging",
     "core:window:allow-set-fullscreen",
     "core:window:allow-is-fullscreen",
+    "core:window:allow-destroy",
     "core:window:allow-internal-toggle-maximize",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-native-transport",
     "allow-downloads",
+    "allow-storage",
     "allow-desktop-services"
   ]
 }

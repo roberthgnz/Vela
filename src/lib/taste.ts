@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import type { MediaItem } from "./contracts";
 import { MAIN_PROFILE, mediaKey, preferencesStore } from "./store";
 
@@ -132,7 +133,7 @@ export function createTaste(storage?: Pick<Storage, "getItem" | "setItem">, prof
   };
 }
 
-export const taste = createTaste(typeof localStorage === "undefined" ? undefined : localStorage, preferencesStore.getProfile());
+export const taste = createTaste(storage, preferencesStore.getProfile());
 
 // Follows the active profile without the profile code having to know about ratings.
 preferencesStore.subscribe(() => taste.switchProfile(preferencesStore.getProfile()));

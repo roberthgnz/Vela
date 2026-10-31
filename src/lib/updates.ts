@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 
 /**
@@ -44,14 +45,14 @@ export const updates = {
   /** Whether Vela looks for updates when it starts (on by default). */
   automatic(): boolean {
     try {
-      return localStorage.getItem(autoKey) !== "off";
+      return storage.getItem(autoKey) !== "off";
     } catch {
       return true;
     }
   },
   setAutomatic(value: boolean) {
     try {
-      localStorage.setItem(autoKey, value ? "auto" : "off");
+      storage.setItem(autoKey, value ? "auto" : "off");
     } catch {
       /* The preference is optional. */
     }

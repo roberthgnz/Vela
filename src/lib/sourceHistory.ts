@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import type { ResolvedStream } from "./contracts";
 
 /**
@@ -102,7 +103,7 @@ export function createSourceHistory(storage?: Pick<Storage, "getItem" | "setItem
   };
 }
 
-export const sourceHistory = createSourceHistory(typeof localStorage === "undefined" ? undefined : localStorage);
+export const sourceHistory = createSourceHistory(storage);
 
 export function useSourceMarks(videoId: string | undefined): Record<string, SourceMark> {
   const state = useSyncExternalStore(sourceHistory.subscribe, sourceHistory.getSnapshot, sourceHistory.getSnapshot);

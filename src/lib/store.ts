@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { storage as deviceStorage } from './storage';
 
 import type {
   AddonCatalog,
@@ -353,13 +354,7 @@ export function createPreferencesStore(providedStorage?: PreferenceStorage) {
   let storage = providedStorage;
   let persistenceError: string | undefined;
   let state = defaults();
-  if (!storage && typeof window !== 'undefined') {
-    try {
-      storage = window.localStorage;
-    } catch (error) {
-      persistenceError = storageFailure('Local storage is unavailable.', error);
-    }
-  }
+  if (!storage) storage = deviceStorage;
   if (storage) {
     try {
       const saved = storage.getItem(storageKey) ?? storage.getItem(legacyKey);

@@ -1,4 +1,5 @@
 import type { AddonCatalog, AddonManifest, MediaItem } from "./contracts";
+import { storage } from "./storage";
 import { requestJson } from "./transport";
 
 /**
@@ -115,7 +116,7 @@ function loadImdbCache() {
   if (imdbLoaded) return;
   imdbLoaded = true;
   try {
-    const saved = JSON.parse(globalThis.localStorage?.getItem(imdbStorageKey) ?? "null") as [string, string | null][] | null;
+    const saved = JSON.parse(storage.getItem(imdbStorageKey) ?? "null") as [string, string | null][] | null;
     if (Array.isArray(saved))
       for (const [key, value] of saved) if (typeof key === "string" && (value === null || /^tt\d+$/.test(value))) imdbCache.set(key, value);
   } catch {
@@ -124,11 +125,11 @@ function loadImdbCache() {
 }
 
 function saveImdbCache() {
-  if (typeof localStorage === "undefined" || imdbSaveTimer) return;
+  if (imdbSaveTimer) return;
   imdbSaveTimer = setTimeout(() => {
     imdbSaveTimer = undefined;
     try {
-      localStorage.setItem(imdbStorageKey, JSON.stringify([...imdbCache].slice(-maxImdbCache)));
+      storage.setItem(imdbStorageKey, JSON.stringify([...imdbCache].slice(-maxImdbCache)));
     } catch {
       /* Full storage: lookups are repeated next time. */
     }

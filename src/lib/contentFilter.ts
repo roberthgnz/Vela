@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import { fitsLimit, lookupRating, type TitleRating } from "./ageRating";
 import type { InstalledAddon, MediaItem } from "./contracts";
 import { profiles, useProfiles, type Profile } from "./profiles";
@@ -28,7 +29,7 @@ type Stored = TitleRating & { at: number };
 
 let ratings = new Map<string, Stored>();
 try {
-  const saved = JSON.parse(localStorage.getItem(storageKey) ?? "{}") as Record<string, Stored>;
+  const saved = JSON.parse(storage.getItem(storageKey) ?? "{}") as Record<string, Stored>;
   const now = Date.now();
   for (const [key, value] of Object.entries(saved))
     if (value && typeof value.at === "number" && now - value.at < TTL && typeof value.adult === "boolean")
@@ -56,7 +57,7 @@ function changed() {
   saveTimer = setTimeout(() => {
     const entries = [...ratings.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, MAX_STORED);
     try {
-      localStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(entries)));
+      storage.setItem(storageKey, JSON.stringify(Object.fromEntries(entries)));
     } catch {
       /* Ratings are looked up again next time. */
     }

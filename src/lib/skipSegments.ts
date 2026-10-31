@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import type { Chapter } from "./mkvChapters";
 
 /**
@@ -67,7 +68,7 @@ function finite(value: unknown): value is number {
 
 function read(): Saved {
   try {
-    const value = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, SeriesMarks>;
+    const value = JSON.parse(storage.getItem(key) ?? "{}") as Record<string, SeriesMarks>;
     const result: Saved = {};
     for (const [id, marks] of Object.entries(value ?? {})) {
       if (id === "__proto__" || typeof marks !== "object" || !marks) continue;
@@ -96,7 +97,7 @@ export const skipMarks = {
     else delete next[seriesId];
     saved = next;
     try {
-      localStorage.setItem(key, JSON.stringify(next));
+      storage.setItem(key, JSON.stringify(next));
     } catch {
       /* Kept for this session. */
     }

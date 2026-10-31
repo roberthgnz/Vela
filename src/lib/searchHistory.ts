@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { storage } from "./storage";
 import { preferencesStore } from "./store";
 
 /**
@@ -20,7 +21,7 @@ function read(): string[] {
   if (cache?.profile === profile) return cache.items;
   let items: string[] = [];
   try {
-    const value = JSON.parse(localStorage.getItem(key()) ?? "[]") as unknown;
+    const value = JSON.parse(storage.getItem(key()) ?? "[]") as unknown;
     if (Array.isArray(value)) items = value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).slice(0, MAX_SEARCHES);
   } catch {
     /* No history yet. */
@@ -32,8 +33,8 @@ function read(): string[] {
 function write(items: string[]) {
   cache = { profile: preferencesStore.getProfile(), items };
   try {
-    if (items.length) localStorage.setItem(key(), JSON.stringify(items));
-    else localStorage.removeItem(key());
+    if (items.length) storage.setItem(key(), JSON.stringify(items));
+    else storage.removeItem(key());
   } catch {
     /* The history lasts for this session. */
   }
