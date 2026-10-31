@@ -238,9 +238,13 @@ fn command_for_this_exe() -> Option<String> {
 fn claim(scheme: &str) -> Result<(), String> {
     let command = command_for_this_exe().ok_or("No se encontró el ejecutable de Vela.")?;
     let base = format!(r"Software\Classes\{scheme}");
-    let ok = registry::write(&base, None, &format!("URL:{scheme}"))
-        && registry::write(&base, Some("URL Protocol"), "")
-        && registry::write(&format!(r"{base}\shell\open\command"), None, &command);
+    // An existing key (Stremio's) keeps its name; only the command changes.
+    let named = registry::read(&base, None).is_some()
+        || registry::write(&base, None, &format!("URL:{scheme}"));
+    let marked = registry::read(&base, Some("URL Protocol")).is_some()
+        || registry::write(&base, Some("URL Protocol"), "");
+    let ok =
+        named && marked && registry::write(&format!(r"{base}\shell\open\command"), None, &command);
     if ok {
         Ok(())
     } else {

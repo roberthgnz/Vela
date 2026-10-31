@@ -4,7 +4,7 @@ import { CalendarDays } from "lucide-react";
 import { byDay, daysFromToday, upcomingEpisodes } from "../lib/calendar";
 import type { Episode, MediaItem } from "../lib/contracts";
 import { episodeCode } from "../lib/episodes";
-import { formatDate, t } from "../lib/i18n";
+import { formatDate, locale, t } from "../lib/i18n";
 import { metaAddon } from "../lib/navigation";
 import { getMeta } from "../lib/protocol";
 import { usePreferences } from "../lib/store";
@@ -105,7 +105,7 @@ export function CalendarView({
                           </span>
                           {offset > 0 && (
                             <span className="calendar-when">
-                              {formatDate(item.date, { hour: "2-digit", minute: "2-digit" })}
+                              {item.date.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}
                             </span>
                           )}
                         </button>
