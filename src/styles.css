@@ -567,6 +567,11 @@ kbd {
   border: 1px solid var(--line-strong);
   background: rgb(255 255 255 / 5%);
 }
+.icon-button.rate-button.on {
+  border-color: rgb(214 239 145 / 45%);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 .icon-button.danger-hover:hover:not(:disabled) {
   background: rgb(255 122 112 / 12%);
   color: var(--danger);

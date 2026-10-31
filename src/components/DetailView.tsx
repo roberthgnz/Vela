@@ -24,6 +24,8 @@ import {
   Star,
   Users,
   SquarePlay,
+  ThumbsDown,
+  ThumbsUp,
 } from "lucide-react";
 import type {
   Episode,
@@ -38,6 +40,7 @@ import { useKidsMode } from "../lib/profiles";
 import { getCatalogSources, getMeta, getStreams } from "../lib/protocol";
 import { kidsCatalog } from "../lib/tmdbCatalogs";
 import { sourceHistory, sourceKey, useSourceMarks } from "../lib/sourceHistory";
+import { taste, useTaste } from "../lib/taste";
 import { useTranslatedMeta } from "../lib/tmdb";
 import { useRouteState } from "../lib/navigation";
 import { useUiSetting } from "../lib/ui";
@@ -178,6 +181,7 @@ export function DetailView({
   const { meta, translated } = useTranslatedMeta(metadata.data || initial);
   const entry = prefs.library[mediaKey(meta.type, meta.id)];
   const saved = Boolean(entry?.saved);
+  const rating = useTaste().ratings[mediaKey(meta.type, meta.id)]?.value;
   const isSeries = meta.type === "series";
   const episodes = meta.videos || [];
   const progressVideo = entry?.progress?.videoId;
@@ -412,6 +416,25 @@ export function DetailView({
                 >
                   {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
                   <span>{saved ? "En la biblioteca" : "Guardar"}</span>
+                </button>
+                {/* Ratings teach the recommendations; pressing the current one clears it. */}
+                <button
+                  className={`icon-button bordered rate-button ${rating === "like" ? "on" : ""}`}
+                  aria-label="Me gusta"
+                  aria-pressed={rating === "like"}
+                  title={rating === "like" ? "Quitar «Me gusta»" : "Me gusta"}
+                  onClick={() => taste.rate(meta, rating === "like" ? null : "like")}
+                >
+                  <ThumbsUp size={15} fill={rating === "like" ? "currentColor" : "none"} />
+                </button>
+                <button
+                  className={`icon-button bordered rate-button ${rating === "dislike" ? "on" : ""}`}
+                  aria-label="No me gusta"
+                  aria-pressed={rating === "dislike"}
+                  title={rating === "dislike" ? "Quitar «No me gusta»" : "No me gusta"}
+                  onClick={() => taste.rate(meta, rating === "dislike" ? null : "dislike")}
+                >
+                  <ThumbsDown size={15} fill={rating === "dislike" ? "currentColor" : "none"} />
                 </button>
                 <button
                   className="icon-button bordered"
