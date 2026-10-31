@@ -22,6 +22,7 @@
     "allow-storage",
     "allow-logging",
     "allow-torrents",
+    "allow-embedded-mpv",
     "allow-desktop-services"
   ]
 }

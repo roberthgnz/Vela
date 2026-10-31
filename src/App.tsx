@@ -40,6 +40,8 @@ import { DownloadsView } from "./components/DownloadsView";
 import { downloads, downloadsAvailable, type Download } from "./lib/downloads";
 import type { CardMenu } from "./components/MediaCard";
 import { Player, PreparingPlayer, type Playing } from "./components/Player";
+import { EmbeddedPlayer } from "./components/EmbeddedPlayer";
+import { prefersEmbedded } from "./lib/embeddedMpv";
 import { Dialog, ErrorBoundary, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
@@ -174,10 +176,13 @@ export default function App() {
     sourceHistory.mark(meta.type, meta.id, videoId, stream, "opened");
     if (mode !== "external") setPreparing({ meta, episode });
     let target: Awaited<ReturnType<typeof resolvePlayback>>;
+    // mpv inside the window opens the original URL with its headers, like an external player.
+    let embedded = false;
     try {
+      embedded = mode !== "external" && (await prefersEmbedded());
       target = await resolvePlayback(meta, stream, prefs.serviceUrl, {
         episode,
-        external: mode === "external",
+        external: mode === "external" || embedded,
       });
     } catch (error) {
       sourceHistory.mark(meta.type, meta.id, videoId, stream, "failed", errorMessage(error));
@@ -219,6 +224,7 @@ export default function App() {
       transcodedBecause: target.transcodedBecause,
       probe: target.probe,
       torrentEngine: target.torrentEngine,
+      embedded,
       serviceUrl: prefs.serviceUrl,
       note: target.note,
       episode,
@@ -238,6 +244,7 @@ export default function App() {
       stream: item.stream,
       url: downloads.playableUrl(item),
       externalUrl: item.url,
+      filePath: item.path,
       headers: item.headers,
       serviceUrl: prefs.serviceUrl,
       note: t("app.downloadedFile"),
@@ -649,19 +656,36 @@ export default function App() {
       )}
       {playing && (
         <ErrorBoundary name="player" resetKey={playing}>
-        <Player
-          key={`${playing.videoId}|${playing.url}`}
-          playing={playing}
-          onNext={(episode) => void playNext(playing, episode)}
-          onStarted={() => sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "played")}
-          onFailed={(message) =>
-            sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "failed", message)
-          }
-          onClose={() => {
-            setPlaying(null);
-            void account.sync();
-          }}
-        />
+          {playing.embedded ? (
+            <EmbeddedPlayer
+              key={`mpv|${playing.videoId}|${playing.externalUrl}`}
+              playing={playing}
+              onNext={(episode) => void playNext(playing, episode)}
+              onStarted={() => sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "played")}
+              onFailed={(message) =>
+                sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "failed", message)
+              }
+              onClose={() => {
+                setPlaying(null);
+                void account.sync();
+              }}
+            />
+          ) : (
+            <Player
+              key={`${playing.videoId}|${playing.url}`}
+              playing={playing}
+              onNext={(episode) => void playNext(playing, episode)}
+              onStarted={() => sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "played")}
+              onFailed={(message) =>
+                sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "failed", message)
+              }
+              onEmbedded={(time) => setPlaying({ ...playing, embedded: true, resume: time })}
+              onClose={() => {
+                setPlaying(null);
+                void account.sync();
+              }}
+            />
+          )}
         </ErrorBoundary>
       )}
       {menu.element}

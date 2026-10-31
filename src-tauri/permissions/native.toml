@@ -27,3 +27,8 @@ commands.allow = ["log_write", "log_tail", "log_folder", "log_reveal", "log_save
 identifier = "allow-torrents"
 description = "Allow the main window to open torrents with Vela's own engine, read their swarm statistics and release them; the files are served only on 127.0.0.1 behind a secret path and deleted afterwards."
 commands.allow = ["torrent_prepare", "torrent_stats", "torrent_release"]
+
+[[permission]]
+identifier = "allow-embedded-mpv"
+description = "Allow the main window to play a source with the libmpv already installed on the machine (Stremio's or next to mpv.exe), drawn in a child window over the video area, and to place, focus, pause and close it."
+commands.allow = ["mpv_embedded_library", "mpv_embedded_open", "mpv_embedded_place", "mpv_embedded_focus", "mpv_embedded_command", "mpv_embedded_close"]

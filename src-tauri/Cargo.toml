@@ -25,9 +25,11 @@ tauri-plugin-updater = { version = "=2.13.1", default-features = false, features
 rusqlite = { version = "=0.41.1", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 librqbit = { version = "=9.1.0", default-features = false, features = ["rust-tls"] }
+libloading = "0.8"
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "=3.6.3", default-features = false, features = ["windows-native"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_UI_Input_KeyboardAndMouse"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt", "net", "io-util"] }

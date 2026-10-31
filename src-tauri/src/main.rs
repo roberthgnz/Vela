@@ -2,6 +2,7 @@
 
 mod clock;
 mod downloads;
+mod embedded_mpv;
 mod logging;
 mod mpv;
 mod proxy;
@@ -326,6 +327,7 @@ fn main() {
         .manage(downloads::Downloads::new().expect("could not initialize downloads"))
         .manage(service::Service::default())
         .manage(torrent::Engine::default())
+        .manage(embedded_mpv::EmbeddedMpv::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_data_dir() {
                 logging::init(&dir);
@@ -393,6 +395,12 @@ fn main() {
             torrent::torrent_prepare,
             torrent::torrent_stats,
             torrent::torrent_release,
+            embedded_mpv::mpv_embedded_library,
+            embedded_mpv::mpv_embedded_open,
+            embedded_mpv::mpv_embedded_place,
+            embedded_mpv::mpv_embedded_focus,
+            embedded_mpv::mpv_embedded_command,
+            embedded_mpv::mpv_embedded_close,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_delete,
@@ -404,6 +412,7 @@ fn main() {
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 app.state::<service::Service>().stop();
+                app.state::<embedded_mpv::EmbeddedMpv>().stop_blocking();
                 tauri::async_runtime::block_on(app.state::<torrent::Engine>().stop());
                 if let Some(storage) = app.try_state::<storage::Storage>() {
                     storage.checkpoint();

@@ -26,6 +26,10 @@ export type Playing = {
   note?: string;
   /** Which engine streams a torrent source (Vela's own or Stremio's server). */
   torrentEngine?: "vela" | "service";
+  /** Play with mpv inside Vela's window instead of the built-in player. */
+  embedded?: boolean;
+  /** The file on disk, for downloads (mpv opens it directly). */
+  filePath?: string;
 };
 
 /** Audio or subtitle choice offered to the user. */

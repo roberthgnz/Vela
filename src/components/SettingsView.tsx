@@ -44,6 +44,7 @@ import { openExternal } from "../lib/transport";
 import { errorMessage, motion } from "../lib/utils";
 import { AccountSection } from "./AccountSection";
 import { TorrentEngineRow } from "./TorrentEngineRow";
+import { VideoPlayerRow } from "./VideoPlayerRow";
 import { Dialog, Segmented, Spinner, Switch } from "./Primitives";
 import { tmdb, useTmdbConfigured } from "../lib/tmdb";
 import { updates, useUpdates } from "../lib/updates";
@@ -458,6 +459,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
           <section id="settings-playback" className="settings-group" aria-labelledby="settings-playback-title">
             <h2 id="settings-playback-title">{t("settings.section.playback")}</h2>
             <div className="settings-card">
+              {native && <VideoPlayerRow />}
               <Row
                 label={t("settings.playback.builtIn")}
                 description={t("settings.playback.builtInHint")}

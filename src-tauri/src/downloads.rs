@@ -102,7 +102,7 @@ fn free_path(dir: &Path, name: &str) -> PathBuf {
 }
 
 /// Only paths inside the downloads folder can be removed or shown.
-fn inside(app: &AppHandle, raw: &str) -> Result<PathBuf, String> {
+pub(crate) fn inside(app: &AppHandle, raw: &str) -> Result<PathBuf, String> {
     let root = folder(app)?
         .canonicalize()
         .map_err(|_| "La carpeta de descargas no existe.".to_owned())?;

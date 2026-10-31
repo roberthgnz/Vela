@@ -29,6 +29,7 @@ import { preferencesStore, usePreferences } from "../lib/store";
 import { describeTorrent } from "../lib/streamingServer";
 import { streamQuality } from "../lib/streams";
 import { releaseVelaTorrent } from "../lib/torrentEngine";
+import { useEmbeddedLibrary } from "../lib/embeddedMpv";
 import { requestRange } from "../lib/transport";
 import { clock, errorMessage, safeImage } from "../lib/utils";
 import { Dialog } from "./Primitives";
@@ -104,6 +105,7 @@ export function Player({
   onNext,
   onStarted,
   onFailed,
+  onEmbedded,
 }: {
   playing: Playing;
   onClose: () => void;
@@ -112,8 +114,11 @@ export function Player({
   /** The source played for the first time / could not be played. */
   onStarted?: () => void;
   onFailed?: (message: string) => void;
+  /** Switch this source to mpv inside Vela's window, from the given position. */
+  onEmbedded?: (time: number) => void;
 }) {
   const prefs = usePreferences();
+  const embeddedLibrary = useEmbeddedLibrary();
   const settings = prefs.player;
   const video = useRef<HTMLVideoElement>(null);
   const surface = useRef<HTMLDivElement>(null);
@@ -636,8 +641,17 @@ export function Player({
                   {t("player.convertWithService")}
                 </button>
               )}
+              {embeddedLibrary && onEmbedded && (
+                <button
+                  className={`button ${playing.transcodeUrl && !converting ? "secondary" : "primary"}`}
+                  onClick={() => onEmbedded(video.current?.currentTime ?? 0)}
+                >
+                  <MonitorPlay size={15} />
+                  {t("mpv.embedded.playWith")}
+                </button>
+              )}
               <button
-                className={`button ${playing.transcodeUrl && !converting ? "secondary" : "primary"}`}
+                className={`button ${(playing.transcodeUrl && !converting) || (embeddedLibrary && onEmbedded) ? "secondary" : "primary"}`}
                 disabled={externalBusy}
                 onClick={() => void external()}
               >
