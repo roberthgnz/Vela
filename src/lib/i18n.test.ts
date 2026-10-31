@@ -75,6 +75,8 @@ describe("initialSetting", () => {
   });
   it("keeps Spanish for installations from before 1.0 and follows the system on new ones", () => {
     expect(initialSetting(null, true)).toBe("es");
+    // Once saved, «system» stays even when the installation has data.
+    expect(initialSetting("system", true)).toBe("system");
     expect(initialSetting(null, false)).toBe("system");
     expect(initialSetting("garbage", false)).toBe("system");
   });

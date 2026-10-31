@@ -320,6 +320,15 @@ fn main() {
         .expect("could not initialize the TLS provider");
     let client = HttpClient::new().expect("could not initialize the addon transport");
     tauri::Builder::default()
+        // One Vela at a time: a second launch brings the open window forward. Two instances would
+        // share the database and the torrent cache (the second empties it at start).
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updater::PendingUpdate::default())

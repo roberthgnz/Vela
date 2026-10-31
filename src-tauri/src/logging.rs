@@ -180,14 +180,14 @@ fn log(app: &AppHandle) -> Result<&'static Log, String> {
 
 /// A line from the interface. `level` is `info`, `warn` or `error`.
 #[tauri::command]
-pub fn log_write(app: AppHandle, level: String, message: String) -> Result<(), String> {
+pub async fn log_write(app: AppHandle, level: String, message: String) -> Result<(), String> {
     log(&app)?.write(Level::parse(&level), "ui", &message);
     Ok(())
 }
 
 /// The end of the current log (at most 64 KB) for «Copiar diagnóstico».
 #[tauri::command]
-pub fn log_tail(app: AppHandle) -> Result<String, String> {
+pub async fn log_tail(app: AppHandle) -> Result<String, String> {
     Ok(log(&app)?.tail(64 * 1024))
 }
 

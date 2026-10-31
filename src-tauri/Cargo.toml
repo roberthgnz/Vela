@@ -26,6 +26,7 @@ rusqlite = { version = "=0.41.1", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 librqbit = { version = "=9.1.0", default-features = false, features = ["rust-tls"] }
 libloading = "0.8"
+tauri-plugin-single-instance = "=2.5.5"
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "=3.6.3", default-features = false, features = ["windows-native"] }
@@ -38,4 +39,4 @@ tokio = { version = "1", features = ["macros", "rt", "net", "io-util"] }
 codegen-units = 1
 lto = "thin"
 strip = true
-panic = "abort"
+panic = "unwind"

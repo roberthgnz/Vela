@@ -25,6 +25,8 @@ export function resolveLocale(setting: string | null | undefined, systemLanguage
 
 /** Saved by every Vela that ever ran (see `store.ts`). */
 const EXISTING_INSTALL_KEY = "vela.preferences.v2";
+/** Written when the data of a version before 1.0 was copied from WebView2's storage (`storage.ts`). */
+const MIGRATED_KEY = "vela.storage.migrated";
 
 /**
  * Vela was Spanish-only before 1.0: an existing installation keeps Spanish (saved, so Settings
@@ -39,8 +41,11 @@ export function initialSetting(saved: string | null, existingInstall: boolean): 
 function readSetting(): LanguageSetting {
   try {
     const saved = storage.getItem(LANGUAGE_KEY);
-    const value = initialSetting(saved, storage.getItem(EXISTING_INSTALL_KEY) !== null);
-    if (saved === null && value === "es") storage.setItem(LANGUAGE_KEY, "es");
+    const existing = storage.getItem(MIGRATED_KEY) !== null || storage.getItem(EXISTING_INSTALL_KEY) !== null;
+    const value = initialSetting(saved, existing);
+    // The first decision is saved, «system» included: preferences written later must not turn a
+    // new installation into an «existing» one on the next start.
+    if (saved === null) storage.setItem(LANGUAGE_KEY, value);
     return value;
   } catch {
     return "system";

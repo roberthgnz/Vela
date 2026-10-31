@@ -65,6 +65,23 @@ describe('desktop storage', () => {
     expect(storage.getStatus()).toMatchObject({ error: undefined, pending: 0 });
   });
 
+  it('flush still tries after an earlier failure (closing the window, reloading)', async () => {
+    let fail = true;
+    const writes: Change[][] = [];
+    const storage = createDesktopStorage(async (changes) => {
+      if (fail) throw new Error('locked');
+      writes.push(changes);
+    });
+    await storage.init([]);
+    storage.setItem('vela.a', '1');
+    await vi.advanceTimersByTimeAsync(60);
+    expect(storage.getStatus().error).toBe('locked');
+    fail = false;
+    await storage.flush();
+    expect(writes).toEqual([[{ key: 'vela.a', value: '1' }]]);
+    expect(storage.getStatus()).toMatchObject({ error: undefined, pending: 0 });
+  });
+
   it('flush writes everything pending at once', async () => {
     const writes: Change[][] = [];
     const storage = createDesktopStorage(async (changes) => void writes.push(changes));

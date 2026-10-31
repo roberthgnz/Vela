@@ -70,6 +70,8 @@ export function EmbeddedPlayer({
     [element, progress],
   );
   const close = useCallback(() => leave(onClose), [leave, onClose]);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Opens mpv once, with the addon subtitles (fetched first, briefly) and the user's languages.
   useEffect(() => {
@@ -136,6 +138,14 @@ export function EmbeddedPlayer({
             const upcoming = current.next;
             current.leave(() => current.onNext?.(upcoming));
           } else current.close();
+        } else if (message.kind === "closed") {
+          // mpv ended by itself (its own quit key, a crash): leave instead of a black rectangle.
+          if (!closed.current) {
+            closed.current = true;
+            progress.save(element);
+            progress.finishIfDone();
+            void closeEmbedded().finally(onCloseRef.current);
+          }
         } else if (message.kind === "error") {
           setError(message.message);
           if (!started.current) current.onFailed?.(message.message);

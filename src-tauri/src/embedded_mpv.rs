@@ -244,7 +244,11 @@ struct Session {
 }
 
 #[derive(Default)]
-pub struct EmbeddedMpv(Mutex<Option<Session>>);
+pub struct EmbeddedMpv {
+    session: Mutex<Option<Session>>,
+    /// Opening and closing run one at a time, so a slow open cannot outlive a newer one.
+    busy: tokio::sync::Mutex<()>,
+}
 
 /// libmpv builds Vela knows how to find, most likely first.
 fn candidates(player_path: Option<&str>) -> Vec<PathBuf> {
@@ -291,6 +295,9 @@ fn valid_header(name: &str, value: &str) -> bool {
 /// Keys on top of mpv's defaults, so the player answers like Vela's own (and YouTube's).
 const BINDINGS: &[(&str, &str)] = &[
     ("ESC", "script-message vela-close"),
+    // mpv's own quit would leave the page with an empty player.
+    ("q", "script-message vela-close"),
+    ("Q", "script-message vela-close"),
     ("f", "script-message vela-fullscreen"),
     ("MBTN_LEFT_DBL", "script-message vela-fullscreen"),
     ("n", "script-message vela-next"),
@@ -614,22 +621,31 @@ fn parent_window(app: &AppHandle) -> Result<isize, String> {
 
 impl EmbeddedMpv {
     fn take(&self) -> Option<Session> {
-        self.0.lock().unwrap_or_else(|p| p.into_inner()).take()
+        self.session
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take()
     }
 
     /// Stops playback and removes the window; waits a moment for mpv to finish.
     async fn shutdown(app: &AppHandle, session: Session) {
-        session.closing.store(true, Ordering::Relaxed);
-        let _ = session.mpv.command(&["quit"]);
+        let Session {
+            mpv,
+            window,
+            events,
+            closing,
+        } = session;
+        closing.store(true, Ordering::Relaxed);
+        let _ = mpv.command(&["quit"]);
         // SAFETY: valid handle; wakes the event thread so it sees the shutdown.
-        unsafe { (session.mpv.api.wakeup)(session.mpv.handle) };
-        let events = session.events;
+        unsafe { (mpv.api.wakeup)(mpv.handle) };
         let _ = tokio::time::timeout(
             Duration::from_secs(3),
             tauri::async_runtime::spawn_blocking(move || events.join()),
         )
         .await;
-        let window = session.window;
+        // mpv is destroyed (the event thread's reference is gone) before the window it draws in.
+        let _ = tauri::async_runtime::spawn_blocking(move || drop(mpv)).await;
         let _ = on_ui(app, move || native::destroy(window)).await;
     }
 
@@ -654,6 +670,7 @@ pub async fn mpv_embedded_open(
     state: State<'_, EmbeddedMpv>,
     options: OpenOptions,
 ) -> Result<String, String> {
+    let _busy = state.busy.lock().await;
     if let Some(previous) = state.take() {
         EmbeddedMpv::shutdown(&app, previous).await;
     }
@@ -705,13 +722,19 @@ pub async fn mpv_embedded_open(
     let closing = Arc::new(AtomicBool::new(false));
     let events = {
         let (app, mpv, closing) = (app.clone(), mpv.clone(), closing.clone());
-        let subtitles = options.subtitles.clone();
+        // Only web subtitles; the page already filters them, this is a second check.
+        let subtitles: Vec<String> = options
+            .subtitles
+            .iter()
+            .filter(|url| crate::transport::checked_url(url).is_ok())
+            .cloned()
+            .collect();
         std::thread::Builder::new()
             .name("vela-mpv-events".into())
             .spawn(move || event_loop(app, mpv, subtitles, closing))
             .map_err(|error| error.to_string())?
     };
-    *state.0.lock().unwrap_or_else(|p| p.into_inner()) = Some(Session {
+    *state.session.lock().unwrap_or_else(|p| p.into_inner()) = Some(Session {
         mpv,
         window,
         events,
@@ -734,7 +757,7 @@ pub async fn mpv_embedded_place(
     rect: Rect,
 ) -> Result<(), String> {
     let window = state
-        .0
+        .session
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .as_ref()
@@ -751,7 +774,7 @@ pub async fn mpv_embedded_focus(
     state: State<'_, EmbeddedMpv>,
 ) -> Result<(), String> {
     let window = state
-        .0
+        .session
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .as_ref()
@@ -764,24 +787,36 @@ pub async fn mpv_embedded_focus(
 
 /// A few controls the page needs (pause before the window loses focus, toggling from buttons).
 #[tauri::command]
-pub fn mpv_embedded_command(
+pub async fn mpv_embedded_command(
     state: State<'_, EmbeddedMpv>,
     action: String,
     key: Option<String>,
 ) -> Result<(), String> {
-    let guard = state.0.lock().unwrap_or_else(|p| p.into_inner());
-    let session = guard.as_ref().ok_or("No hay ningún vídeo en mpv.")?;
-    match action.as_str() {
-        "pause" => session.mpv.command(&["set", "pause", "yes"]),
-        "play" => session.mpv.command(&["set", "pause", "no"]),
-        "toggle" => session.mpv.command(&["cycle", "pause"]),
+    let args: Vec<String> = match action.as_str() {
+        "pause" => vec!["set".into(), "pause".into(), "yes".into()],
+        "play" => vec!["set".into(), "pause".into(), "no".into()],
+        "toggle" => vec!["cycle".into(), "pause".into()],
         // A key pressed while the page has the focus, run through mpv's bindings.
         "key" => {
             let key = key.filter(|key| valid_key(key)).ok_or("Tecla no válida.")?;
-            session.mpv.command(&["keypress", &key])
+            vec!["keypress".into(), key]
         }
-        _ => Err("Acción desconocida.".to_owned()),
-    }
+        _ => return Err("Acción desconocida.".to_owned()),
+    };
+    let mpv = state
+        .session
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .as_ref()
+        .map(|session| session.mpv.clone())
+        .ok_or("No hay ningún vídeo en mpv.")?;
+    // mpv_command waits for the core; not on the UI thread, not under the lock.
+    tauri::async_runtime::spawn_blocking(move || {
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        mpv.command(&args)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 /// An mpv key name (`SPACE`, `LEFT`, `k`, `<`…): short, printable, no spaces or separators.
@@ -798,6 +833,7 @@ pub async fn mpv_embedded_close(
     app: AppHandle,
     state: State<'_, EmbeddedMpv>,
 ) -> Result<(), String> {
+    let _busy = state.busy.lock().await;
     if let Some(session) = state.take() {
         EmbeddedMpv::shutdown(&app, session).await;
     }

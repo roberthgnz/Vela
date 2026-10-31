@@ -3,6 +3,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { flushStorage } from "../lib/storage";
+import { closeEmbedded } from "../lib/embeddedMpv";
 import { t } from "../lib/i18n";
 
 export const native = isTauri();
@@ -57,7 +58,8 @@ export function useCloseFlush() {
       if (closing) return;
       closing = true;
       try {
-        await flushStorage();
+        // mpv drawing in a child window ends before its parent goes away.
+        await Promise.all([flushStorage(), closeEmbedded().catch(() => {})]);
       } finally {
         await getCurrentWindow().destroy().catch(() => {});
       }

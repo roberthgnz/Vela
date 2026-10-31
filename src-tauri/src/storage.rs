@@ -270,31 +270,50 @@ fn failed(action: &str) -> impl Fn(rusqlite::Error) -> String + '_ {
     }
 }
 
-#[tauri::command]
-pub fn storage_load(app: AppHandle) -> Result<Vec<Entry>, String> {
-    storage(&app)?
-        .load()
-        .map_err(failed("No se pudieron leer los datos guardados"))
+/// Runs blocking database work off the UI thread (synchronous commands run on it).
+async fn blocking<T: Send + 'static>(
+    app: AppHandle,
+    job: impl FnOnce(&Storage) -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(move || job(&*storage(&app)?))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-pub fn storage_write(app: AppHandle, changes: Vec<Change>) -> Result<(), String> {
-    storage(&app)?
-        .write(&changes)
-        .map_err(failed("No se pudieron guardar los cambios"))
+pub async fn storage_load(app: AppHandle) -> Result<Vec<Entry>, String> {
+    blocking(app, |storage| {
+        storage
+            .load()
+            .map_err(failed("No se pudieron leer los datos guardados"))
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn storage_info(app: AppHandle) -> Result<Info, String> {
-    Ok(storage(&app)?.info())
+pub async fn storage_write(app: AppHandle, changes: Vec<Change>) -> Result<(), String> {
+    blocking(app, move |storage| {
+        storage
+            .write(&changes)
+            .map_err(failed("No se pudieron guardar los cambios"))
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn storage_backup(app: AppHandle) -> Result<String, String> {
-    storage(&app)?
-        .backup()
-        .map(|path| path.to_string_lossy().into_owned())
-        .map_err(failed("No se pudo crear la copia"))
+pub async fn storage_info(app: AppHandle) -> Result<Info, String> {
+    blocking(app, |storage| Ok(storage.info())).await
+}
+
+#[tauri::command]
+pub async fn storage_backup(app: AppHandle) -> Result<String, String> {
+    blocking(app, |storage| {
+        storage
+            .backup()
+            .map(|path| path.to_string_lossy().into_owned())
+            .map_err(failed("No se pudo crear la copia"))
+    })
+    .await
 }
 
 /// Shows the folder with the database and its backups in Explorer.

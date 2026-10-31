@@ -133,9 +133,10 @@ export function createDesktopStorage(writer: Writer, backend: Backend = "desktop
         clearTimeout(timer);
         timer = undefined;
       }
-      // One pass: a failure keeps the changes for the retry timer instead of looping here.
+      // One attempt even after an earlier failure (closing, reloading); a new failure keeps the
+      // changes and re-arms the retry timer instead of looping here.
       if (writing) await writing;
-      if (pending.size && !status.error) {
+      if (pending.size) {
         schedule();
         if (writing) await writing;
       }

@@ -42,6 +42,7 @@ import type { CardMenu } from "./components/MediaCard";
 import { Player, PreparingPlayer, type Playing } from "./components/Player";
 import { EmbeddedPlayer } from "./components/EmbeddedPlayer";
 import { prefersEmbedded } from "./lib/embeddedMpv";
+import { releaseVelaTorrent } from "./lib/torrentEngine";
 import { Dialog, ErrorBoundary, ErrorState, useMenu } from "./components/Primitives";
 import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
@@ -83,6 +84,8 @@ export default function App() {
   const menu = useMenu();
   const pinGate = usePinGate((message) => notify(message, "error"));
   const content = useRef<HTMLElement>(null);
+  /** A torrent of Vela's engine playing in an external player, released when it closes. */
+  const externalTorrent = useRef<string | undefined>(undefined);
   const scrolls = useRef(new Map<number, number>());
   /** Accessible name of the focused control in each history entry, restored when going back. */
   const focused = useRef(new Map<number, string>());
@@ -190,7 +193,11 @@ export default function App() {
       setPreparing(null);
       throw error;
     }
-    if (token !== preparation.current) return;
+    const ownTorrent = target.torrentEngine === "vela" && stream.infoHash ? stream.infoHash : undefined;
+    if (token !== preparation.current) {
+      if (ownTorrent) releaseVelaTorrent(ownTorrent);
+      return;
+    }
     const entry = preferencesStore.getSnapshot().library[mediaKey(meta.type, meta.id)];
     const saved = entry?.videos?.[videoId] ?? (entry?.progress?.videoId === videoId ? entry.progress : undefined);
     const resume = saved && saved.duration > 0 && saved.seconds < saved.duration * CREDITS_THRESHOLD ? saved.seconds : 0;
@@ -206,6 +213,9 @@ export default function App() {
         subtitles: target.subtitles,
       });
       sourceHistory.mark(meta.type, meta.id, videoId, stream, "played");
+      // Released when the player reports its exit; players without that are covered by the next
+      // torrent (which removes idle ones) and by the cleanup at exit.
+      if (ownTorrent) externalTorrent.current = ownTorrent;
       notify(launch.ipc ? t("app.openedIn", { player: externalPlayerName(launch) }) : t("app.openedExternal"));
       return;
     }
@@ -328,6 +338,10 @@ export default function App() {
   useEffect(
     () =>
       onExternalClosed((event) => {
+        if (externalTorrent.current) {
+          releaseVelaTorrent(externalTorrent.current);
+          externalTorrent.current = undefined;
+        }
         const position = event.position !== undefined ? t("app.closedAt", { time: clock(event.position) }) : "";
         notify(
           event.finished

@@ -28,6 +28,10 @@ const FOLDER: &str = "torrents";
 const METADATA_TIMEOUT: Duration = Duration::from_secs(60);
 /// A released torrent stays this long in case the next episode is in the same torrent.
 const RELEASE_GRACE: Duration = Duration::from_secs(90);
+/// A released torrent still being served is checked again this often...
+const RELEASE_RETRY: Duration = Duration::from_secs(30);
+/// ...and removed anyway after this many checks (a response stuck waiting for pieces).
+const RELEASE_ATTEMPTS: u32 = 20;
 
 const VIDEO: &[&str] = &[
     "mp4", "m4v", "mkv", "webm", "avi", "mov", "wmv", "flv", "ts", "m2ts", "mpg", "mpeg", "ogv",
@@ -42,6 +46,8 @@ pub struct Engine {
 
 struct Running {
     session: Arc<Session>,
+    /// Emptied when the engine stops, so nothing is left on disk after Vela exits.
+    folder: PathBuf,
     port: u16,
     token: String,
     /// Open HTTP responses per info hash: a torrent being streamed is never removed.
@@ -277,6 +283,7 @@ impl Running {
             client_name_and_version: Some(format!("Vela {}", env!("CARGO_PKG_VERSION"))),
             ..Default::default()
         };
+        let folder_for_cleanup = folder.clone();
         let session = Session::new_with_opts(folder, options)
             .await
             .map_err(|error| format!("No se pudo iniciar el motor de torrents: {error:#}"))?;
@@ -289,6 +296,7 @@ impl Running {
             .port();
         let running = Arc::new(Self {
             session,
+            folder: folder_for_cleanup,
             port,
             token: crate::proxy::token(),
             streaming: Mutex::default(),
@@ -386,11 +394,9 @@ impl Running {
             .filter(|(_, file)| is_subtitle(&file.name))
             .map(|(index, _)| index)
             .collect();
+        // Only this episode and the subtitles: earlier episodes of a season pack are not kept
+        // downloading.
         wanted.insert(chosen);
-        // Files chosen for an earlier episode of the same torrent stay wanted.
-        if let Some(previous) = torrent.only_files() {
-            wanted.extend(previous);
-        }
         self.session
             .update_only_files(&torrent, &wanted)
             .await
@@ -441,14 +447,22 @@ impl Running {
         let generation = self.bump(&hash);
         tokio::spawn(async move {
             tokio::time::sleep(RELEASE_GRACE).await;
-            let current = self
-                .generation
-                .lock()
-                .unwrap_or_else(|p| p.into_inner())
-                .get(&hash)
-                .copied();
-            if current == Some(generation) && !self.is_streaming(&hash) {
-                let _ = self.session.delete(TorrentIdOrHash::Hash(id), true).await;
+            for attempt in 0..=RELEASE_ATTEMPTS {
+                let current = self
+                    .generation
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .get(&hash)
+                    .copied();
+                // Prepared again meanwhile: someone wants it.
+                if current != Some(generation) {
+                    return;
+                }
+                if !self.is_streaming(&hash) || attempt == RELEASE_ATTEMPTS {
+                    let _ = self.session.delete(TorrentIdOrHash::Hash(id), true).await;
+                    return;
+                }
+                tokio::time::sleep(RELEASE_RETRY).await;
             }
         });
     }
@@ -565,9 +579,11 @@ impl Engine {
             .cloned()
     }
 
+    /// Stops the session and deletes what it downloaded.
     pub async fn stop(&self) {
         if let Some(running) = self.running.get() {
             running.session.stop().await;
+            let _ = tokio::fs::remove_dir_all(&running.folder).await;
         }
     }
 }
