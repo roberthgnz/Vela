@@ -179,7 +179,9 @@ export function DetailView({
     queryFn: ({ signal }) => getMeta(addon, initial.type, initial.id, signal),
     enabled: addon.manifest.id !== "saved",
   });
-  const { meta, translated } = useTranslatedMeta(metadata.data || initial);
+  // While the translation is on its way, the title, synopsis and genres wait (briefly) instead of
+  // showing the addon's English and then switching.
+  const { meta, translated, pending: translating } = useTranslatedMeta(metadata.data || initial);
   const entry = prefs.library[mediaKey(meta.type, meta.id)];
   const saved = Boolean(entry?.saved);
   const rating = useTaste().ratings[mediaKey(meta.type, meta.id)]?.value;
@@ -334,7 +336,14 @@ export function DetailView({
           <div className="detail-header">
             <Artwork src={meta.poster} name={meta.name} className="detail-poster" />
             <div className="detail-info">
-              <h1>{meta.name}</h1>
+              {translating ? (
+                <h1 className="title-pending" aria-busy="true">
+                  <span className="skeleton skeleton-title" />
+                  <span className="sr-only">{meta.name}</span>
+                </h1>
+              ) : (
+                <h1>{meta.name}</h1>
+              )}
               <div className="facts">
                 {facts.map((fact) => (
                   <span key={fact}>{fact}</span>
@@ -350,7 +359,12 @@ export function DetailView({
                   </span>
                 )}
               </div>
-              {meta.genres?.length ? (
+              {translating ? (
+                <div className="genres" aria-hidden="true">
+                  <span className="skeleton skeleton-chip" />
+                  <span className="skeleton skeleton-chip" />
+                </div>
+              ) : meta.genres?.length ? (
                 <div className="genres">
                   {meta.genres.slice(0, 5).map((genre) => {
                     const type = meta.type === "movie" || meta.type === "series" ? meta.type : undefined;
@@ -449,7 +463,7 @@ export function DetailView({
               </div>
             </div>
           </div>
-          {metadata.isPending && !meta.description ? (
+          {translating || (metadata.isPending && !meta.description) ? (
             <div className="detail-description">
               <div className="skeleton skeleton-line" />
               <div className="skeleton skeleton-line" />

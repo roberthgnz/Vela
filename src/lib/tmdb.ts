@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Episode, MediaItem } from "./contracts";
+import { storage } from "./storage";
 import { preferencesStore, usePreferences } from "./store";
 import { provideTmdbContext } from "./tmdbCatalogs";
 import { deleteSecret, getSecret, requestJson, setSecret } from "./transport";
@@ -56,16 +57,20 @@ export function validTmdbKey(value: string): boolean {
  * transport (Rust in the desktop app).
  */
 export async function translate(
-  meta: Pick<MediaItem, "id" | "type" | "videos">,
+  meta: Pick<MediaItem, "id" | "type" | "videos" | "tmdbId">,
   language: string,
   apiKey: string,
   fetchJson: (url: string) => Promise<unknown> = requestJson,
 ): Promise<Translation | null> {
   const imdb = /^tt\d+/.exec(meta.id)?.[0];
   if (!imdb) return null;
-  const found = (await fetchJson(url(`/find/${imdb}`, { external_source: "imdb_id", language }, apiKey))) as FindResult;
   const series = meta.type === "series";
-  const id = (series ? found.tv_results : found.movie_results)?.[0]?.id;
+  // Cinemeta's catalogs carry the TMDB id: then TMDB need not be searched first.
+  let id = meta.tmdbId;
+  if (!id) {
+    const found = (await fetchJson(url(`/find/${imdb}`, { external_source: "imdb_id", language }, apiKey))) as FindResult;
+    id = (series ? found.tv_results : found.movie_results)?.[0]?.id;
+  }
   if (!id) return null;
   const details = (await fetchJson(url(`/${series ? "tv" : "movie"}/${id}`, { language }, apiKey))) as Details;
   const result: Translation = {
@@ -119,6 +124,70 @@ export function applyTranslation<T extends MediaItem>(meta: T, translation: Tran
   };
 }
 
+/**
+ * Translated titles, synopses and genres, kept on this computer (by title and language) so a title
+ * opens already translated the next time. Episodes are not kept: they arrive with the details.
+ */
+type Heading = Pick<Translation, "name" | "description" | "genres">;
+const headingsKey = "vela.translations.v1";
+const HEADINGS_MAX = 2000;
+const HEADING_TTL = 30 * 24 * 60 * 60_000;
+let headings: Record<string, { at: number; value: Heading | null }> | undefined;
+let headingsTimer: ReturnType<typeof setTimeout> | undefined;
+
+function savedHeadings() {
+  if (!headings) {
+    try {
+      headings = JSON.parse(storage.getItem(headingsKey) ?? "{}") ?? {};
+    } catch {
+      headings = {};
+    }
+  }
+  return headings!;
+}
+
+function headingId(meta: Pick<MediaItem, "type" | "id">, language: string) {
+  return `${language}|${meta.type}|${meta.id}`;
+}
+
+function savedHeading(id: string) {
+  const entry = savedHeadings()[id];
+  return entry && Date.now() - entry.at < HEADING_TTL ? entry : undefined;
+}
+
+function saveHeading(id: string, translation: Translation | null) {
+  const all = savedHeadings();
+  all[id] = {
+    at: Date.now(),
+    value: translation ? { name: translation.name, description: translation.description, genres: translation.genres } : null,
+  };
+  clearTimeout(headingsTimer);
+  headingsTimer = setTimeout(() => {
+    const kept = Object.entries(all)
+      .sort((a, b) => b[1].at - a[1].at)
+      .slice(0, HEADINGS_MAX);
+    headings = Object.fromEntries(kept);
+    try {
+      storage.setItem(headingsKey, JSON.stringify(headings));
+    } catch {
+      /* Translations are looked up again next time. */
+    }
+  }, 1000);
+}
+
+/** Whether a title in this language can be translated through TMDB. */
+function translatable(meta: Pick<MediaItem, "id">, language: string) {
+  return Boolean(language) && !/^en\b/i.test(language) && /^tt\d+/.test(meta.id);
+}
+
+async function fetchHeading(meta: Pick<MediaItem, "id" | "type" | "tmdbId">, language: string) {
+  const apiKey = await tmdb.key();
+  if (!apiKey) return null;
+  const translation = await translate({ id: meta.id, type: meta.type, tmdbId: meta.tmdbId }, language, apiKey);
+  saveHeading(headingId(meta, language), translation);
+  return translation;
+}
+
 export const tmdb = {
   subscribe(listener: () => void) {
     listeners.add(listener);
@@ -129,7 +198,9 @@ export const tmdb = {
   /** The stored key, read once from the credential store. */
   async key(): Promise<string | null> {
     if (key === undefined) {
-      key = await getSecret(secretName).catch(() => null);
+      key = (await Promise.resolve()
+        .then(() => getSecret(secretName))
+        .catch(() => null)) ?? null;
       notify();
     }
     return key;
@@ -172,29 +243,78 @@ export function useTmdbConfigured(): boolean {
   return useSyncExternalStore(tmdb.subscribe, () => Boolean(key), () => Boolean(key));
 }
 
-/**
- * The title in the language chosen in Settings, when a TMDB key is configured. Returns the
- * addon's data unchanged otherwise, or while the translation loads.
- */
-export function useTranslatedMeta<T extends MediaItem>(meta: T): { meta: T; translated: boolean } {
+/** «unknown» until the key has been read from the credential store. */
+function useTmdbKeyState(): "unknown" | "none" | "set" {
+  const read = () => (key === undefined ? "unknown" : key ? "set" : "none");
+  return useSyncExternalStore(tmdb.subscribe, read, read);
+}
+
+// The key is read as soon as Vela starts, so a title opened right away is translated right away.
+void tmdb.key().catch(() => undefined);
+
+/** Starts translating a title before it is opened (on hover or focus of its card). */
+export function usePrefetchTranslation(): (meta: MediaItem) => void {
+  const client = useQueryClient();
   const language = usePreferences().metadataLanguage;
-  const configured = useTmdbConfigured();
-  useEffect(() => {
-    void tmdb.key();
-  }, []);
-  const query = useQuery({
-    queryKey: ["tmdb", meta.type, meta.id, language, meta.videos?.length ?? 0],
+  return useCallback(
+    (meta: MediaItem) => {
+      if (!key || !translatable(meta, language) || savedHeading(headingId(meta, language))) return;
+      void client.prefetchQuery({
+        queryKey: ["tmdb-heading", meta.type, meta.id, language],
+        queryFn: () => fetchHeading(meta, language),
+        staleTime: 7 * 24 * 60 * 60_000,
+      });
+    },
+    [client, language],
+  );
+}
+
+/** How long a title waits for its translation before showing the addon's text. */
+const TRANSLATION_WAIT = 2500;
+
+/**
+ * The title in the language chosen in Settings, when a TMDB key is configured. `pending` is true
+ * while a translation is expected and has not arrived (up to a couple of seconds): the detail page
+ * holds its text then instead of showing English and switching. Title, synopsis and genres come
+ * first (and are kept on disk); episode titles follow without changing them.
+ */
+export function useTranslatedMeta<T extends MediaItem>(meta: T): { meta: T; translated: boolean; pending: boolean } {
+  const language = usePreferences().metadataLanguage;
+  const keyState = useTmdbKeyState();
+  const expected = keyState !== "none" && translatable(meta, language);
+  const saved = expected ? savedHeading(headingId(meta, language)) : undefined;
+  const heading = useQuery({
+    queryKey: ["tmdb-heading", meta.type, meta.id, language],
+    queryFn: () => fetchHeading(meta, language),
+    enabled: keyState === "set" && expected,
+    initialData: saved ? (saved.value as Translation | null) : undefined,
+    initialDataUpdatedAt: saved?.at,
+    staleTime: 7 * 24 * 60 * 60_000,
+    gcTime: 24 * 60 * 60_000,
+    retry: 1,
+  });
+  const series = meta.type === "series" && Boolean(meta.videos?.length);
+  const episodes = useQuery({
+    queryKey: ["tmdb-episodes", meta.type, meta.id, language, meta.videos?.length ?? 0],
     queryFn: async () => {
       const apiKey = await tmdb.key();
-      return apiKey ? translate(meta, language, apiKey) : null;
+      return apiKey ? ((await translate(meta, language, apiKey))?.episodes ?? null) : null;
     },
-    enabled: configured && Boolean(language) && /^tt\d+/.test(meta.id),
+    enabled: keyState === "set" && expected && series,
+    placeholderData: keepPreviousData,
     staleTime: 24 * 60 * 60_000,
     gcTime: 24 * 60 * 60_000,
     retry: 1,
   });
-  return useMemo(
-    () => ({ meta: applyTranslation(meta, query.data), translated: Boolean(query.data) }),
-    [meta, query.data],
-  );
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    setWaited(false);
+    const timer = setTimeout(() => setWaited(true), TRANSLATION_WAIT);
+    return () => clearTimeout(timer);
+  }, [meta.id, language]);
+  const pending = expected && heading.data === undefined && !heading.isError && !waited;
+  return useMemo(() => {
+    const translation = heading.data || episodes.data ? { ...(heading.data ?? {}), episodes: episodes.data ?? undefined } : null;
+    return { meta: applyTranslation(meta, translation), translated: Boolean(heading.data), pending };
+  }, [meta, heading.data, episodes.data, pending]);
 }

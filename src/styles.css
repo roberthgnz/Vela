@@ -798,6 +798,19 @@ kbd {
 .skeleton-line.short {
   width: 55%;
 }
+/* A title or genre waiting for its translation keeps the space it will take. */
+.skeleton-title {
+  display: block;
+  width: min(360px, 70%);
+  height: 0.9em;
+  margin: 0.11em 0;
+}
+.skeleton-chip {
+  display: inline-block;
+  width: 64px;
+  height: 20px;
+  border-radius: 10px;
+}
 @keyframes shimmer {
   from {
     background-position: 100% 0;

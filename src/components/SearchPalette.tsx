@@ -5,6 +5,7 @@ import type { InstalledAddon, MediaItem } from "../lib/contracts";
 import { getCatalog, getCatalogSources } from "../lib/protocol";
 import { activeFilters, applySearchFilters, decades, noSearchFilters, type SearchFilters } from "../lib/searchFilters";
 import { searchHistory, useSearchHistory } from "../lib/searchHistory";
+import { usePrefetchTranslation } from "../lib/tmdb";
 import { useContentCategories, useContentFilter, type ContentCategory } from "../lib/contentFilter";
 import { useKidsMode } from "../lib/profiles";
 import { mediaKey, usePreferences } from "../lib/store";
@@ -50,6 +51,7 @@ export function SearchPalette({
   const prefs = usePreferences();
   const [input, setInput] = useState(initialQuery);
   const recent = useSearchHistory();
+  const prefetch = usePrefetchTranslation();
   const search = useDeferredValue(input.trim());
   // A children's profile does not search: addon search results cannot be filtered by age.
   const kids = useKidsMode();
@@ -238,6 +240,8 @@ export function SearchPalette({
                       className="palette-item"
                       data-palette-item
                       aria-label={t("library.open", { name: meta.name })}
+                      onPointerEnter={() => prefetch(meta)}
+                      onFocus={() => prefetch(meta)}
                       onKeyDown={moveFocus}
                       onClick={() => {
                         searchHistory.add(search);

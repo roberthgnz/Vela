@@ -3,6 +3,7 @@ import { Bookmark, BookmarkCheck, Check, Info, Play, Plus, ThumbsDown, ThumbsUp,
 import type { LibraryEntry, MediaItem } from "../lib/contracts";
 import { t } from "../lib/i18n";
 import { taste } from "../lib/taste";
+import { usePrefetchTranslation } from "../lib/tmdb";
 import { clock, yearOf } from "../lib/utils";
 import { Artwork, type MenuAnchor, type MenuItem } from "./Primitives";
 
@@ -90,6 +91,8 @@ export function MediaCard({
   extraMenu?: MenuItem[];
 }) {
   const progress = progressOf(entry);
+  // Hovering or focusing a card starts its translation, so the detail page opens translated.
+  const prefetch = usePrefetchTranslation();
   const saved = Boolean(entry?.saved);
   const watched = Boolean(entry?.watchedAt);
   const year = yearOf(meta);
@@ -120,6 +123,8 @@ export function MediaCard({
   return (
     <article
       className="media-card"
+      onPointerEnter={() => prefetch(meta)}
+      onFocus={() => prefetch(meta)}
       onContextMenu={(event: MouseEvent) => {
         if (!onMenu) return;
         event.preventDefault();
