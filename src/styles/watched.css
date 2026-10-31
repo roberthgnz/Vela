@@ -1,0 +1,32 @@
+/* Watched marks */
+.card-watched,
+.episode-watched {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(10 11 13 / 78%);
+  color: var(--accent);
+}
+.card-watched {
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+}
+.episode-watched {
+  right: 4px;
+  bottom: 4px;
+  width: 20px;
+  height: 20px;
+}
+.episode-row.watched .episode-text strong {
+  color: var(--fg-2);
+}
+.watched-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 600;
+}

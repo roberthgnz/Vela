@@ -1,0 +1,201 @@
+/* Content layer */
+.content {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overflow-x: hidden;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  border-top-left-radius: var(--radius-xl);
+  background: var(--bg);
+  user-select: text;
+  scrollbar-gutter: stable;
+}
+.content:focus-visible {
+  outline: none;
+}
+.banner {
+  padding: 12px var(--gutter) 0;
+}
+.page {
+  min-height: 100%;
+  padding-bottom: 40px;
+}
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  min-height: 60px;
+  padding: 14px var(--gutter) 10px;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(18px) saturate(1.3);
+}
+.page-header h1 {
+  margin-right: auto;
+  font: 600 20px/1.2 var(--font-display);
+  letter-spacing: -0.01em;
+}
+.count {
+  margin-left: 6px;
+  color: var(--faint);
+  font-size: 0.8em;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.page-body {
+  padding: 4px var(--gutter) 0;
+}
+.page-body.narrow {
+  max-width: 1080px;
+}
+.page-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 var(--gutter) 14px;
+  border-bottom: 1px solid var(--line);
+}
+.page-tabs button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.page-tabs button:hover {
+  color: var(--fg);
+}
+.page-tabs button.selected {
+  color: var(--fg);
+}
+.page-tabs button.selected::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.tab-count {
+  color: var(--faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+/* Library collections: tabs after the type tabs, scrolling sideways when there are many. */
+.page-tabs {
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.page-tabs > * {
+  flex: none;
+}
+.tab-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--line-strong);
+}
+.page-tabs button.collection-tab svg {
+  color: var(--faint);
+}
+.page-tabs button.collection-tab.selected svg {
+  color: var(--accent);
+}
+.page-tabs .tab-more {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+}
+.page-tabs .tab-add {
+  margin-left: 4px;
+  color: var(--faint);
+  font-weight: 500;
+}
+.page-tabs .tab-add:hover,
+.page-tabs .tab-add:focus-visible {
+  color: var(--accent);
+}
+.collection-form .form-error,
+.collection-picker .form-error {
+  min-height: 1.2em;
+  margin: 6px 0 0;
+}
+.collection-picker > p {
+  color: var(--muted);
+}
+.collection-options {
+  display: grid;
+  gap: 2px;
+  max-height: 260px;
+  margin: 12px 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.collection-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  color: var(--fg);
+  text-align: left;
+}
+.collection-option:hover,
+.collection-option:focus-visible {
+  background: rgb(255 255 255 / 6%);
+  outline: none;
+}
+.collection-option:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.collection-check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 5px;
+  color: #14161a;
+}
+.collection-option[aria-checked="true"] .collection-check {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.collection-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.collection-none {
+  margin: 12px 0;
+  color: var(--muted);
+}
+.collection-new {
+  display: flex;
+  gap: 8px;
+}
+.collection-new .input {
+  flex: 1;
+}

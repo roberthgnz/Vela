@@ -1,0 +1,146 @@
+/* Vela — desktop design system */
+:root {
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --chrome: #0b0c0e;
+  --bg: #121316;
+  --surface: #17181c;
+  --raised: #1d1f24;
+  --raised-2: #24262c;
+  --popover: #1f2126;
+  --hover: rgb(255 255 255 / 5.5%);
+  --pressed: rgb(255 255 255 / 9%);
+  --line: rgb(255 255 255 / 7%);
+  --line-strong: rgb(255 255 255 / 12%);
+  --fg: #ececee;
+  --fg-2: #c2c4ca;
+  --muted: #8d9099;
+  --faint: #60636c;
+  --accent: #d6ef91;
+  --accent-hover: #e3f6b0;
+  --accent-ink: #172012;
+  --accent-soft: rgb(214 239 145 / 12%);
+  --danger: #ff7a70;
+  --danger-strong: #c42b1c;
+  --warning: #f0c36a;
+  --ok: #86d6a0;
+  --titlebar: 40px;
+  --sidebar: 212px;
+  --gutter: 28px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --shadow-pop: 0 16px 40px rgb(0 0 0 / 50%), 0 0 0 1px rgb(255 255 255 / 8%);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--fg);
+  background: var(--chrome);
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  overflow: hidden;
+  background: var(--chrome);
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled {
+  opacity: 0.45;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+img {
+  display: block;
+  max-width: 100%;
+}
+svg {
+  flex-shrink: 0;
+}
+h1,
+h2,
+h3,
+p,
+dl,
+dd,
+ul {
+  margin: 0;
+}
+ul {
+  padding: 0;
+  list-style: none;
+}
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  font: 500 10.5px/1 var(--font);
+  color: var(--muted);
+  background: rgb(255 255 255 / 3%);
+}
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+::selection {
+  background: rgb(214 239 145 / 30%);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.muted {
+  color: var(--muted);
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

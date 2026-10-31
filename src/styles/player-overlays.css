@@ -1,0 +1,384 @@
+/* JASSUB draws styled ASS subtitles on its own canvas over the video. */
+.player canvas {
+  pointer-events: none;
+}
+.player-icon.pressed {
+  background: rgb(255 255 255 / 14%);
+}
+.player-loading {
+  z-index: 2;
+}
+/* The cover hides the black video until it plays; the top bar stays above it. */
+.player-loading.cover {
+  z-index: 1;
+  isolation: isolate;
+  gap: 18px;
+  background: #000;
+}
+.player-cover-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.38;
+}
+.player-cover-logo {
+  max-width: min(440px, 42vw);
+  max-height: min(170px, 22vh);
+  object-fit: contain;
+  filter: drop-shadow(0 2px 12px rgb(0 0 0 / 60%));
+  animation: cover-pulse 2s ease-in-out infinite;
+}
+.player-cover-name {
+  max-width: 60vw;
+  color: #fff;
+  font: 600 34px/1.2 var(--font-display);
+  text-align: center;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 60%);
+  animation: cover-pulse 2s ease-in-out infinite;
+}
+@keyframes cover-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+/* The player replaces the preparing cover in place: only the cover fades in. */
+.player-dialog[open]:not(.preparing),
+.player-dialog:not(.preparing)::backdrop {
+  animation: none;
+}
+.player-slow {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: rgb(20 21 24 / 88%);
+  pointer-events: auto;
+}
+.player-slow div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.player-notice {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, calc(100% - 32px));
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--radius-lg);
+  background: rgb(20 21 24 / 92%);
+  transform: translateX(-50%);
+}
+.player-next {
+  position: absolute;
+  right: 24px;
+  bottom: 104px;
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+  width: min(340px, calc(100% - 48px));
+  padding: 14px 16px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: var(--radius-xl);
+  background: rgb(20 21 24 / 92%);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-pop);
+  animation: fade 0.2s var(--ease);
+}
+.player-next-label {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.player-next strong {
+  overflow: hidden;
+  font: 600 14px/1.35 var(--font-display);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-next div {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.player[data-status="ended"] .player-next {
+  bottom: 50%;
+  transform: translateY(50%);
+}
+/* Same surface as the app's menus. */
+.player-popover {
+  position: absolute;
+  bottom: 84px;
+  z-index: 4;
+  display: flex;
+  max-height: min(520px, calc(100% - 160px));
+  padding: 8px 4px;
+  border-radius: var(--radius-lg);
+  background: var(--popover);
+  color: var(--fg);
+  box-shadow: var(--shadow-pop);
+  animation: menu-in 0.12s var(--ease);
+  user-select: none;
+}
+.player-popover section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.speed-panel {
+  width: 160px;
+}
+.speed-panel.with-marks {
+  display: grid;
+  grid-template-columns: 140px 220px;
+  gap: 16px;
+  width: auto;
+}
+.skip-marks-value {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.skip-marks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.player-skip {
+  position: absolute;
+  right: 24px;
+  bottom: 96px;
+  z-index: 3;
+  background: rgb(20 21 24 / 88%);
+  backdrop-filter: blur(12px);
+}
+.seek-segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgb(255 255 255 / 35%);
+  pointer-events: none;
+}
+/* Two flex columns rather than a grid: a grid row grows with the longest list and spills past the
+   panel's max-height, while flex items stretch to the clamped height and scroll inside it. */
+.track-panel {
+  gap: 16px;
+  width: min(560px, calc(100% - 24px));
+}
+.track-panel > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.track-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.track-languages {
+  min-height: 0;
+}
+.track-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+.track-divider {
+  height: 1px;
+  margin: 6px 10px;
+  border: 0;
+  background: rgb(255 255 255 / 8%);
+}
+@media (max-width: 720px) {
+  .track-panel {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .track-panel > * {
+    flex: none;
+  }
+}
+.player-popover h3 {
+  margin: 0 0 4px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.player-popover [role="radiogroup"] {
+  display: grid;
+  gap: 2px;
+}
+.track-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  padding: 4px 10px 4px 26px;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  text-align: left;
+  position: relative;
+}
+.track-option:hover,
+.track-option:focus-visible {
+  background: rgb(255 255 255 / 8%);
+  outline: none;
+}
+.track-option[aria-checked="true"] {
+  font-weight: 600;
+}
+.track-option[aria-checked="true"]::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(-50%);
+}
+.track-option small {
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.track-empty {
+  padding: 4px 10px;
+  color: var(--muted);
+}
+.track-delay .stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.track-delay output {
+  min-width: 56px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.track-sync-toggle {
+  margin-top: 8px;
+}
+.track-look {
+  gap: 6px;
+  padding: 0 10px;
+}
+.track-look h3 {
+  padding: 0;
+}
+.track-look-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.track-look .stepper,
+.track-choices,
+.track-swatches {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.track-look output {
+  min-width: 46px;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.track-choices .button[aria-pressed="true"] {
+  background: rgb(255 255 255 / 14%);
+  color: var(--fg);
+}
+.track-swatch {
+  width: 22px;
+  height: 22px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--swatch) content-box;
+  padding: 2px;
+}
+.track-swatch[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+.track-swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.color-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: -1px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 25%);
+}
+.track-sync p {
+  margin: 8px 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.track-sync-list {
+  display: grid;
+  gap: 2px;
+  max-height: 220px;
+}
+.track-sync-line {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  text-align: left;
+}
+.track-sync-line small {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.track-sync-line span {
+  white-space: pre-line;
+}
+.track-sync-line:hover,
+.track-sync-line:focus-visible {
+  background: rgb(255 255 255 / 8%);
+  outline: none;
+}
+.track-sync-line[data-current] {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+@media (max-width: 720px) {
+  .player-next {
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+  .player-row .volume input,
+  .player-time span {
+    display: none;
+  }
+}

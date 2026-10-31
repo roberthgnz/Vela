@@ -1,0 +1,21 @@
+/* Sources already opened: their state replaces the addon line; tried ones are dimmed. */
+.source-item.marked.opened .source-heading,
+.source-item.marked.opened .source-detail {
+  color: var(--fg-2);
+}
+.source-item.marked.failed .source-row {
+  opacity: 0.55;
+}
+.source-item.marked .source-row:hover,
+.source-item.marked .source-row:focus-visible {
+  opacity: 1;
+}
+.source-mark {
+  font-variant-numeric: tabular-nums;
+}
+.source-mark.last {
+  color: var(--accent);
+}
+.source-mark.failed {
+  color: #e59a8a;
+}

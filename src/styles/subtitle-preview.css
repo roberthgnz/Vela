@@ -1,0 +1,39 @@
+/* Subtitle preview in Settings */
+.subtitle-preview {
+  position: relative;
+  height: 96px;
+  margin: 4px 16px 12px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 4%), transparent 60%),
+    repeating-linear-gradient(90deg, #2a3140 0 60px, #3b4252 60px 120px);
+}
+.subtitle-preview .player-subtitle {
+  bottom: 12px;
+  width: 100%;
+}
+.subtitle-preview .player-subtitle span {
+  font-size: calc(18px * var(--subtitle-scale, 1));
+}
+.input-with-action {
+  position: relative;
+  margin-bottom: 6px;
+}
+.input-with-action .input {
+  width: 100%;
+  margin-bottom: 0;
+  padding-right: 40px;
+}
+.input-with-action .icon-button {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+}
+
+.player-swarm {
+  color: rgb(255 255 255 / 62%);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}

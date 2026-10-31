@@ -1,0 +1,17 @@
+/* mpv inside the window (EmbeddedPlayer): the page keeps the top bar, mpv's native window
+   covers the area below it. */
+.player.embedded {
+  display: flex;
+  flex-direction: column;
+}
+.player.embedded .embedded-top {
+  position: relative;
+  flex: none;
+  background: #000;
+}
+.embedded-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #000;
+}

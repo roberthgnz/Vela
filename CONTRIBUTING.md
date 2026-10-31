@@ -38,7 +38,8 @@ La CI ejecuta lo mismo. Las pruebas de `src/lib` corren en Node; las de componen
 
 - Añade pruebas unitarias para los cambios de comportamiento y de regresión para los errores que corrijas.
 - Distingue en la descripción lo verificado contra servicios reales de lo cubierto solo por pruebas simuladas, y actualiza `docs/stremio.md` cuando cambie lo que sabemos de un contrato o de un servicio.
-- Sigue el estilo del código que rodea tu cambio. La interfaz está en español.
+- Sigue el estilo del código que rodea tu cambio. La interfaz está en español e inglés: los textos van en `src/locales/` (`es.ts` es la referencia).
+- Los estilos están en `src/styles/`, un archivo por zona (reproductor, ajustes, detalle…). `src/styles.css` los importa en orden de cascada: los posteriores pisan a los anteriores, así que una regla nueva va en el archivo de su zona y un archivo nuevo se añade a la lista en su sitio.
 - Mensajes de commit al estilo [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `test:`, `ci:`, `chore:`.
 
 ## Límites del proyecto

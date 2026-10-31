@@ -1,0 +1,95 @@
+/* Responsive */
+@media (max-width: 1100px) {
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .detail-panel {
+    position: relative;
+    top: 0;
+    max-height: 640px;
+  }
+}
+@media (max-width: 900px) {
+  :root {
+    --gutter: 20px;
+  }
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-nav {
+    display: none;
+  }
+  .table-row {
+    grid-template-columns: minmax(160px, 1fr) 80px 44px;
+  }
+  .table-row > :nth-child(3),
+  .table-row > :nth-child(4),
+  .table-row > :nth-child(5) {
+    display: none;
+  }
+}
+@media (max-width: 720px) {
+  .app,
+  .app.sidebar-collapsed {
+    --sidebar: 56px;
+  }
+  .nav-item span,
+  .account-text,
+  .app-mark span,
+  .history-buttons,
+  .search-trigger span,
+  .search-trigger kbd {
+    display: none;
+  }
+  .search-trigger {
+    flex: none;
+    width: 32px;
+    margin: 0 4px;
+    padding: 0;
+    justify-content: center;
+  }
+  .detail-header {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 16px;
+  }
+  .detail-info h1 {
+    font-size: 22px;
+  }
+  .poster-grid {
+    --poster: 120px;
+  }
+  .filter-field {
+    width: 140px;
+  }
+  .addon-row {
+    grid-template-areas:
+      "icon name controls"
+      "icon version controls"
+      "desc desc desc"
+      "meta meta meta";
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+  }
+  .palette {
+    top: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (forced-colors: active) {
+  .nav-item.active,
+  .button.primary,
+  .chip.selected {
+    border: 1px solid CanvasText;
+  }
+}
+.settings-nav a[aria-current="true"] {
+  background: rgb(255 255 255 / 6%);
+  color: var(--fg);
+}

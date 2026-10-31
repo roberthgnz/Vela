@@ -1,0 +1,33 @@
+/* Grids and shelves */
+.poster-grid {
+  --poster: 156px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--poster), 1fr));
+  gap: 22px 16px;
+}
+.poster-grid.compact {
+  --poster: 116px;
+  gap: 16px 12px;
+}
+/* Long catalogs (a decade brings hundreds of titles): cards out of view are not laid out or
+   painted. `auto` remembers each card's last size so the scroll height stays right; the clip
+   margin keeps the focus ring, which is drawn outside the card, visible. */
+.poster-grid > .media-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 156px auto 290px;
+  overflow-clip-margin: 8px;
+}
+.poster-grid.compact > .media-card {
+  contain-intrinsic-size: auto 116px auto 174px;
+}
+.poster-grid.compact .card-meta {
+  display: none;
+}
+.grid-footer {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0 8px;
+}
+.home-page {
+  padding-top: 12px;
+}

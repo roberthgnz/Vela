@@ -1,0 +1,131 @@
+/* Feedback */
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  color: var(--muted);
+}
+.skeleton {
+  border-radius: var(--radius);
+  background: linear-gradient(100deg, rgb(255 255 255 / 4%) 30%, rgb(255 255 255 / 8%) 50%, rgb(255 255 255 / 4%) 70%) 0 0 / 300% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.skeleton-line {
+  height: 10px;
+  margin-top: 8px;
+}
+.skeleton-line.short {
+  width: 55%;
+}
+/* A title or genre waiting for its translation keeps the space it will take. */
+.skeleton-title {
+  display: block;
+  width: min(360px, 70%);
+  height: 0.9em;
+  margin: 0.11em 0;
+}
+.skeleton-chip {
+  display: inline-block;
+  width: 64px;
+  height: 20px;
+  border-radius: 10px;
+}
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  max-width: 420px;
+  margin: 56px auto;
+  padding: 0 20px;
+  text-align: center;
+}
+.empty-state.compact {
+  margin: 28px auto;
+}
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--raised);
+  color: var(--muted);
+}
+.empty-state h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.empty-state p {
+  color: var(--muted);
+}
+.empty-actions {
+  margin-top: 10px;
+}
+.error-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgb(255 122 112 / 22%);
+  border-radius: var(--radius-lg);
+  background: rgb(255 122 112 / 7%);
+  color: var(--fg-2);
+}
+.error-state > svg {
+  margin-top: 2px;
+  color: var(--danger);
+}
+.error-state div {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+}
+.error-state strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+.error-state .button {
+  flex: none;
+}
+.toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--popover);
+  box-shadow: var(--shadow-pop);
+  animation: toast-in 0.18s var(--ease);
+}
+.toast > svg {
+  color: var(--ok);
+}
+.toast.error > svg {
+  color: var(--danger);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
