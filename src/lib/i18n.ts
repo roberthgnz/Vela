@@ -23,10 +23,25 @@ export function resolveLocale(setting: string | null | undefined, systemLanguage
   return systemLanguage?.trim().toLowerCase().startsWith("es") ? "es" : "en";
 }
 
+/** Saved by every Vela that ever ran (see `store.ts`). */
+const EXISTING_INSTALL_KEY = "vela.preferences.v2";
+
+/**
+ * Vela was Spanish-only before 1.0: an existing installation keeps Spanish (saved, so Settings
+ * shows it) instead of switching to the system language on update; new installations follow the
+ * system.
+ */
+export function initialSetting(saved: string | null, existingInstall: boolean): LanguageSetting {
+  if (saved === "es" || saved === "en" || saved === "system") return saved;
+  return existingInstall ? "es" : "system";
+}
+
 function readSetting(): LanguageSetting {
   try {
-    const value = storage.getItem(LANGUAGE_KEY);
-    return value === "es" || value === "en" ? value : "system";
+    const saved = storage.getItem(LANGUAGE_KEY);
+    const value = initialSetting(saved, storage.getItem(EXISTING_INSTALL_KEY) !== null);
+    if (saved === null && value === "es") storage.setItem(LANGUAGE_KEY, "es");
+    return value;
   } catch {
     return "system";
   }

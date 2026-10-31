@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { en } from "../locales/en";
 import { es } from "../locales/es";
-import { interpolate, locale, plural, resolveLocale, t, translate } from "./i18n";
+import { initialSetting, interpolate, locale, plural, resolveLocale, t, translate } from "./i18n";
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
 
@@ -64,5 +64,18 @@ describe("i18n", () => {
       (key) => (key.endsWith(".one") && !keys.has(key.replace(/\.one$/, ".other"))) || (key.endsWith(".other") && !keys.has(key.replace(/\.other$/, ".one"))),
     );
     expect(unpaired).toEqual([]);
+  });
+});
+
+describe("initialSetting", () => {
+  it("keeps a saved choice", () => {
+    expect(initialSetting("en", true)).toBe("en");
+    expect(initialSetting("system", true)).toBe("system");
+    expect(initialSetting("es", false)).toBe("es");
+  });
+  it("keeps Spanish for installations from before 1.0 and follows the system on new ones", () => {
+    expect(initialSetting(null, true)).toBe("es");
+    expect(initialSetting(null, false)).toBe("system");
+    expect(initialSetting("garbage", false)).toBe("system");
   });
 });
