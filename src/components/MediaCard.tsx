@@ -1,10 +1,11 @@
 import type { KeyboardEvent, MouseEvent } from "react";
-import { Bookmark, BookmarkCheck, Check, Info, Play, Plus, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, FolderPlus, Info, Play, Plus, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import type { LibraryEntry, MediaItem } from "../lib/contracts";
 import { t } from "../lib/i18n";
 import { taste } from "../lib/taste";
 import { usePrefetchTranslation } from "../lib/tmdb";
 import { clock, yearOf } from "../lib/utils";
+import { openCollectionPicker } from "./Collections";
 import { Artwork, type MenuAnchor, type MenuItem } from "./Primitives";
 
 export type CardMenu = (anchor: MenuAnchor, items: MenuItem[], label: string) => void;
@@ -114,6 +115,7 @@ export function MediaCard({
               onSelect: onSave,
             }
           : { label: t("card.addToLibrary"), icon: <Bookmark size={15} />, onSelect: onSave },
+        { label: t("collections.addTo"), icon: <FolderPlus size={15} />, onSelect: () => openCollectionPicker({ meta, addonUrl: entry?.addonUrl, onSave }) },
         "separator",
         ...ratingItems(meta),
         ...(extraMenu ?? []),

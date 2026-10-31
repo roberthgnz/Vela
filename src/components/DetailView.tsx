@@ -13,6 +13,7 @@ import {
   Clipboard,
   Download as DownloadIcon,
   ExternalLink,
+  FolderPlus,
   Globe,
   Lock,
   Magnet,
@@ -35,6 +36,7 @@ import type {
 } from "../lib/contracts";
 import { episodeCode, isUpcoming, orderedEpisodes, videoProgress, watchedEpisodes } from "../lib/episodes";
 import { useTitleAllowed } from "../lib/contentFilter";
+import { openCollectionPicker } from "./Collections";
 import { genreTarget, type GenreTarget } from "../lib/genres";
 import { locale, plural, t } from "../lib/i18n";
 import { useKidsMode } from "../lib/profiles";
@@ -237,6 +239,7 @@ export function DetailView({
           disabled: addon.manifest.id === "saved",
           onSelect: () => void metadata.refetch(),
         },
+        { label: t("collections.addTo"), icon: <FolderPlus size={15} />, onSelect: () => openCollectionPicker({ meta, addonUrl: addon.manifestUrl }) },
         ...(isSeries
           ? []
           : [

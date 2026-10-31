@@ -473,6 +473,109 @@ kbd {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+/* Library collections: tabs after the type tabs, scrolling sideways when there are many. */
+.page-tabs {
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.page-tabs > * {
+  flex: none;
+}
+.tab-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--line-strong);
+}
+.page-tabs button.collection-tab svg {
+  color: var(--faint);
+}
+.page-tabs button.collection-tab.selected svg {
+  color: var(--accent);
+}
+.page-tabs .tab-more {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+}
+.page-tabs .tab-add {
+  margin-left: 4px;
+  color: var(--faint);
+  font-weight: 500;
+}
+.page-tabs .tab-add:hover,
+.page-tabs .tab-add:focus-visible {
+  color: var(--accent);
+}
+.collection-form .form-error,
+.collection-picker .form-error {
+  min-height: 1.2em;
+  margin: 6px 0 0;
+}
+.collection-picker > p {
+  color: var(--muted);
+}
+.collection-options {
+  display: grid;
+  gap: 2px;
+  max-height: 260px;
+  margin: 12px 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.collection-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  color: var(--fg);
+  text-align: left;
+}
+.collection-option:hover,
+.collection-option:focus-visible {
+  background: rgb(255 255 255 / 6%);
+  outline: none;
+}
+.collection-option:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.collection-check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 5px;
+  color: #14161a;
+}
+.collection-option[aria-checked="true"] .collection-check {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.collection-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.collection-none {
+  margin: 12px 0;
+  color: var(--muted);
+}
+.collection-new {
+  display: flex;
+  gap: 8px;
+}
+.collection-new .input {
+  flex: 1;
+}
 
 /* Controls */
 .button {

@@ -165,6 +165,15 @@ export type PlayerPreferences = {
 /** How the user arranged Home: catalog keys in order, hidden or shown, and custom names. */
 export type CatalogLayout = { order: string[]; hidden: Record<string, boolean>; names: Record<string, string> };
 
+/** A group of library titles the user makes («Ciencia ficción», «Para ver con amigos»…). */
+export type Collection = {
+  id: string;
+  name: string;
+  /** Library keys (`mediaKey`) of its titles, in the order they were added. */
+  keys: string[];
+  createdAt: number;
+};
+
 export type AppPreferences = {
   version: 2;
   addons: InstalledAddon[];
@@ -176,4 +185,6 @@ export type AppPreferences = {
   metadataLanguage: string;
   /** Home catalogs, per profile. */
   catalogs: CatalogLayout;
+  /** The library's collections, per profile. */
+  collections: Collection[];
 };

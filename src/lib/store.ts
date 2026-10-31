@@ -5,6 +5,7 @@ import type {
   AddonCatalog,
   AddonManifest,
   AppPreferences,
+  Collection,
   CatalogLayout,
   Episode,
   InstalledAddon,
@@ -32,10 +33,16 @@ export const MAIN_PROFILE = 'main';
 export const profileKey = (id: string) => `vela.profile.${id}.v1`;
 
 /** What each profile has of its own; addons and services are shared. */
-type ProfileData = Pick<AppPreferences, 'library' | 'player' | 'metadataLanguage' | 'catalogs'>;
+type ProfileData = Pick<AppPreferences, 'library' | 'player' | 'metadataLanguage' | 'catalogs' | 'collections'>;
 
 function profileData(value: AppPreferences): ProfileData {
-  return { library: value.library, player: value.player, metadataLanguage: value.metadataLanguage, catalogs: value.catalogs };
+  return {
+    library: value.library,
+    player: value.player,
+    metadataLanguage: value.metadataLanguage,
+    catalogs: value.catalogs,
+    collections: value.collections,
+  };
 }
 const defaultServiceUrl = 'http://127.0.0.1:11470';
 
@@ -285,7 +292,33 @@ function defaults(): AppPreferences {
     player: { ...defaultPlayer },
     metadataLanguage: 'es-ES',
     catalogs: { order: [], hidden: {}, names: {} },
+    collections: [],
   };
+}
+
+export const MAX_COLLECTIONS = 50;
+const COLLECTION_NAME_LENGTH = 40;
+
+function collectionName(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').slice(0, COLLECTION_NAME_LENGTH);
+}
+
+function collections(value: unknown): Collection[] {
+  if (!Array.isArray(value)) return [];
+  const result: Collection[] = [];
+  const ids = new Set<string>();
+  for (const item of value) {
+    if (!record(item) || !nonempty(item.id) || !safeKey(item.id) || ids.has(item.id) || !nonempty(item.name)) continue;
+    ids.add(item.id);
+    result.push({
+      id: item.id,
+      name: collectionName(item.name),
+      keys: [...new Set((strings(item.keys) ?? []).filter(safeKey))],
+      createdAt: finite(item.createdAt) ? item.createdAt : 0,
+    });
+    if (result.length >= MAX_COLLECTIONS) break;
+  }
+  return result;
 }
 
 function catalogLayout(value: unknown): CatalogLayout {
@@ -333,6 +366,7 @@ function readPreferences(value: unknown, fallback: AppPreferences): AppPreferenc
     player: player(value.player),
     metadataLanguage: metadataLanguage(value.metadataLanguage, fallback.metadataLanguage),
     catalogs: catalogLayout(value.catalogs),
+    collections: collections(value.collections),
   };
 }
 
@@ -440,14 +474,37 @@ export function createPreferencesStore(providedStorage?: PreferenceStorage) {
     setEntry(key, { ...item, saved: true, changedAt: Date.now(), addedAt: state.library[key]?.saved ? item.addedAt : Date.now() });
   }
 
-  /** Takes a title out of the library. Its watched history stays (as Stremio keeps removed items' state). */
+  /**
+   * Takes a title out of the library, and out of its collections. Its watched history stays (as
+   * Stremio keeps removed items' state).
+   */
   function removeMedia(type: string, id: string) {
     const key = mediaKey(type, id);
     const existing = state.library[key];
     if (!existing) return;
     const { progress: _progress, ...rest } = existing;
     const kept: LibraryEntry = { ...rest, saved: false, changedAt: Date.now() };
-    setEntry(key, hasHistory(kept) ? kept : undefined);
+    const library = { ...state.library };
+    if (hasHistory(kept)) library[key] = kept;
+    else delete library[key];
+    const grouped = state.collections.some((item) => item.keys.includes(key))
+      ? state.collections.map((item) => ({ ...item, keys: item.keys.filter((value) => value !== key) }))
+      : state.collections;
+    update({ ...state, library, collections: grouped });
+  }
+
+  function findCollection(id: string): Collection {
+    const found = state.collections.find((item) => item.id === id);
+    if (!found) throw new Error('Collection not found.');
+    return found;
+  }
+
+  function uniqueName(name: string, except?: string): string {
+    const value = collectionName(name);
+    if (!value) throw new Error('empty');
+    const lower = value.toLocaleLowerCase();
+    if (state.collections.some((item) => item.id !== except && item.name.toLocaleLowerCase() === lower)) throw new Error('duplicate');
+    return value;
   }
 
   function setVideos(meta: MediaItem, addonUrl: string, videoIds: string[], watched: boolean) {
@@ -592,7 +649,42 @@ export function createPreferencesStore(providedStorage?: PreferenceStorage) {
       if (JSON.stringify(next) !== JSON.stringify(state.player)) update({ ...state, player: next });
     },
     clearLibrary() {
-      if (Object.keys(state.library).length) update({ ...state, library: {} });
+      if (Object.keys(state.library).length || state.collections.some((item) => item.keys.length))
+        update({ ...state, library: {}, collections: state.collections.map((item) => ({ ...item, keys: [] })) });
+    },
+    /**
+     * Creates a collection. Throws `empty` or `duplicate` (the caller shows the message) and
+     * `limit` beyond MAX_COLLECTIONS. Returns its id.
+     */
+    createCollection(name: string): string {
+      const value = uniqueName(name);
+      if (state.collections.length >= MAX_COLLECTIONS) throw new Error('limit');
+      const id = crypto.randomUUID().slice(0, 8);
+      update({ ...state, collections: [...state.collections, { id, name: value, keys: [], createdAt: Date.now() }] });
+      return id;
+    },
+    renameCollection(id: string, name: string) {
+      const value = uniqueName(name, id);
+      if (findCollection(id).name === value) return;
+      update({ ...state, collections: state.collections.map((item) => (item.id === id ? { ...item, name: value } : item)) });
+    },
+    deleteCollection(id: string) {
+      if (state.collections.some((item) => item.id === id))
+        update({ ...state, collections: state.collections.filter((item) => item.id !== id) });
+    },
+    /** Puts a title in a collection (saving it in the library first) or takes it out. */
+    setInCollection(id: string, meta: MediaItem, addonUrl: string, included: boolean) {
+      const collection = findCollection(id);
+      const key = mediaKey(meta.type, meta.id);
+      if (included === collection.keys.includes(key)) return;
+      if (included && !state.library[key]?.saved) saveMedia(meta, addonUrl);
+      if (included && !state.library[key]?.saved) return; // Not a title the library can keep.
+      update({
+        ...state,
+        collections: state.collections.map((item) =>
+          item.id === id ? { ...item, keys: included ? [...item.keys, key] : item.keys.filter((value) => value !== key) } : item,
+        ),
+      });
     },
     /** Applies a batch of synchronized entries and removals in one update. */
     mergeLibrary(entries: LibraryEntry[], removals: { type: string; id: string }[] = []) {

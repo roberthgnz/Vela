@@ -261,3 +261,46 @@ describe('local preferences', () => {
     expect(storage.getItem('vela.profile.kids.v1')).toBeNull();
   });
 });
+
+describe('library collections', () => {
+  it('groups saved titles, saving them when added, and keeps them per profile', () => {
+    const backing = memoryStorage();
+    const store = createPreferencesStore(backing);
+    const id = store.createCollection('  Ciencia   ficción ');
+    expect(store.getSnapshot().collections).toMatchObject([{ id, name: 'Ciencia ficción', keys: [] }]);
+    expect(() => store.createCollection('ciencia ficción')).toThrow('duplicate');
+    expect(() => store.createCollection('   ')).toThrow('empty');
+
+    store.setInCollection(id, movie, 'https://addon/manifest.json', true);
+    expect(store.getSnapshot().library[mediaKey('movie', movie.id)]?.saved).toBe(true);
+    expect(store.getSnapshot().collections[0].keys).toEqual([mediaKey('movie', movie.id)]);
+
+    store.renameCollection(id, 'Sci-fi');
+    expect(createPreferencesStore(backing).getSnapshot().collections).toMatchObject([{ id, name: 'Sci-fi' }]);
+
+    store.switchProfile('kids');
+    expect(store.getSnapshot().collections).toEqual([]);
+    store.switchProfile('main');
+    expect(store.getSnapshot().collections).toHaveLength(1);
+
+    // Leaving the library also leaves its collections.
+    store.removeMedia('movie', movie.id);
+    expect(store.getSnapshot().collections[0].keys).toEqual([]);
+    store.deleteCollection(id);
+    expect(store.getSnapshot().collections).toEqual([]);
+  });
+
+  it('drops collections that are not valid when reading', () => {
+    const store = createPreferencesStore(memoryStorage(JSON.stringify({
+      version: 1,
+      library: {},
+      collections: [
+        { id: 'a', name: 'Ok', keys: ['["movie","tt1"]', '["movie","tt1"]', 7], createdAt: 1 },
+        { id: 'a', name: 'Duplicate id', keys: [] },
+        { id: '__proto__', name: 'Unsafe', keys: [] },
+        { name: 'No id', keys: [] },
+      ],
+    })));
+    expect(store.getSnapshot().collections).toEqual([{ id: 'a', name: 'Ok', keys: ['["movie","tt1"]'], createdAt: 1 }]);
+  });
+});

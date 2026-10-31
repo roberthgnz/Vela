@@ -48,6 +48,7 @@ import { SearchPalette, type Command } from "./components/SearchPalette";
 import { SettingsView, ShortcutTable } from "./components/SettingsView";
 import { UpdateNotice } from "./components/UpdateNotice";
 import { openProfile, ProfileAvatar, ProfilePicker, usePinGate } from "./components/Profiles";
+import { CollectionPickerHost } from "./components/Collections";
 import { profiles, useProfiles } from "./lib/profiles";
 import { native, WindowControls } from "./components/WindowControls";
 import { sourceHistory } from "./lib/sourceHistory";
@@ -703,6 +704,7 @@ export default function App() {
         </ErrorBoundary>
       )}
       {menu.element}
+      <CollectionPickerHost />
       <UpdateNotice />
       {!profileState.chosen && (
         <ProfilePicker onManage={() => openSettings("profiles")} />

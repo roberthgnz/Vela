@@ -1,4 +1,5 @@
-import { Library, List, LayoutGrid, Search, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Folder, Library, List, LayoutGrid, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import type { LibraryEntry } from "../lib/contracts";
 import { useRouteState } from "../lib/navigation";
 import { mediaKey, preferencesStore, usePreferences } from "../lib/store";
@@ -6,10 +7,12 @@ import { useUiSetting } from "../lib/ui";
 import { clock, yearOf } from "../lib/utils";
 import { inProgress, type OpenMedia } from "./HomeView";
 import { cardKeys, MediaCard, typeLabel, type CardMenu } from "./MediaCard";
-import { Artwork, EmptyState, Segmented } from "./Primitives";
+import { CollectionNameDialog } from "./Collections";
+import { anchorFrom, Artwork, Dialog, EmptyState, Segmented } from "./Primitives";
 import { compareText, locale, t } from "../lib/i18n";
 
-type Filter = "all" | "continue" | "movie" | "series";
+/** A type tab, or `c:<id>` for a collection. */
+type Filter = "all" | "continue" | "movie" | "series" | `c:${string}`;
 const sorts = ["recent", "watched", "title", "year"] as const;
 const views = ["grid", "list"] as const;
 
@@ -27,7 +30,12 @@ export function LibraryView({
   onMenu: CardMenu;
 }) {
   const prefs = usePreferences();
-  const [filter, setFilter] = useRouteState<Filter>("filter", "all");
+  const [chosen, setFilter] = useRouteState<Filter>("filter", "all");
+  const [naming, setNaming] = useState<{ id?: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
+  const collection = chosen.startsWith("c:") ? prefs.collections.find((item) => `c:${item.id}` === chosen) : undefined;
+  // A collection deleted elsewhere (or in another profile) falls back to everything.
+  const filter: Filter = chosen.startsWith("c:") && !collection ? "all" : chosen;
   const [text, setText] = useRouteState<string>("text", "");
   const [sort, setSort] = useUiSetting("library.sort", "recent", sorts);
   const [view, setView] = useUiSetting("library.view", "grid", views);
@@ -37,11 +45,13 @@ export function LibraryView({
   const needle = text.trim().toLocaleLowerCase("es");
   const entries = (filter === "continue" ? everything : all)
     .filter((entry) =>
-      filter === "all"
-        ? true
-        : filter === "continue"
-          ? inProgress(entry)
-          : entry.meta.type === filter,
+      collection
+        ? collection.keys.includes(mediaKey(entry.meta.type, entry.meta.id))
+        : filter === "all"
+          ? true
+          : filter === "continue"
+            ? inProgress(entry)
+            : entry.meta.type === filter,
     )
     .filter((entry) => !needle || entry.meta.name.toLocaleLowerCase("es").includes(needle))
     .sort((a, b) =>
@@ -59,6 +69,16 @@ export function LibraryView({
     movie: all.filter((entry) => entry.meta.type === "movie").length,
     series: all.filter((entry) => entry.meta.type === "series").length,
   };
+  const savedKeys = new Set(all.map((entry) => mediaKey(entry.meta.type, entry.meta.id)));
+  const collectionMenu = (anchor: Parameters<CardMenu>[0], id: string, name: string) =>
+    onMenu(
+      anchor,
+      [
+        { label: t("collections.rename"), icon: <Pencil size={15} />, onSelect: () => setNaming({ id, name }) },
+        { label: t("collections.delete"), icon: <Trash2 size={15} />, danger: true, onSelect: () => setDeleting({ id, name }) },
+      ],
+      t("collections.actions"),
+    );
   return (
     <div className="page">
       <header className="page-header">
@@ -120,7 +140,72 @@ export function LibraryView({
             <span className="tab-count">{counts[value]}</span>
           </button>
         ))}
+        {prefs.collections.length > 0 && <span className="tab-divider" aria-hidden="true" />}
+        {prefs.collections.map((item) => (
+          <button
+            key={item.id}
+            role="tab"
+            aria-selected={filter === `c:${item.id}`}
+            className={`collection-tab ${filter === `c:${item.id}` ? "selected" : ""}`}
+            onClick={() => setFilter(`c:${item.id}`)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              collectionMenu({ x: event.clientX, y: event.clientY }, item.id, item.name);
+            }}
+          >
+            <Folder size={13} aria-hidden="true" />
+            {item.name}
+            <span className="tab-count">{item.keys.filter((key) => savedKeys.has(key)).length}</span>
+          </button>
+        ))}
+        {collection && (
+          <button
+            className="icon-button tab-more"
+            aria-label={t("collections.actions")}
+            title={t("collections.actions")}
+            aria-haspopup="menu"
+            onClick={(event) => collectionMenu(anchorFrom(event.currentTarget), collection.id, collection.name)}
+          >
+            <MoreHorizontal size={15} />
+          </button>
+        )}
+        <button className="tab-add" onClick={() => setNaming({ name: "" })}>
+          <Plus size={13} /> {t("collections.new")}
+        </button>
       </div>
+      {naming && (
+        <CollectionNameDialog
+          title={naming.id ? t("collections.rename") : t("collections.new")}
+          initial={naming.name}
+          submitLabel={naming.id ? t("common.save") : t("collections.create")}
+          onSubmit={(name) => {
+            if (naming.id) preferencesStore.renameCollection(naming.id, name);
+            else setFilter(`c:${preferencesStore.createCollection(name)}`);
+          }}
+          onClose={() => setNaming(null)}
+        />
+      )}
+      {deleting && (
+        <Dialog title={t("collections.delete")} onClose={() => setDeleting(null)} className="compact-dialog" hideClose>
+          <h2>{t("collections.deleteConfirm", { name: deleting.name })}</h2>
+          <p>{t("collections.deleteDescription")}</p>
+          <div className="form-actions">
+            <button className="button secondary" data-autofocus onClick={() => setDeleting(null)}>
+              {t("common.cancel")}
+            </button>
+            <button
+              className="button danger"
+              onClick={() => {
+                preferencesStore.deleteCollection(deleting.id);
+                if (filter === `c:${deleting.id}`) setFilter("all");
+                setDeleting(null);
+              }}
+            >
+              {t("collections.delete")}
+            </button>
+          </div>
+        </Dialog>
+      )}
       {entries.length ? (
         view === "grid" ? (
           <div className="page-body">
@@ -207,23 +292,27 @@ export function LibraryView({
         )
       ) : (
         <EmptyState
-          icon={<Library size={20} />}
+          icon={collection ? <Folder size={20} /> : <Library size={20} />}
           title={
             needle
               ? t("library.noMatches")
-              : filter === "continue"
-                ? t("library.nothingInProgress")
-                : t("library.empty")
+              : collection
+                ? t("collections.empty")
+                : filter === "continue"
+                  ? t("library.nothingInProgress")
+                  : t("library.empty")
           }
           description={
             needle
               ? t("library.noMatchesDescription")
-              : filter === "continue"
-                ? t("library.nothingInProgressDescription")
-                : t("library.emptyDescription")
+              : collection
+                ? t("collections.emptyDescription")
+                : filter === "continue"
+                  ? t("library.nothingInProgressDescription")
+                  : t("library.emptyDescription")
           }
           action={
-            !needle && (
+            !needle && !collection && (
               <button className="button primary" onClick={onDiscover}>
                 {t("library.explore")}
               </button>
