@@ -156,6 +156,14 @@ export function useMediaSource(options: {
     [playing.transcodeUrl, video],
   );
 
+  /** Loads the source again from where it was (after the server opened the torrent again). */
+  const reload = useCallback(() => {
+    const element = video.current;
+    if (!element) return;
+    if (element.currentTime > 0) resumeAt.current = element.currentTime;
+    element.load();
+  }, [video]);
+
   // Stremio Service inspects the file in the background (for a torrent it waits for the first
   // pieces, which the direct source is fetching anyway).
   useEffect(() => {
@@ -190,5 +198,6 @@ export function useMediaSource(options: {
     hlsAudio,
     hlsSubtitles,
     switchToConversion,
+    reload,
   };
 }

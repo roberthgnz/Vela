@@ -24,6 +24,12 @@ vi.mock("../lib/streamingServer", async (importOriginal) => {
     subtitleUrl: () => "",
     mediaCapabilities: actual.mediaCapabilities,
     probeProblems: actual.probeProblems,
+    suggestedProfile: actual.suggestedProfile,
+    torrentProfiles: actual.torrentProfiles,
+    torrentProfile: vi.fn(() => Promise.reject(new Error("no service"))),
+    setTorrentProfile: vi.fn(),
+    removeTorrent: vi.fn(),
+    prepareTorrent: vi.fn(),
   };
 });
 vi.mock("../lib/externalPlayback", () => ({
@@ -34,7 +40,7 @@ vi.mock("../lib/mkvChapters", () => ({ readMkvChapters: vi.fn(() => Promise.reje
 
 import type { Episode } from "../lib/contracts";
 import { readMkvChapters } from "../lib/mkvChapters";
-import { probe } from "../lib/streamingServer";
+import { prepareTorrent, probe, removeTorrent, setTorrentProfile, torrentProfile } from "../lib/streamingServer";
 import { Player, type Playing } from "./Player";
 
 const play = vi.fn(() => Promise.resolve());
@@ -116,6 +122,45 @@ describe("Player", () => {
     fireEvent.pause(video);
     fireEvent.playing(video);
     expect(onStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Stremio's fast profile for a file above its limit, and opens the torrent again with it", async () => {
+    const service = "http://127.0.0.1:11470";
+    const hash = "f015156e0a766402900ae7a006fba36af3a4df0c";
+    const url = `${service}/${hash}/3`;
+    const base = movie();
+    const playing: Playing = {
+      ...base,
+      stream: { addonName: "Demo", addonUrl: base.addonUrl, infoHash: hash, fileIdx: 3 },
+      url,
+      externalUrl: url,
+      transcodeUrl: `${service}/hlsv2/x/master.m3u8?mediaURL=${encodeURIComponent(url)}`,
+      torrentEngine: "service",
+      // 75 GB in 155 minutes: about 7.7 MB/s against the default profile's 3.5.
+      fileSize: 75_260_000_000,
+    };
+    vi.mocked(probe).mockResolvedValueOnce({
+      format: { name: "mov,mp4,m4a,3gp,3g2,mj2", duration: 9300 },
+      streams: [
+        { track: "video", codec: "h264" },
+        { track: "audio", codec: "aac" },
+      ],
+    });
+    vi.mocked(torrentProfile).mockResolvedValueOnce("default");
+    vi.mocked(setTorrentProfile).mockResolvedValueOnce();
+    vi.mocked(removeTorrent).mockResolvedValueOnce();
+    vi.mocked(prepareTorrent).mockResolvedValueOnce({ url, fileIdx: 3, subtitles: [] });
+    setup(playing);
+    await act(async () => {});
+    expect(screen.getByText(/necesita unos 7[.,]7 MB\/s/)).toBeTruthy();
+    const loads = vi.mocked(HTMLMediaElement.prototype.load).mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Usar el perfil «Rápido»" }));
+    await act(async () => {});
+    expect(setTorrentProfile).toHaveBeenCalledWith(service, "fast");
+    expect(removeTorrent).toHaveBeenCalledWith(service, hash);
+    expect(prepareTorrent).toHaveBeenCalledWith(service, playing.stream, undefined);
+    expect(vi.mocked(HTMLMediaElement.prototype.load).mock.calls.length).toBeGreaterThan(loads);
+    expect(screen.queryByText(/necesita unos/)).toBeNull();
   });
 
   it("reads the chapters of the file only once it plays", () => {

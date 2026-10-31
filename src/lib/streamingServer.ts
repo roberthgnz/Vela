@@ -174,7 +174,7 @@ export async function prepareTorrent(
   serviceUrl: string,
   stream: Pick<ResolvedStream, "infoHash" | "fileIdx" | "sources">,
   episode?: Pick<Episode, "season" | "episode">,
-): Promise<{ url: string; fileIdx: number; fileName?: string; subtitles: Subtitle[] }> {
+): Promise<{ url: string; fileIdx: number; fileName?: string; fileSize?: number; subtitles: Subtitle[] }> {
   const infoHash = stream.infoHash!.toLowerCase();
   const sources = peerSources(infoHash, stream.sources);
   const knownIndex = stream.fileIdx !== undefined && Number.isInteger(stream.fileIdx);
@@ -217,7 +217,28 @@ export async function prepareTorrent(
     const code = /\.([a-z]{2,3}(?:-[a-z]{2})?)\.(?:srt|vtt)$/i.exec(item.name)?.[1];
     return [{ id: `torrent:${index}`, lang: code || item.name, url: torrentUrl(serviceUrl, infoHash, index) }];
   });
-  return { url: torrentUrl(serviceUrl, infoHash, fileIdx, sources), fileIdx, fileName: file?.name, subtitles };
+  const fileSize = typeof file?.length === "number" && file.length > 0 ? file.length : undefined;
+  return { url: torrentUrl(serviceUrl, infoHash, fileIdx, sources), fileIdx, fileName: file?.name, fileSize, subtitles };
+}
+
+/**
+ * Drops a torrent from the server (`/{infoHash}/remove`). The server reads its torrent profile
+ * when it creates a torrent: creating one again only applies a new profile after this (checked
+ * with server 4.22.3: 55 connections kept, 200 after removing it).
+ */
+export async function removeTorrent(serviceUrl: string, infoHash: string): Promise<void> {
+  await requestJson(`${base(serviceUrl)}/${encodeURIComponent(infoHash.toLowerCase())}/remove`);
+}
+
+/**
+ * The profile to offer for a file that needs `rate` bytes per second (its size over its duration)
+ * when the server's profile caps the download below that: the video would stop to load again and
+ * again. Only the built-in profiles below «fast» are known to be too slow; custom limits are left
+ * alone.
+ */
+export function suggestedProfile(current: TorrentProfile | undefined, rate: number): TorrentProfile | undefined {
+  if (current !== "default" && current !== "soft") return undefined;
+  return rate > torrentProfiles[current].values.btDownloadSpeedHardLimit ? "fast" : undefined;
 }
 
 export type TorrentStats = { peers: number; found: number; unchoked: number; speed: number; downloaded: number; searching: boolean };

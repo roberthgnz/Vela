@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const transport = vi.hoisted(() => ({ postJson: vi.fn(), requestJson: vi.fn() }));
 vi.mock('./transport', () => transport);
 
-import { describeTorrent, ensureService, isLocalService, peerSources, prepareTorrent, setTorrentProfile, torrentProfileOf, torrentProfiles, probeProblems, proxyUrl, torrentStats, torrentUrl, transcodeUrl } from './streamingServer';
+import { describeTorrent, ensureService, isLocalService, peerSources, prepareTorrent, removeTorrent, setTorrentProfile, suggestedProfile, torrentProfileOf, torrentProfiles, probeProblems, proxyUrl, torrentStats, torrentUrl, transcodeUrl } from './streamingServer';
 
 const hash = '08ada5a7a6183aae1e09d831df6748d566095a10';
 const files = ['Sintel.de.srt', 'Sintel.en.srt', 'Sintel.es.srt', 'Sintel.fr.srt', 'Sintel.it.srt', 'Sintel.mp4', 'poster.jpg']
@@ -34,7 +34,7 @@ describe('streaming server client', () => {
       torrent: { infoHash: hash },
       guessFileIdx: { season: 2, episode: 3 },
     });
-    expect(prepared).toMatchObject({ url: `http://127.0.0.1:11470/${hash}/5`, fileIdx: 5, fileName: 'Sintel.mp4' });
+    expect(prepared).toMatchObject({ url: `http://127.0.0.1:11470/${hash}/5`, fileIdx: 5, fileName: 'Sintel.mp4', fileSize: 1 });
     expect(prepared.subtitles.map((item) => [item.lang, item.url])).toEqual(
       ['de', 'en', 'es', 'fr', 'it'].map((lang, index) => [lang, `http://127.0.0.1:11470/${hash}/${index}`]),
     );
@@ -126,5 +126,23 @@ describe('torrent profiles', () => {
     expect(transport.postJson).toHaveBeenLastCalledWith('http://127.0.0.1:11470/settings', torrentProfiles.fast.values);
     transport.postJson.mockResolvedValueOnce({ error: 'nope' });
     await expect(setTorrentProfile('http://127.0.0.1:11470', 'soft')).rejects.toThrow();
+  });
+
+  it('offers the fast profile when a file needs more than the default or soft limit', () => {
+    const mb = 1048576;
+    // The test magnet: 75 GB of 4K remux in 155 minutes is about 8 MB/s; the default cap is 3.5.
+    expect(suggestedProfile('default', 75_260_000_000 / 9300)).toBe('fast');
+    expect(suggestedProfile('default', 3 * mb)).toBeUndefined();
+    expect(suggestedProfile('soft', 2 * mb)).toBe('fast');
+    expect(suggestedProfile('fast', 20 * mb)).toBeUndefined();
+    expect(suggestedProfile('ultra', 20 * mb)).toBeUndefined();
+    // Custom limits are the user's choice.
+    expect(suggestedProfile(undefined, 20 * mb)).toBeUndefined();
+  });
+
+  it('removes a torrent so that the next one is created with the current profile', async () => {
+    transport.requestJson.mockResolvedValueOnce({});
+    await removeTorrent('http://127.0.0.1:11470/', hash.toUpperCase());
+    expect(transport.requestJson).toHaveBeenLastCalledWith(`http://127.0.0.1:11470/${hash}/remove`);
   });
 });

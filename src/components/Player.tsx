@@ -26,7 +26,16 @@ import { readMkvChapters, type Chapter } from "../lib/mkvChapters";
 import { activeSegment, skipMarks, skipSegments, useSeriesMarks } from "../lib/skipSegments";
 import { storage } from "../lib/storage";
 import { preferencesStore, usePreferences } from "../lib/store";
-import { describeTorrent } from "../lib/streamingServer";
+import {
+  describeTorrent,
+  prepareTorrent,
+  removeTorrent,
+  setTorrentProfile,
+  suggestedProfile,
+  torrentProfile,
+  torrentProfiles,
+  type TorrentProfile,
+} from "../lib/streamingServer";
 import { streamQuality } from "../lib/streams";
 import { releaseVelaTorrent } from "../lib/torrentEngine";
 import { useEmbeddedLibrary } from "../lib/embeddedMpv";
@@ -258,6 +267,45 @@ export function Player({
     if (!infoHash || playing.torrentEngine !== "vela") return;
     return () => releaseVelaTorrent(infoHash);
   }, [infoHash, playing.torrentEngine]);
+
+  // On Stremio's engine, a file whose bitrate (its size over the duration the inspection found)
+  // is above the download limit of the server's torrent profile stops to load again and again:
+  // the faster profile is offered.
+  const [profileHint, setProfileHint] = useState<{ profile: TorrentProfile; current: TorrentProfile; rate: number }>();
+  const probedDuration = probe?.format.duration;
+  useEffect(() => {
+    if (!infoHash || playing.torrentEngine !== "service" || !playing.fileSize || !probedDuration || probedDuration <= 0)
+      return;
+    const rate = playing.fileSize / probedDuration;
+    let active = true;
+    void torrentProfile(playing.serviceUrl)
+      .then((current) => {
+        const profile = suggestedProfile(current, rate);
+        if (active && current && profile) setProfileHint({ profile, current, rate });
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [infoHash, playing.fileSize, playing.serviceUrl, playing.torrentEngine, probedDuration]);
+  const applyProfile = async (profile: TorrentProfile) => {
+    setProfileHint(undefined);
+    const name = torrentProfiles[profile].label;
+    try {
+      await setTorrentProfile(playing.serviceUrl, profile);
+      // The server reads the limits when it creates a torrent: this one is created again, and the
+      // video goes on from where it was. The conversion keeps reading the torrent it opened, so
+      // there the profile applies to the next one.
+      if (infoHash && !converting) {
+        await removeTorrent(playing.serviceUrl, infoHash);
+        await prepareTorrent(playing.serviceUrl, playing.stream, playing.episode);
+        media.reload();
+        showFlash(t("player.profile.applied", { name }));
+      } else setNotice(t("player.profile.nextTime", { name }));
+    } catch (cause) {
+      setNotice(errorMessage(cause));
+    }
+  };
 
   /* ---------- Next episode ---------- */
 
@@ -596,6 +644,25 @@ export function Player({
           <div className="player-notice" role="status">
             <span>{notice}</span>
             <button className="button small subtle" onClick={() => setNotice("")}>
+              {t("common.close")}
+            </button>
+          </div>
+        )}
+        {profileHint && !notice && !error && (
+          <div className="player-notice" role="status">
+            <span>
+              {t("player.profile.suggest", {
+                needed: formatNumber(profileHint.rate / 1048576, { maximumFractionDigits: 1 }),
+                profile: torrentProfiles[profileHint.current].label,
+                limit: formatNumber(torrentProfiles[profileHint.current].values.btDownloadSpeedHardLimit / 1048576, {
+                  maximumFractionDigits: 1,
+                }),
+              })}
+            </span>
+            <button className="button small" onClick={() => void applyProfile(profileHint.profile)}>
+              {t("player.profile.use", { name: torrentProfiles[profileHint.profile].label })}
+            </button>
+            <button className="button small subtle" onClick={() => setProfileHint(undefined)}>
               {t("common.close")}
             </button>
           </div>

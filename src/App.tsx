@@ -239,6 +239,7 @@ export default function App() {
       transcodeUrl: target.transcodeUrl,
       convertIfNeeded: target.convertIfNeeded,
       torrentEngine: target.torrentEngine,
+      fileSize: target.fileSize,
       embedded,
       serviceUrl: prefs.serviceUrl,
       note: target.note,

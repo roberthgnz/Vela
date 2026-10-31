@@ -31,6 +31,8 @@ export type PlaybackTarget = {
   subtitles?: Subtitle[];
   /** Which engine is streaming a torrent source. */
   torrentEngine?: "vela" | "service";
+  /** Size of the torrent's file on Stremio's engine, for its bitrate once the duration is known. */
+  fileSize?: number;
 };
 
 const serviceHint =
@@ -74,6 +76,7 @@ export async function resolvePlayback(
   const useVela = ownEngine || (torrent && velaEngineAvailable && engine === "auto" && !service);
   let url = stream.url;
   let note: string | undefined;
+  let fileSize: number | undefined;
   let subtitles: Subtitle[] = [];
   if (torrent && useVela) {
     const prepared = await prepareVelaTorrent(stream, options.episode);
@@ -85,6 +88,7 @@ export async function resolvePlayback(
       throw new Error(t("lib.playback.torrentNeedsService", { hint: serviceHint }));
     const prepared = await prepareTorrent(serviceUrl, stream, options.episode);
     url = prepared.url;
+    fileSize = prepared.fileSize;
     subtitles = prepared.subtitles;
     note = prepared.fileName ? t("lib.playback.connectingFile", { file: prepared.fileName }) : t("lib.playback.connecting");
   }
@@ -114,6 +118,7 @@ export async function resolvePlayback(
     note,
     subtitles,
     torrentEngine: engineUsed,
+    fileSize,
   };
   if (optionalService) service = await within(optionalService, SERVICE_GRACE);
   if (!service || /\.m3u8(?:$|[?#])/i.test(playable)) return target;
