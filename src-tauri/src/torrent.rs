@@ -463,6 +463,11 @@ impl Running {
             request.next().unwrap_or_default(),
             request.next().unwrap_or_default(),
         );
+        if method == "OPTIONS" {
+            // CORS preflight for page requests with a Range header.
+            let head = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, HEAD\r\nAccess-Control-Allow-Headers: Range\r\nAccess-Control-Max-Age: 600\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            return socket.write_all(head.as_bytes()).await;
+        }
         if method != "GET" && method != "HEAD" {
             return crate::proxy::reply(&mut socket, "405 Method Not Allowed").await;
         }
@@ -506,7 +511,7 @@ impl Running {
         };
         let count = if length == 0 { 0 } else { end - start + 1 };
         let mut head = format!(
-            "HTTP/1.1 {status}\r\nContent-Type: {}\r\nContent-Length: {count}\r\nAccept-Ranges: bytes\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n",
+            "HTTP/1.1 {status}\r\nContent-Type: {}\r\nContent-Length: {count}\r\nAccept-Ranges: bytes\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\nCache-Control: no-store\r\nConnection: close\r\n",
             content_type(&file.name)
         );
         if status.starts_with("206") {

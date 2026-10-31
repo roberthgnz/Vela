@@ -45,7 +45,7 @@ export type DesktopStorage = KeyValueStorage & {
   subscribe(listener: () => void): () => void;
 };
 
-export function createDesktopStorage(writer: Writer, backend: Backend = "desktop"): DesktopStorage {
+export function createDesktopStorage(writer: Writer, backend: Backend = "desktop", afterMigration?: () => Promise<unknown>): DesktopStorage {
   const data = new Map<string, string>();
   const pending = new Map<string, string | null>();
   const listeners = new Set<() => void>();
@@ -125,6 +125,8 @@ export function createDesktopStorage(writer: Writer, backend: Backend = "desktop
       log.info(`storage: copied ${copied.length} keys from localStorage`);
       setStatus({ migrated: true });
       await this.flush();
+      // The first backup holds the data just copied (the daily one skipped the empty database).
+      if (!status.error) await afterMigration?.().catch(() => {});
     },
     async flush() {
       if (timer) {
@@ -187,7 +189,11 @@ function hasLocalStorage(): boolean {
 }
 
 const desktop = isTauri()
-  ? createDesktopStorage((changes) => invoke("storage_write", { changes }))
+  ? createDesktopStorage(
+      (changes) => invoke("storage_write", { changes }),
+      "desktop",
+      () => invoke("storage_backup"),
+    )
   : undefined;
 const fallback: KeyValueStorage & { getStatus(): StorageStatus; subscribe(listener: () => void): () => void } = {
   ...(hasLocalStorage()

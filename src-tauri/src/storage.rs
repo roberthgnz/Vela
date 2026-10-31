@@ -197,6 +197,14 @@ impl Storage {
 
     /// Makes the daily backup when the newest one is older than a day (or missing).
     pub fn backup_if_due(&self) -> rusqlite::Result<Option<PathBuf>> {
+        // An empty database (first start, before the interface copies the old data) is not worth
+        // a backup; the interface asks for one once it has migrated.
+        let keys: i64 = self
+            .connection()
+            .query_row("SELECT COUNT(*) FROM kv", [], |row| row.get(0))?;
+        if keys == 0 {
+            return Ok(None);
+        }
         let newest = self
             .backups()
             .into_iter()
@@ -401,6 +409,9 @@ mod tests {
     fn daily_backup_runs_once() {
         let dir = temp();
         let storage = Storage::open(&dir).unwrap();
+        // Nothing to back up yet.
+        assert!(storage.backup_if_due().unwrap().is_none());
+        storage.write(&[change("vela.a", Some("1"))]).unwrap();
         assert!(storage.backup_if_due().unwrap().is_some());
         assert!(storage.backup_if_due().unwrap().is_none());
         assert_eq!(storage.backups().len(), 1);

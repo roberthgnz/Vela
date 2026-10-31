@@ -261,8 +261,9 @@ fn candidates(player_path: Option<&str>) -> Vec<PathBuf> {
     }
     if let Some(local) = std::env::var_os("LOCALAPPDATA") {
         let local = PathBuf::from(local);
-        list.push(local.join("Programs/Stremio/libmpv-2.dll"));
-        list.push(local.join("Programs/mpv/libmpv-2.dll"));
+        let programs = local.join("Programs");
+        list.push(programs.join("Stremio").join("libmpv-2.dll"));
+        list.push(programs.join("mpv").join("libmpv-2.dll"));
     }
     if let Some(programs) = std::env::var_os("ProgramFiles") {
         let programs = PathBuf::from(programs);

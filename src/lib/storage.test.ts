@@ -122,6 +122,16 @@ describe('desktop storage', () => {
     expect(writer).not.toHaveBeenCalled();
   });
 
+  it('asks for a backup right after migrating, and only then', async () => {
+    const backup = vi.fn(async () => {});
+    const migrated = createDesktopStorage(async () => {}, 'desktop', backup);
+    await migrated.init([], fakeLocalStorage({ 'vela.preferences.v2': '{}' }));
+    expect(backup).toHaveBeenCalledTimes(1);
+    const existing = createDesktopStorage(async () => {}, 'desktop', backup);
+    await existing.init([{ key: 'vela.preferences.v2', value: '{}' }], fakeLocalStorage({ 'vela.preferences.v2': 'old' }));
+    expect(backup).toHaveBeenCalledTimes(1);
+  });
+
   it('does not migrate when localStorage has nothing of Vela', async () => {
     const writer = vi.fn(async () => {});
     const storage = createDesktopStorage(writer);
