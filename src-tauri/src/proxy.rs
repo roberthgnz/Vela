@@ -2,8 +2,9 @@
 //! players that cannot send them (VLC). It serves a single secret path, forwards GET and HEAD with
 //! the player's Range header, streams the answer back unchanged and stops when dropped.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::hash::{BuildHasher, Hasher};
+use std::sync::Mutex;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -23,6 +24,40 @@ const FORWARDED: &[&str] = &[
 pub struct HeaderProxy {
     pub url: Url,
     task: tokio::task::JoinHandle<()>,
+}
+
+/// Playback leases are independent: a cancelled preparation cannot replace the active source.
+#[derive(Default)]
+pub struct PlaybackProxy(Mutex<HashMap<String, HeaderProxy>>);
+
+#[tauri::command]
+pub async fn media_proxy_start(
+    url: String,
+    headers: BTreeMap<String, String>,
+    state: tauri::State<'_, PlaybackProxy>,
+) -> Result<String, String> {
+    let target = crate::transport::checked_url(&url)?;
+    for (name, value) in &headers {
+        reqwest::header::HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| "Cabecera de fuente no válida.".to_owned())?;
+        reqwest::header::HeaderValue::from_str(value)
+            .map_err(|_| "Cabecera de fuente no válida.".to_owned())?;
+    }
+    let proxy = serve(target, headers).await?;
+    let url = proxy.url.to_string();
+    state
+        .0
+        .lock()
+        .map_err(|_| "No se pudo preparar la fuente.".to_owned())?
+        .insert(url.clone(), proxy);
+    Ok(url)
+}
+
+#[tauri::command]
+pub fn media_proxy_stop(url: String, state: tauri::State<'_, PlaybackProxy>) {
+    if let Ok(mut current) = state.0.lock() {
+        current.remove(&url);
+    }
 }
 
 impl Drop for HeaderProxy {
@@ -70,14 +105,21 @@ pub async fn serve(target: Url, headers: BTreeMap<String, String>) -> Result<Hea
     let url = Url::parse(&format!("http://127.0.0.1:{port}{path}/{name}")).map_err(|_| failed())?;
     let served = url.path().to_owned();
     let task = tokio::spawn(async move {
-        while let Ok((socket, _)) = listener.accept().await {
+        // Dropping the listener task also cancels in-flight upstream transfers.
+        let mut transfers = tokio::task::JoinSet::new();
+        loop {
+            let accepted = tokio::select! {
+                accepted = listener.accept(), if transfers.len() < 64 => accepted,
+                _ = transfers.join_next(), if !transfers.is_empty() => continue,
+            };
+            let Ok((socket, _)) = accepted else { break };
             let (client, target, headers, served) = (
                 client.clone(),
                 target.clone(),
                 headers.clone(),
                 served.clone(),
             );
-            tokio::spawn(async move {
+            transfers.spawn(async move {
                 let _ = handle(socket, &client, &target, &headers, &served).await;
             });
         }
@@ -114,7 +156,9 @@ async fn handle(
     headers: &BTreeMap<String, String>,
     served: &str,
 ) -> std::io::Result<()> {
-    let Some(head) = read_head(&mut socket).await else {
+    let Ok(Some(head)) =
+        tokio::time::timeout(Duration::from_secs(10), read_head(&mut socket)).await
+    else {
         return reply(&mut socket, "400 Bad Request").await;
     };
     let mut lines = head.split("\r\n");
@@ -220,6 +264,15 @@ mod tests {
         assert_eq!(response.headers()["content-range"], "bytes 2-5/10");
         assert!(response.headers().get("x-upstream").is_none());
         assert_eq!(response.bytes().await.unwrap().as_ref(), b"2345");
+        let head = client
+            .head(proxy.url.clone())
+            .header("Range", "bytes=2-5")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(head.status(), 206);
+        assert_eq!(head.headers()["content-length"], "4");
+        assert!(head.bytes().await.unwrap().is_empty());
         let mut other = proxy.url.clone();
         other.set_path("/guess/movie.mp4");
         assert_eq!(client.get(other).send().await.unwrap().status(), 404);

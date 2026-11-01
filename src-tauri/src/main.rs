@@ -361,6 +361,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updater::PendingUpdate::default())
         .manage(client)
+        .manage(proxy::PlaybackProxy::default())
         .manage(downloads::Downloads::new().expect("could not initialize downloads"))
         .manage(service::Service::default())
         .manage(torrent::Engine::default())
@@ -422,6 +423,8 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            proxy::media_proxy_start,
+            proxy::media_proxy_stop,
             request_json,
             post_json,
             request_text,

@@ -14,6 +14,7 @@ export type Playing = {
   /** Original URL and headers for an external player. */
   externalUrl: string;
   headers?: Record<string, string>;
+  mediaProxy?: string;
   /** HLS conversion through Stremio Service, when available. */
   transcodeUrl?: string;
   /** Why the built-in player cannot open the file, known before trying (see `PlaybackTarget`). */

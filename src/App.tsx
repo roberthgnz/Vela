@@ -28,6 +28,7 @@ import { externalPlayerName, onExternalClosed, playExternally } from "./lib/exte
 import { defaultAddons, getStreams, loadManifest } from "./lib/protocol";
 import { metaAddon, RouteStateProvider, useNavigation, type Route, type Section } from "./lib/navigation";
 import { containerProblems, resolvePlayback } from "./lib/playback";
+import { stopMediaProxy } from "./lib/mediaProxy";
 import { CREDITS_THRESHOLD, mediaKey, preferencesStore, usePreferences } from "./lib/store";
 import { openExternal } from "./lib/transport";
 import { useUiSetting } from "./lib/ui";
@@ -104,6 +105,10 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [installRequest, setInstallRequest] = useState<{ id: number; url?: string }>({ id: 0 });
   const [playing, setPlaying] = useState<Playing | null>(null);
+  const mediaProxy = playing?.mediaProxy;
+  useEffect(() => () => {
+    if (mediaProxy) stopMediaProxy(mediaProxy);
+  }, [mediaProxy]);
   /** Title whose source is being prepared: the player opens on its cover right away. */
   const [preparing, setPreparing] = useState<{ meta: MediaItem; episode?: Episode } | null>(null);
   /** Increases with every preparation; a result whose number is stale was cancelled. */
@@ -202,6 +207,7 @@ export default function App() {
     }
     const ownTorrent = target.torrentEngine === "vela" && stream.infoHash ? stream.infoHash : undefined;
     if (token !== preparation.current) {
+      if (target.mediaProxy) stopMediaProxy(target.mediaProxy);
       if (ownTorrent) releaseVelaTorrent(ownTorrent);
       return;
     }
@@ -238,6 +244,7 @@ export default function App() {
       externalUrl: target.externalUrl,
       headers: target.headers,
       transcodeUrl: target.transcodeUrl,
+      mediaProxy: target.mediaProxy,
       unsupported: target.unsupported,
       torrentEngine: target.torrentEngine,
       fileSize: target.fileSize,

@@ -1,4 +1,9 @@
 [[permission]]
+identifier = "allow-media-proxy"
+description = "Prepare and stop the one-source local header proxy used by the built-in player."
+commands.allow = ["media_proxy_start", "media_proxy_stop"]
+
+[[permission]]
 identifier = "allow-native-transport"
 description = "Allow the main window to request addon and account data, keep its Stremio session in the OS credential store, explicitly launch links or a configured player (and tell which kind it is and send it subtitle URLs found after it started), and check for and install signed updates."
 commands.allow = ["request_json", "post_json", "request_text", "request_bytes", "request_range", "open_external", "launch_external_player", "external_player_kind", "external_player_subtitles", "secret_get", "secret_set", "secret_delete", "update_check", "update_install"]
