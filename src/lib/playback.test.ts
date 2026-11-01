@@ -88,8 +88,8 @@ describe('resolvePlayback torrent engines', () => {
     vi.mocked(prepareVelaTorrent).mockClear();
   });
 
-  it('auto: uses Stremio Service when it answers', async () => {
-    engine.value = 'auto';
+  it('service: uses Stremio Service when explicitly selected', async () => {
+    engine.value = 'service';
     vi.mocked(ensureService).mockResolvedValue(true);
     const target = await resolvePlayback(meta, torrent, service);
     expect(target.torrentEngine).toBe('service');
@@ -98,7 +98,7 @@ describe('resolvePlayback torrent engines', () => {
     expect(prepareVelaTorrent).not.toHaveBeenCalled();
   });
 
-  it("auto: falls back to Vela's engine without Stremio Service", async () => {
+  it("auto: uses Vela's engine without starting Stremio Service", async () => {
     engine.value = 'auto';
     vi.mocked(ensureService).mockResolvedValue(false);
     const target = await resolvePlayback(meta, torrent, service, { episode: { id: 'e', season: 1, episode: 2 } });
@@ -108,10 +108,11 @@ describe('resolvePlayback torrent engines', () => {
     expect(target.note).toContain('Sintel.mp4');
     expect(prepareVelaTorrent).toHaveBeenCalledWith(torrent, { id: 'e', season: 1, episode: 2 });
     expect(prepareTorrent).not.toHaveBeenCalled();
+    expect(ensureService).not.toHaveBeenCalled();
   });
 
-  it("vela: never starts Stremio's server, but still offers its conversion when it already runs", async () => {
-    engine.value = 'vela';
+  it("auto: uses Vela even when Stremio answers, retaining optional conversion", async () => {
+    engine.value = 'auto';
     vi.mocked(serviceAvailable).mockResolvedValue(true);
     const target = await resolvePlayback(meta, torrent, service);
     expect(ensureService).not.toHaveBeenCalled();

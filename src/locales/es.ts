@@ -1174,7 +1174,7 @@ export const es = {
   "torrent.engine.label": "Motor de torrents",
   "torrent.engine.hint": "Vela abre los torrents con su propio motor cuando Stremio Service no está instalado. Stremio Service añade la conversión de formatos que el reproductor integrado no admite; el motor de Vela borra los datos al terminar.",
   "torrent.engine.auto": "Automático",
-  "torrent.engine.autoTitle": "Stremio Service si está instalado; si no, el motor de Vela",
+  "torrent.engine.autoTitle": "Motor de Vela; Stremio Service sigue disponible como opción explícita",
   "torrent.engine.vela": "Vela",
   "torrent.engine.velaTitle": "El motor propio de Vela: no necesita instalar nada",
   "torrent.engine.service": "Stremio Service",

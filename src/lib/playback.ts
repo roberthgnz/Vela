@@ -88,7 +88,7 @@ export async function resolvePlayback(
   const torrent = Boolean(stream.infoHash && !stream.url);
   const engine = torrentEngine.get();
   // Vela's own engine opens torrents when chosen, or in «auto» when Stremio's server is missing.
-  const ownEngine = torrent && velaEngineAvailable && engine === "vela";
+  const ownEngine = torrent && velaEngineAvailable && engine !== "service";
   // Torrents and header proxies need the server, so Vela starts it if it can; plain links (and
   // torrents on Vela's engine) only use it for optional inspection and conversion. On Vela's
   // engine the question is asked while the torrent opens, so it costs nothing in between.
@@ -102,7 +102,7 @@ export async function resolvePlayback(
     optionalService = serviceAvailable(serviceUrl);
     service = false;
   }
-  const useVela = ownEngine || (torrent && velaEngineAvailable && engine === "auto" && !service);
+  const useVela = ownEngine;
   let url = stream.url;
   let note: string | undefined;
   let fileSize: number | undefined;

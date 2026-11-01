@@ -1172,7 +1172,7 @@ export const en: Record<keyof typeof es, string> = {
   "torrent.engine.label": "Torrent engine",
   "torrent.engine.hint": "Vela opens torrents with its own engine when Stremio Service is not installed. Stremio Service adds the format conversion the built-in player lacks; Vela's engine deletes the data when you are done.",
   "torrent.engine.auto": "Automatic",
-  "torrent.engine.autoTitle": "Stremio Service when it is installed; Vela's engine otherwise",
+  "torrent.engine.autoTitle": "Vela's engine; Stremio Service remains an explicit option",
   "torrent.engine.vela": "Vela",
   "torrent.engine.velaTitle": "Vela's own engine: nothing to install",
   "torrent.engine.service": "Stremio Service",

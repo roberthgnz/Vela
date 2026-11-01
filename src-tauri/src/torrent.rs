@@ -1477,6 +1477,144 @@ mod tests {
             .and_then(|value| value.parse().ok())
     }
 
+    /// Controlled loopback benchmark, no external content or trackers.
+    /// cargo test --locked large_piece_loopback_benchmark -- --ignored --nocapture
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[ignore = "64 MiB network benchmark; run explicitly"]
+    async fn large_piece_loopback_benchmark() {
+        use librqbit::{CreateTorrentOptions, create_torrent, spawn_utils::BlockingSpawner};
+        const PIECE: usize = 4 * 1024 * 1024;
+        const SIZE: usize = 16 * PIECE;
+        let root = std::env::temp_dir().join(format!(
+            "vela-large-pieces-{}-{}",
+            std::process::id(),
+            crate::clock::now().as_millis()
+        ));
+        let data = root.join("seed");
+        std::fs::create_dir_all(&data).unwrap();
+        let content: Vec<u8> = (0..SIZE)
+            .map(|i| ((i * 7 + i / PIECE) % 251) as u8)
+            .collect();
+        let file = data.join("synthetic.mp4");
+        std::fs::write(&file, &content).unwrap();
+        let created = create_torrent(
+            &file,
+            CreateTorrentOptions {
+                piece_length: Some(PIECE as u32),
+                ..Default::default()
+            },
+            &BlockingSpawner::new(2),
+        )
+        .await
+        .unwrap();
+        let options = || SessionOptions {
+            dht: None,
+            disable_trackers: true,
+            disable_local_service_discovery: true,
+            fastresume: false,
+            persistence: None,
+            ..Default::default()
+        };
+        let seed = Session::new_with_opts(
+            data.clone(),
+            SessionOptions {
+                listen: Some(ListenerOptions {
+                    listen_addr: "127.0.0.1:0".parse().unwrap(),
+                    enable_upnp_port_forwarding: false,
+                    ..Default::default()
+                }),
+                ..options()
+            },
+        )
+        .await
+        .unwrap();
+        let seed_handle = seed
+            .add_torrent(
+                AddTorrent::from_bytes(created.as_bytes().unwrap()),
+                Some(AddTorrentOptions {
+                    output_folder: Some(data.to_string_lossy().into_owned()),
+                    overwrite: true,
+                    ..Default::default()
+                }),
+            )
+            .await
+            .unwrap()
+            .into_handle()
+            .unwrap();
+        seed_handle.wait_until_completed().await.unwrap();
+        let hash = created.info_hash().as_string();
+        for run in 1..=3 {
+            let folder = root.join(format!("run-{run}"));
+            let session = Session::new_with_opts(folder.clone(), options())
+                .await
+                .unwrap();
+            let handle = session
+                .add_torrent(
+                    AddTorrent::from_bytes(created.as_bytes().unwrap()),
+                    Some(AddTorrentOptions {
+                        initial_peers: Some(vec![seed.listen_addr().unwrap()]),
+                        peer_opts: Some(PeerConnectionOptions {
+                            max_request_window: Some(request_window(PIECE as u64)),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }),
+                )
+                .await
+                .unwrap()
+                .into_handle()
+                .unwrap();
+            handle.wait_until_initialized().await.unwrap();
+            assert_eq!(piece_length(&handle), PIECE as u64);
+            let running = Running::serve(session, folder, Tuning::default())
+                .await
+                .unwrap();
+            let path = format!("/{}/{hash}/0", running.token);
+            let tail_range = format!("bytes={}-", SIZE - 1024 * 1024);
+            let (head, tail) = tokio::join!(
+                timed_read(
+                    running.port,
+                    &path,
+                    "bytes=0-",
+                    SIZE as u64,
+                    Duration::from_secs(90)
+                ),
+                timed_read(
+                    running.port,
+                    &path,
+                    &tail_range,
+                    1024 * 1024,
+                    Duration::from_secs(90)
+                )
+            );
+            assert!(
+                head.1.is_some() && tail.1.is_some(),
+                "transfer stalled: {head:?} / {tail:?}"
+            );
+            assert_eq!(head.2, SIZE as u64);
+            let (status, _, bytes) = fetch(
+                running.port,
+                &format!("GET {path} HTTP/1.1\r\nHost: x\r\nRange: bytes=100-199\r\n\r\n"),
+                Duration::from_secs(5),
+            )
+            .await;
+            assert!(status.contains("206"));
+            assert_eq!(bytes, &content[100..200]);
+            println!(
+                "run={run} piece_bytes={PIECE} file_bytes={SIZE} request_window={} first_ms={} full_ms={} tail_ms={} delivered_bytes={} downloaded_bytes={}",
+                request_window(PIECE as u64),
+                head.0.unwrap().as_millis(),
+                head.1.unwrap().as_millis(),
+                tail.1.unwrap().as_millis(),
+                head.2,
+                running.stats(&hash).unwrap().downloaded
+            );
+            running.session.stop().await;
+        }
+        seed.stop().await;
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     /// End-to-end streaming against a live swarm: how many bytes reach the player in order
     /// compared with what the torrent downloaded, from the start and after a seek.
     ///
