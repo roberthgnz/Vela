@@ -51,6 +51,11 @@ describe('containerProblems', () => {
 });
 
 describe('resolvePlayback torrent engines', () => {
+  it('explains archives before trying the service or a player', async () => {
+    vi.mocked(ensureService).mockClear();
+    await expect(resolvePlayback(meta, { ...torrent, infoHash: undefined, url: 'https://media.test/season.part1.rar?x=1' }, service)).rejects.toThrow(/archivo comprimido/);
+    expect(ensureService).not.toHaveBeenCalled();
+  });
   it('hands header-protected HLS to mpv rather than breaking relative segment URLs', async () => {
     vi.mocked(startMediaProxy).mockClear();
     vi.mocked(serviceAvailable).mockResolvedValue(false);

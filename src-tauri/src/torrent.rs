@@ -761,6 +761,18 @@ impl Running {
             .map_err(|error| format!("No se pudo preparar el torrent: {error:#}"))?;
         let files = files_of(&torrent)?;
         let chosen = choose_file(&files, file_idx, season, episode)?;
+        // librqbit closes download resources when the selected files finish. Changing only_files
+        // on that live, completed selection can leave the next episode stuck after its shared
+        // boundary piece. Restart it around the selection change so its files/peers reopen.
+        let stats = torrent.stats();
+        if stats.finished
+            && stats.file_progress.get(chosen).copied().unwrap_or(0) < files[chosen].length
+            && !torrent.is_paused()
+        {
+            self.session.pause(&torrent).await.map_err(|error| {
+                format!("No se pudo preparar el siguiente archivo del torrent: {error:#}")
+            })?;
+        }
         self.session
             .update_only_files(&torrent, &wanted_files(&files, chosen))
             .await
@@ -1475,6 +1487,146 @@ mod tests {
         std::env::var(name)
             .ok()
             .and_then(|value| value.parse().ok())
+    }
+
+    /// A full season is selected episode by episode in one live engine session, over TCP.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn streams_a_complete_season_from_one_torrent() {
+        use librqbit::{CreateTorrentOptions, create_torrent, spawn_utils::BlockingSpawner};
+        let root = std::env::temp_dir().join(format!(
+            "vela-season-{}-{}",
+            std::process::id(),
+            crate::clock::now().as_millis()
+        ));
+        let data = root.join("seed");
+        std::fs::create_dir_all(&data).unwrap();
+        let mut episodes = Vec::new();
+        for episode in 1..=3u32 {
+            let bytes = if let Ok(folder) = std::env::var("VELA_SEASON_MEDIA") {
+                std::fs::read(PathBuf::from(folder).join(format!("ep{episode}.mp4"))).unwrap()
+            } else {
+                vec![episode as u8; 160_000 + episode as usize * 1000]
+            };
+            std::fs::write(data.join(format!("Synthetic.S01E{episode:02}.mp4")), &bytes).unwrap();
+            episodes.push(bytes);
+        }
+        std::fs::write(
+            data.join("Synthetic.spa.srt"),
+            b"1\n00:00:01,000 --> 00:00:02,000\nTest\n",
+        )
+        .unwrap();
+        let created = create_torrent(
+            &data,
+            CreateTorrentOptions {
+                piece_length: Some(64 * 1024),
+                ..Default::default()
+            },
+            &BlockingSpawner::new(2),
+        )
+        .await
+        .unwrap();
+        let options = || SessionOptions {
+            dht: None,
+            disable_trackers: true,
+            disable_local_service_discovery: true,
+            fastresume: false,
+            persistence: None,
+            ..Default::default()
+        };
+        let seed = Session::new_with_opts(
+            data.clone(),
+            SessionOptions {
+                listen: Some(ListenerOptions {
+                    listen_addr: "127.0.0.1:0".parse().unwrap(),
+                    enable_upnp_port_forwarding: false,
+                    ..Default::default()
+                }),
+                ..options()
+            },
+        )
+        .await
+        .unwrap();
+        let seed_handle = seed
+            .add_torrent(
+                AddTorrent::from_bytes(created.as_bytes().unwrap()),
+                Some(AddTorrentOptions {
+                    output_folder: Some(data.to_string_lossy().into_owned()),
+                    overwrite: true,
+                    ..Default::default()
+                }),
+            )
+            .await
+            .unwrap()
+            .into_handle()
+            .unwrap();
+        seed_handle.wait_until_completed().await.unwrap();
+        let folder = root.join("client");
+        let client = Session::new_with_opts(folder.clone(), options())
+            .await
+            .unwrap();
+        let torrent = client
+            .add_torrent(
+                AddTorrent::from_bytes(created.as_bytes().unwrap()),
+                Some(AddTorrentOptions {
+                    initial_peers: Some(vec![seed.listen_addr().unwrap()]),
+                    only_files: Some(vec![]),
+                    ..Default::default()
+                }),
+            )
+            .await
+            .unwrap()
+            .into_handle()
+            .unwrap();
+        torrent.wait_until_initialized().await.unwrap();
+        let running = Running::serve(client, folder, Tuning::default())
+            .await
+            .unwrap();
+        let hash = created.info_hash().as_string();
+        for episode in 1..=3u32 {
+            let prepared = running
+                .prepare(&hash, None, &[], Some(1), Some(episode))
+                .await
+                .unwrap();
+            assert!(prepared.file_name.contains(&format!("S01E{episode:02}")));
+            let wanted = wanted_files(&prepared.files, prepared.file_idx);
+            assert_eq!(
+                wanted.len(),
+                2,
+                "only this episode and the subtitle should be selected"
+            );
+            let path = format!("/{}/{hash}/{}", running.token, prepared.file_idx);
+            let (status, _, bytes) = fetch(
+                running.port,
+                &format!("GET {path} HTTP/1.1\r\nHost: x\r\nRange: bytes=0-\r\n\r\n"),
+                Duration::from_secs(20),
+            )
+            .await;
+            assert!(status.contains("206"));
+            assert_eq!(
+                bytes.len(),
+                episodes[episode as usize - 1].len(),
+                "episode {episode} incomplete"
+            );
+            assert!(
+                bytes == episodes[episode as usize - 1],
+                "episode {episode} bytes differ"
+            );
+            assert!(Arc::ptr_eq(
+                &torrent,
+                &running
+                    .session
+                    .get(TorrentIdOrHash::Hash(hash_of(&hash).unwrap()))
+                    .unwrap()
+            ));
+            println!(
+                "season=1 episode={episode} bytes={} file={} reused_session=true",
+                bytes.len(),
+                prepared.file_name
+            );
+        }
+        running.session.stop().await;
+        seed.stop().await;
+        let _ = std::fs::remove_dir_all(root);
     }
 
     /// Controlled loopback benchmark, no external content or trackers.

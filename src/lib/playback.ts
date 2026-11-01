@@ -83,6 +83,8 @@ export async function resolvePlayback(
   serviceUrl: string,
   options: { episode?: Episode; external?: boolean } = {},
 ): Promise<PlaybackTarget> {
+  const filename = stream.behaviorHints?.filename ?? stream.url?.split(/[?#]/)[0];
+  if (filename && /\.(?:rar|r\d\d|7z|zip)$/i.test(filename)) throw new Error(t("lib.playback.archive"));
   const headers = stream.behaviorHints?.proxyHeaders?.request || {};
   const needsHeaders = Object.keys(headers).length > 0;
   const torrent = Boolean(stream.infoHash && !stream.url);
