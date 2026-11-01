@@ -30,6 +30,8 @@ export type Playing = {
   fileSize?: number;
   /** Play with mpv inside Vela's window instead of the built-in player. */
   embedded?: boolean;
+  /** Enable mpv's embedded subtitles when explicitly requested from the track panel. */
+  embeddedSubtitlesAuto?: boolean;
   /** The file on disk, for downloads (mpv opens it directly). */
   filePath?: string;
 };

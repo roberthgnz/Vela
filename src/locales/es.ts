@@ -539,6 +539,8 @@ export const es = {
   "player.subtitleLanguage": "Idioma de los subtítulos",
   "player.subtitlesOff": "Desactivados",
   "player.noSubtitles": "No hay subtítulos para este vídeo.",
+  "player.subs.embeddedMpv": "Este archivo contiene subtítulos incrustados. Puedes verlos con mpv integrado.",
+  "player.subs.openMpv": "Ver subtítulos incrustados con mpv",
   "player.audio": "Audio",
   "player.audioTrack": "Pista de audio",
   "player.version": "Versión",

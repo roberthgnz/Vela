@@ -325,6 +325,14 @@ Versión 0.3.0, 29 de octubre de 2026:
 - Prueba simulada no es validación real: los flujos Playwright usaban addons, subtítulos y vídeo controlados en Chromium; la cuenta de Stremio sigue sin probarse con datos reales.
 - Después de la 0.3.0 se retiraron las pruebas de interfaz con Playwright por su duración. Quedan las pruebas unitarias (Vitest) y Rust; la interfaz se comprueba a mano en la ventana Tauri (por CDP, con los scripts de `.tmp/`). El vídeo de prueba pasó de `tests/fixtures/` a `dev/media/playback.mp4`, que usa el addon de validación.
 
+## Subtítulos incrustados sin servidor
+
+El sondeo propio identifica las pistas, pero no extrae sus eventos. Se evaluó la extracción completa de ASS con `node dev/measure-embedded-subtitles.mjs`: en el MKV sintético de 40 s, FFmpeg leyó 13.640.481 bytes (todo el archivo, sin seeks) para generar 768 bytes de ASS; tres ejecuciones locales tardaron 46, 40 y 41 ms. FFmpeg se usa solo como herramienta de desarrollo, no se distribuye ni se ejecuta desde Vela.
+
+Esta medición demuestra el coste de lectura de esa estrategia de extracción completa, no de todos los demuxores posibles. Aplicarla al torrent obligaría a obtener datos del vídeo antes de disponer de todos los subtítulos. No se ha implementado un demuxor incremental con seek, lacing, compresión y fuentes adjuntas en JavaScript. Se elige mpv integrado para los subtítulos incrustados sin servidor: el panel Audio y subtítulos detecta las pistas y ofrece abrirlos con mpv o descargar libmpv. Conserva la posición y activa la selección automática de subtítulos solo para esa sesión. Los subtítulos externos siguen disponibles en el reproductor HTML.
+
+Verificado en Tauri con el MKV sintético multipista sin servicio: el panel muestra la acción y cambia a mpv, que empieza a reproducir. La activación de subtítulos de la sesión se cubre también con prueba de componente; no se ha comprobado cada códec de subtítulo ni una muestra con fuentes adjuntas.
+
 ## Estado de «Vela sin Stremio» (1 de noviembre de 2026)
 
 - Punto 1: implementado en `fix/player-error-freeze`, PR #3 contra `libmpv-download`.
@@ -333,7 +341,8 @@ Versión 0.3.0, 29 de octubre de 2026:
   - Verificación automática: `pnpm test` (337 pruebas en 47 archivos), `pnpm build`, `cargo fmt --check`, `cargo clippy --locked -- -D warnings` y `cargo test --locked` (59 correctas, 2 ignoradas). Incluye comparación con FFprobe sobre los medios locales disponibles, límites ante índices dañados y regresión del ciclo de vida de mpv con StrictMode.
   - Ventana Tauri de desarrollo por CDP, sin servicio (`127.0.0.1:11999`): lectura real de H.264 MP4, DTS MKV, MP4 con dos audios y MKV con dos audios y tres subtítulos. Una petición por archivo, hasta 256 KiB, 9–28 ms en el servidor local de validación (no mide una red externa ni un torrent). DTS cambia a mpv integrado y comunica progreso de 0 a 4,1 s de 20 s durante la observación. StrictMode queda activado: el montaje descartado ya no abre una sesión nativa que luego cierre la válida.
 - Punto 4: implementado en `feat/native-header-proxy`, desde el punto 3. Proxy Rust para `<video>`, con pruebas reales HTTP y HTTPS; 340 pruebas frontend y 59 Rust correctas (2 ignoradas), build, formato y Clippy correctos.
-- Puntos 5–7 pendientes: coste de subtítulos incrustados sin servicio, benchmark/valor por defecto Automático, documentación de límites y validación de temporada. El usuario ya no tiene el magnet de Dune: se usará contenido libre con piezas de al menos 4 MiB para el punto 6; Dune queda sin verificar.
+- Punto 5: implementado en `feat/embedded-subtitles-without-service`, desde el punto 4. Medición reproducible y alternativa mpv explícita en el panel; 341 pruebas frontend, 59 Rust correctas (2 ignoradas), build, formato y Clippy correctos.
+- Puntos 6–7 pendientes: benchmark/valor por defecto Automático, documentación de límites y validación de temporada. El usuario ya no tiene el magnet de Dune: se usará contenido libre con piezas de al menos 4 MiB para el punto 6; Dune queda sin verificar.
 - Worktree: `C:\Users\reliu\Documents\Vela-standalone`; target de Cargo propio en `src-tauri/target`. Pruebas de ventana con `.tmp/vela-dev.exe` (identificador dev), perfil `.tmp/wv2` y `LOCALAPPDATA` aislado. No tocar los datos de `com.vela.desktop` ni los procesos de otras sesiones. El registro de `vela://` comprobado al cerrar esta revisión apunta al ejecutable instalado, no al de desarrollo: se conserva.
 
 ## Orden de trabajo pendiente

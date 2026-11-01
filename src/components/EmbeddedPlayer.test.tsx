@@ -36,11 +36,12 @@ it("opens one native session under StrictMode and closes it only on actual unmou
     meta: { id: "test", type: "movie", name: "Test" },
     stream: { url: "https://media.test/video.mkv", addonUrl: "https://addon.test/manifest.json", addonName: "Test" },
     addonUrl: "https://addon.test/manifest.json",
-    videoId: "test", url: "https://media.test/video.mkv", externalUrl: "https://media.test/video.mkv", serviceUrl: "http://127.0.0.1:11999", resume: 0,
+    videoId: "test", url: "https://media.test/video.mkv", externalUrl: "https://media.test/video.mkv", serviceUrl: "http://127.0.0.1:11999", resume: 0, embeddedSubtitlesAuto: true,
   };
   const view = render(<StrictMode><EmbeddedPlayer playing={playing} onClose={() => {}} /></StrictMode>);
   await act(async () => {});
   expect(openEmbedded).toHaveBeenCalledTimes(1);
+  expect(openEmbedded).toHaveBeenCalledWith(expect.objectContaining({ subtitlesAuto: true }));
   expect(closeEmbedded).not.toHaveBeenCalled();
   view.unmount();
   expect(closeEmbedded).toHaveBeenCalledTimes(1);

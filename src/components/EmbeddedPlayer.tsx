@@ -99,7 +99,7 @@ export function EmbeddedPlayer({
           subtitles: urls,
           audioLanguages: mpvLanguages(settings.audioLanguage, settings.audioSecondary),
           subtitleLanguages: mpvLanguages(settings.subtitleLanguage, settings.subtitleSecondary),
-          subtitlesAuto: settings.subtitlesAuto,
+          subtitlesAuto: playing.embeddedSubtitlesAuto ?? settings.subtitlesAuto,
           volume: Number.isFinite(saved) && saved > 0 && saved <= 1 ? saved : 1,
           rect: rectOf(box),
         });

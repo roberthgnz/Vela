@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { PlayerPreferences } from "../../lib/contracts";
 import { formatNumber, locale, t } from "../../lib/i18n";
 import { languageLabel, normalizeLanguage } from "../../lib/languages";
@@ -124,6 +124,7 @@ export function TrackPanel({
   onDelay,
   look,
   onLook,
+  embeddedAction,
 }: {
   right: number;
   audio: Track[];
@@ -139,6 +140,7 @@ export function TrackPanel({
   onDelay: (value: number) => void;
   look: PlayerPreferences;
   onLook: (value: Partial<PlayerPreferences>) => void;
+  embeddedAction?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   // Steps through the preset sizes; a size set elsewhere moves to the nearest preset.
@@ -195,8 +197,9 @@ export function TrackPanel({
           {top.map(language)}
           {others.length > 0 && top.length > 0 && <hr className="track-divider" aria-hidden="true" />}
           {others.map(language)}
-          {!subtitles.length && <p className="track-empty">{t("player.noSubtitles")}</p>}
+          {!subtitles.length && !embeddedAction && <p className="track-empty">{t("player.noSubtitles")}</p>}
         </div>
+        {embeddedAction}
       </section>
       <div className="track-side">
         {audio.length > 1 && (
