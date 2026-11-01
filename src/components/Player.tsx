@@ -39,6 +39,7 @@ import {
 import { streamQuality } from "../lib/streams";
 import { releaseVelaTorrent } from "../lib/torrentEngine";
 import { useEmbeddedLibrary } from "../lib/embeddedMpv";
+import { LibmpvInstall } from "./LibmpvInstall";
 import { requestRange } from "../lib/transport";
 import { clock, errorMessage, safeImage } from "../lib/utils";
 import { Dialog } from "./Primitives";
@@ -724,6 +725,9 @@ export function Player({
                   <MonitorPlay size={15} />
                   {t("mpv.embedded.playWith")}
                 </button>
+              )}
+              {embeddedLibrary === null && onEmbedded && (
+                <LibmpvInstall play onDone={() => onEmbedded(video.current?.currentTime ?? 0)} />
               )}
               <button
                 className={`button ${(playing.transcodeUrl && !converting) || (embeddedLibrary && onEmbedded) ? "secondary" : "primary"}`}

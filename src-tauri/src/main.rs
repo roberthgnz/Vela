@@ -4,6 +4,7 @@ mod clock;
 mod desktop;
 mod downloads;
 mod embedded_mpv;
+mod libmpv;
 mod logging;
 mod mpv;
 mod proxy;
@@ -364,6 +365,7 @@ fn main() {
         .manage(service::Service::default())
         .manage(torrent::Engine::default())
         .manage(embedded_mpv::EmbeddedMpv::default())
+        .manage(libmpv::Installer::default())
         .manage(desktop::Desktop::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_data_dir() {
@@ -463,6 +465,10 @@ fn main() {
             embedded_mpv::mpv_embedded_command,
             embedded_mpv::mpv_embedded_subtitles,
             embedded_mpv::mpv_embedded_close,
+            libmpv::mpv_install_info,
+            libmpv::mpv_install,
+            libmpv::mpv_install_cancel,
+            libmpv::mpv_uninstall,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_delete,
