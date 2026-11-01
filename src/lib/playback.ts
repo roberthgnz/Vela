@@ -7,7 +7,6 @@ import {
   serviceAvailable,
   transcodeUrl,
 } from "./streamingServer";
-import { streamTags } from "./streams";
 import { prepareVelaTorrent, torrentEngine, velaEngineAvailable } from "./torrentEngine";
 import { isDirectUrl } from "./utils";
 import { t } from "./i18n";
@@ -19,14 +18,11 @@ export type PlaybackTarget = {
   externalUrl: string;
   headers?: Record<string, string>;
   note?: string;
-  /** HLS conversion offered by Stremio Service when the integrated player cannot decode the file. */
-  transcodeUrl?: string;
   /**
-   * The file may be one the integrated player cannot decode (a torrent, `notWebReady`, HEVC or
-   * MKV): the player has Stremio Service inspect it while it starts and switches to the
-   * conversion if a track cannot be decoded.
+   * HLS conversion offered by Stremio Service when the integrated player cannot decode the file.
+   * The player inspects every file while it starts and switches to it when a track cannot be decoded.
    */
-  convertIfNeeded?: boolean;
+  transcodeUrl?: string;
   /** Subtitle files shipped inside a torrent. */
   subtitles?: Subtitle[];
   /** Which engine is streaming a torrent source. */
@@ -157,13 +153,8 @@ export async function resolvePlayback(
   if (unsupported.length) target.unsupported = unsupported;
   if (optionalService) service = await within(optionalService, SERVICE_GRACE);
   if (!service || /\.m3u8(?:$|[?#])/i.test(playable)) return target;
+  // The file is not inspected here: that waits for its header (for a torrent, the first pieces),
+  // and the player can start meanwhile. It inspects it in the background.
   target.transcodeUrl = transcodeUrl(serviceUrl, playable, mediaCapabilities());
-  // The file is not inspected here: that waits for the server to read its header (for a torrent,
-  // for the first pieces), and the player can start meanwhile. It inspects it in the background.
-  target.convertIfNeeded = Boolean(
-    torrent ||
-      stream.behaviorHints?.notWebReady ||
-      streamTags(stream).some((tag) => tag === "HEVC" || tag === "MKV"),
-  );
   return target;
 }

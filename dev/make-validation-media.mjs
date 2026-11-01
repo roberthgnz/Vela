@@ -92,4 +92,31 @@ ffmpeg(
   "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
   "-c:a", "dca", "-strict", "-2", "-ar", "48000", "-ac", "2", "-metadata:s:a:0", "language=eng", path("dts.mkv"),
 );
+
+// For the native track reader: TrueHD 5.1 next to AAC, an MP4 with its index at the end (AC-3
+// and AAC audio, a mov_text subtitle) and a WebM (VP9 + Opus).
+ffmpeg(
+  "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=24:duration=8",
+  "-f", "lavfi", "-i", "sine=frequency=440:duration=8",
+  "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+  "-map", "0:v", "-map", "1:a", "-map", "1:a",
+  "-c:a:0", "truehd", "-strict", "-2", "-ar:a:0", "48000", "-ac:a:0", "6", "-c:a:1", "aac", "-ac:a:1", "2",
+  "-metadata:s:a:0", "language=spa", "-metadata:s:a:0", "title=Castellano TrueHD 5.1", "-metadata:s:a:1", "language=eng",
+  path("truehd.mkv"),
+);
+ffmpeg(
+  "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=24:duration=8",
+  "-f", "lavfi", "-i", "sine=frequency=440:duration=8",
+  "-i", path("subs-en.srt"),
+  "-map", "0:v", "-map", "1:a", "-map", "1:a", "-map", "2",
+  "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+  "-c:a:0", "ac3", "-ac:a:0", "6", "-c:a:1", "aac", "-c:s", "mov_text",
+  "-metadata:s:a:0", "language=fra", "-metadata:s:a:1", "language=eng", "-metadata:s:s:0", "language=eng",
+  path("tail.mp4"),
+);
+ffmpeg(
+  "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=24:duration=8",
+  "-f", "lavfi", "-i", "sine=frequency=440:duration=8",
+  "-c:v", "libvpx-vp9", "-b:v", "200k", "-deadline", "realtime", "-c:a", "libopus", path("vp9.webm"),
+);
 console.log(`Media written to ${out}`);

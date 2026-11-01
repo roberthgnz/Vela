@@ -68,7 +68,7 @@ describe('streaming server client', () => {
     expect(probeProblems({ format: { name: 'mov,mp4,m4a,3gp,3g2,mj2' }, streams: [{ track: 'video', codec: 'h264' }, { track: 'audio', codec: 'aac', channels: 6 }] }, capabilities)).toEqual([]);
     expect(probeProblems({ format: { name: 'matroska,webm' }, streams: [{ track: 'video', codec: 'hevc' }, { track: 'audio', codec: 'dts' }] }, capabilities))
       .toEqual(['vídeo HEVC', 'audio DTS', 'ninguna pista de audio compatible']);
-    expect(probeProblems({ format: { name: 'avi' }, streams: [] }, capabilities)).toEqual(['contenedor avi']);
+    expect(probeProblems({ format: { name: 'avi' }, streams: [] }, capabilities)).toEqual(['contenedor AVI']);
   });
 
   it('requests an HLS conversion limited to codecs the player decodes', () => {

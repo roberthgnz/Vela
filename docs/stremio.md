@@ -317,6 +317,16 @@ Versión 0.3.0, 29 de octubre de 2026:
 - Prueba simulada no es validación real: los flujos Playwright usaban addons, subtítulos y vídeo controlados en Chromium; la cuenta de Stremio sigue sin probarse con datos reales.
 - Después de la 0.3.0 se retiraron las pruebas de interfaz con Playwright por su duración. Quedan las pruebas unitarias (Vitest) y Rust; la interfaz se comprueba a mano en la ventana Tauri (por CDP, con los scripts de `.tmp/`). El vídeo de prueba pasó de `tests/fixtures/` a `dev/media/playback.mp4`, que usa el addon de validación.
 
+## Estado de «Vela sin Stremio» (1 de noviembre de 2026)
+
+- Punto 1: implementado en `fix/player-error-freeze`, PR #3 contra `libmpv-download`.
+- Punto 2: implementado en `feat/play-without-service`, PR #4 contra `fix/player-error-freeze`.
+- Punto 3: implementado en `feat/native-track-probe` (parte del punto 2). El lector propio inspecciona Tracks/Info de Matroska y los índices MP4 mediante HTTP Range, sin bloquear el inicio del vídeo. El sondeo del servicio queda como respaldo cuando el lector falla y existe conversión. Detecta audio no decodificable para pasar a mpv o proponer su descarga.
+  - Verificación automática: `pnpm test` (337 pruebas en 47 archivos), `pnpm build`, `cargo fmt --check`, `cargo clippy --locked -- -D warnings` y `cargo test --locked` (59 correctas, 2 ignoradas). Incluye comparación con FFprobe sobre los medios locales disponibles, límites ante índices dañados y regresión del ciclo de vida de mpv con StrictMode.
+  - Ventana Tauri de desarrollo por CDP, sin servicio (`127.0.0.1:11999`): lectura real de H.264 MP4, DTS MKV, MP4 con dos audios y MKV con dos audios y tres subtítulos. Una petición por archivo, hasta 256 KiB, 9–28 ms en el servidor local de validación (no mide una red externa ni un torrent). DTS cambia a mpv integrado y comunica progreso de 0 a 4,1 s de 20 s durante la observación. StrictMode queda activado: el montaje descartado ya no abre una sesión nativa que luego cierre la válida.
+- Puntos 4–7 pendientes: proxy de cabeceras para vídeo, coste de subtítulos incrustados sin servicio, benchmark/valor por defecto Automático, documentación de límites y validación de temporada. El usuario ya no tiene el magnet de Dune: se usará contenido libre con piezas de al menos 4 MiB para el punto 6; Dune queda sin verificar.
+- Worktree: `C:\Users\reliu\Documents\Vela-standalone`; target de Cargo propio en `src-tauri/target`. Pruebas de ventana con `.tmp/vela-dev.exe` (identificador dev), perfil `.tmp/wv2` y `LOCALAPPDATA` aislado. No tocar los datos de `com.vela.desktop` ni los procesos de otras sesiones. El registro de `vela://` comprobado al cerrar esta revisión apunta al ejecutable instalado, no al de desarrollo: se conserva.
+
 ## Orden de trabajo pendiente
 
 1. Probar la cuenta con credenciales reales: vinculación, `datastoreGet/Put` con temporales, puntero y el bitfield `watched` que genera Vela, `addonCollectionGet`, y conflictos con varios dispositivos.

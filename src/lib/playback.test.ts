@@ -106,14 +106,13 @@ describe('resolvePlayback torrent engines', () => {
     vi.mocked(serviceAvailable).mockResolvedValue(true);
     const target = await resolvePlayback(meta, torrent, service);
     expect(target.url).toBe('http://127.0.0.1:5000/token/abc/0');
-    expect(target.convertIfNeeded).toBe(true);
+    expect(target.transcodeUrl).toContain('hlsv2');
     expect(probe).not.toHaveBeenCalled();
-    // A plain link with nothing suspicious only gets the conversion offered.
     const link = { addonName: 'Demo', addonUrl: 'http://addon.test/manifest.json', url: 'https://media.test/a.mp4' };
     const direct = await resolvePlayback(meta, link, service);
     expect(direct.url).toBe('https://media.test/a.mp4');
     expect(direct.transcodeUrl).toContain('hlsv2');
-    expect(direct.convertIfNeeded).toBe(false);
+    expect(probe).not.toHaveBeenCalled();
   });
 
   it('service: explains that Stremio Service is needed when it does not answer', async () => {

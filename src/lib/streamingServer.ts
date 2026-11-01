@@ -331,7 +331,7 @@ export async function probe(serviceUrl: string, mediaUrl: string, signal?: Abort
 export function probeProblems(result: Probe, capabilities: Capabilities): string[] {
   const problems: string[] = [];
   if (!capabilities.formats.some((format) => result.format.name.includes(format)))
-    problems.push(t("lib.server.problem.container", { name: result.format.name.split(",")[0] }));
+    problems.push(t("lib.server.problem.container", { name: result.format.name.split(",")[0].toUpperCase() }));
   for (const stream of result.streams) {
     if (stream.track === "video" && !capabilities.videoCodecs.includes(stream.codec))
       problems.push(t("lib.server.problem.video", { codec: stream.codec.toUpperCase() }));

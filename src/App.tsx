@@ -238,7 +238,6 @@ export default function App() {
       externalUrl: target.externalUrl,
       headers: target.headers,
       transcodeUrl: target.transcodeUrl,
-      convertIfNeeded: target.convertIfNeeded,
       unsupported: target.unsupported,
       torrentEngine: target.torrentEngine,
       fileSize: target.fileSize,
