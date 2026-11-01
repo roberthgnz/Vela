@@ -93,3 +93,28 @@
   color: var(--faint);
   font-size: 12px;
 }
+.discover-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.discover-toolbar .filter-field {
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+.discover-toolbar .chip-row {
+  padding: 0;
+}
+.discover-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+.addon-icon.layered > * {
+  grid-area: 1 / 1;
+}
+.addon-icon.layered img.pending {
+  opacity: 0;
+}
