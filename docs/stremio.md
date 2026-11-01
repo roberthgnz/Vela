@@ -360,6 +360,8 @@ RAR/ZIP/7z y volúmenes RAR no se extraen. Una fuente directa o un nombre del ad
 
 ## Estado de «Vela sin Stremio» (1 de noviembre de 2026)
 
+Los PR #2–#9 se fusionaron en orden en `next`. La versión 1.3.0 reúne estos cambios y el explorador de addons que ya estaba en `main`. Su paso a `main` y publicación se valida mediante un PR de integración y el workflow Release; las limitaciones descritas abajo siguen vigentes.
+
 - Punto 1: implementado en `fix/player-error-freeze`, PR #3 contra `libmpv-download`.
 - Punto 2: implementado en `feat/play-without-service`, PR #4 contra `fix/player-error-freeze`.
 - Punto 3: implementado en `feat/native-track-probe` (parte del punto 2). El lector propio inspecciona Tracks/Info de Matroska y los índices MP4 mediante HTTP Range, sin bloquear el inicio del vídeo. El sondeo del servicio queda como respaldo cuando el lector falla y existe conversión. Detecta audio no decodificable para pasar a mpv o proponer su descarga.
