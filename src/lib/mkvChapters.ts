@@ -31,10 +31,10 @@ const ID = {
 const HEAD = 256 * 1024;
 const MAX_CHAPTERS_BYTES = 1024 * 1024;
 
-type Element = { id: number; offset: number; dataStart: number; size: number | undefined; end: number };
+export type Element = { id: number; offset: number; dataStart: number; size: number | undefined; end: number };
 
 /** Variable-length integer at `offset`: its length and value (`id` keeps the marker bits). */
-function vint(bytes: Uint8Array, offset: number, id: boolean): { length: number; value: number | undefined } | undefined {
+export function vint(bytes: Uint8Array, offset: number, id: boolean): { length: number; value: number | undefined } | undefined {
   const first = bytes[offset];
   if (first === undefined || first === 0) return undefined;
   const length = Math.clz32(first) - 23;
@@ -48,7 +48,7 @@ function vint(bytes: Uint8Array, offset: number, id: boolean): { length: number;
   return { length, value: !id && allOnes ? undefined : value };
 }
 
-function element(bytes: Uint8Array, offset: number): Element | undefined {
+export function element(bytes: Uint8Array, offset: number): Element | undefined {
   const id = vint(bytes, offset, true);
   if (!id) return undefined;
   const size = vint(bytes, offset + id.length, false);
@@ -57,7 +57,7 @@ function element(bytes: Uint8Array, offset: number): Element | undefined {
   return { id: id.value!, offset, dataStart, size: size.value, end: size.value === undefined ? bytes.length : dataStart + size.value };
 }
 
-function* children(bytes: Uint8Array, start: number, end: number): Generator<Element> {
+export function* children(bytes: Uint8Array, start: number, end: number): Generator<Element> {
   let offset = start;
   while (offset < Math.min(end, bytes.length)) {
     const child = element(bytes, offset);
@@ -67,8 +67,9 @@ function* children(bytes: Uint8Array, start: number, end: number): Generator<Ele
   }
 }
 
-function uint(bytes: Uint8Array, item: Element): number {
+export function uint(bytes: Uint8Array, item: Element): number {
   let value = 0;
+  if (item.end > bytes.length || item.end - item.dataStart > 8) return 0;
   for (let index = item.dataStart; index < item.end; index++) value = value * 256 + bytes[index];
   return value;
 }

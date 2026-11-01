@@ -1,9 +1,29 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type Hls from "hls.js";
 import { t } from "../../lib/i18n";
 import { normalizeLanguage } from "../../lib/languages";
-import { mediaCapabilities, probe as probeMedia, probeProblems, type Probe } from "../../lib/streamingServer";
-import { hlsPattern, numbered, trackName, type Playing, type Track } from "./shared";
+import { log } from "../../lib/log";
+import { probeFile } from "../../lib/mediaProbe";
+import {
+  mediaCapabilities,
+  probe as probeMedia,
+  probeProblems,
+  type Probe,
+} from "../../lib/streamingServer";
+import { requestRange } from "../../lib/transport";
+import {
+  hlsPattern,
+  numbered,
+  trackName,
+  type Playing,
+  type Track,
+} from "./shared";
 
 /** `HTMLMediaElement.HAVE_CURRENT_DATA`: the element is decoding the source. */
 const DECODING = 2;
@@ -14,13 +34,64 @@ const DECODING = 2;
  * conversion would only cost quality), but WebView2 plays it in silence when it cannot decode
  * any of its audio tracks.
  */
-export function conversionReasons(result: Probe, element: HTMLVideoElement | null): string[] {
+export function conversionReasons(
+  result: Probe,
+  element: HTMLVideoElement | null,
+): string[] {
   const capabilities = mediaCapabilities();
   const problems = probeProblems(result, capabilities);
-  if (!problems.length || (element?.readyState ?? 0) < DECODING) return problems;
+  if (!problems.length || (element?.readyState ?? 0) < DECODING)
+    return problems;
   const audio = result.streams.filter((stream) => stream.track === "audio");
-  const silent = audio.length > 0 && !audio.some((stream) => capabilities.audioCodecs.includes(stream.codec));
+  const silent =
+    audio.length > 0 &&
+    !audio.some((stream) => capabilities.audioCodecs.includes(stream.codec));
   return silent ? problems : [];
+}
+
+/**
+ * The file's tracks: Vela reads its header itself (`probeFile`, HTTP ranges through Rust); Stremio
+ * Service's probe is only asked when that cannot read it (a server without ranges, a container
+ * the reader does not know) and the service is there.
+ */
+async function inspect(
+  playing: Playing,
+  signal: AbortSignal,
+): Promise<Probe | undefined> {
+  const url = playing.transcodeUrl
+    ? (new URL(playing.transcodeUrl).searchParams.get("mediaURL") ??
+      playing.url)
+    : playing.url;
+  let failure: unknown;
+  try {
+    const result = await probeFile((start, length) =>
+      requestRange(url, start, length, signal),
+    );
+    if (result) {
+      const { reads, ...probe } = result;
+      log.info(
+        `player: inspected ${probe.format.name.split(",")[0]} with ${reads} range reads`,
+        describeProbe(probe),
+      );
+      return probe;
+    }
+  } catch (cause) {
+    if (signal.aborted) throw cause;
+    failure = cause;
+  }
+  if (playing.transcodeUrl) return probeMedia(playing.serviceUrl, url, signal);
+  if (failure) throw failure;
+  return undefined;
+}
+
+/** Codecs and languages for the log (no URLs). */
+function describeProbe(probe: Probe): string {
+  return probe.streams
+    .map(
+      (stream) =>
+        `${stream.track[0]}:${stream.codec}${stream.language ? `/${stream.language}` : ""}`,
+    )
+    .join(" ");
 }
 
 /**
@@ -55,14 +126,16 @@ export function useMediaSource(options: {
   // A file known not to open (its container) starts with the conversion when there is one, and is
   // not loaded at all otherwise: it goes to mpv.
   const known = playing.unsupported?.length ? playing.unsupported : undefined;
-  const [source, setSource] = useState(known ? (playing.transcodeUrl ?? "") : playing.url);
+  const [source, setSource] = useState(
+    known ? (playing.transcodeUrl ?? "") : playing.url,
+  );
   const current = useRef(source);
   current.current = source;
   const [probe, setProbe] = useState<Probe | undefined>();
   /** Why the player switched to the conversion by itself (before or after the inspection), if it did. */
-  const [convertedBecause, setConvertedBecause] = useState<string[] | undefined>(
-    known && playing.transcodeUrl ? known : undefined,
-  );
+  const [convertedBecause, setConvertedBecause] = useState<
+    string[] | undefined
+  >(known && playing.transcodeUrl ? known : undefined);
   const [hlsAudio, setHlsAudio] = useState<Track[]>([]);
   const [hlsSubtitles, setHlsSubtitles] = useState<Track[]>([]);
   const hls = useRef<Hls | null>(null);
@@ -85,7 +158,10 @@ export function useMediaSource(options: {
       // WebView2 plays HLS natively (and exposes its audio renditions as audioTracks). That path is
       // required for Stremio Service: the server sends CORS headers only to Stremio's own origins,
       // so hls.js, which downloads with XHR, cannot read its playlists from Vela.
-      if (hlsPattern.test(source) && !element.canPlayType("application/vnd.apple.mpegurl")) {
+      if (
+        hlsPattern.test(source) &&
+        !element.canPlayType("application/vnd.apple.mpegurl")
+      ) {
         void import("hls.js")
           .then(({ default: HlsPlayer }) => {
             if (destroyed) return;
@@ -93,7 +169,10 @@ export function useMediaSource(options: {
               callbacks.current.onError(t("player.hls.needsExternal"));
               return;
             }
-            const instance = new HlsPlayer({ maxBufferLength: 30, backBufferLength: 30 });
+            const instance = new HlsPlayer({
+              maxBufferLength: 30,
+              backBufferLength: 30,
+            });
             // Cues are loaded into hidden text tracks and drawn by Vela.
             instance.subtitleDisplay = false;
             hls.current = instance;
@@ -180,26 +259,48 @@ export function useMediaSource(options: {
     if (known && !playing.transcodeUrl) callbacks.current.onUnsupported(known);
   }, [known, playing.transcodeUrl]);
 
-  // Stremio Service inspects the file in the background (for a torrent it waits for the first
-  // pieces, which the direct source is fetching anyway).
-  useEffect(() => {
-    if (probe || !playing.transcodeUrl || hlsPattern.test(playing.url)) return;
-    let active = true;
-    void probeMedia(playing.serviceUrl, new URL(playing.transcodeUrl).searchParams.get("mediaURL") ?? playing.url)
-      .then((result) => {
-        if (!active) return;
-        setProbe(result);
-        if (!playing.convertIfNeeded || current.current === playing.transcodeUrl) return;
-        const reasons = conversionReasons(result, video.current);
-        if (!reasons.length) return;
+  /** What to do with a file the built-in player cannot decode: the conversion, or mpv. */
+  const fallBack = useCallback(
+    (reasons: string[]) => {
+      if (playing.transcodeUrl) {
         setConvertedBecause(reasons);
         switchToConversion({});
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [playing, probe, switchToConversion, video]);
+      } else callbacks.current.onUnsupported(reasons);
+    },
+    [playing.transcodeUrl, switchToConversion],
+  );
+
+  // The file is inspected in the background while it starts (for a torrent, its first pieces and
+  // its index, which the engine fetches first anyway): its tracks fill the menus, and a track the
+  // built-in player cannot decode sends the file to the conversion or to mpv.
+  useEffect(() => {
+    if (probe || known || hlsPattern.test(playing.url)) return;
+    const controller = new AbortController();
+    const run = (again: boolean) =>
+      inspect(playing, controller.signal).then(
+        (result) => {
+          if (controller.signal.aborted || !result) return;
+          setProbe(result);
+          if (current.current === playing.transcodeUrl) return;
+          const reasons = conversionReasons(result, video.current);
+          if (reasons.length) fallBack(reasons);
+        },
+        () => {
+          // A torrent's header can take longer to arrive than one read waits (20 s). Once the
+          // player has read it, its pieces are here: try once more then.
+          const element = video.current;
+          if (again || controller.signal.aborted || !element) return;
+          if (element.readyState >= 1) void run(true);
+          else
+            element.addEventListener("loadedmetadata", () => void run(true), {
+              once: true,
+              signal: controller.signal,
+            });
+        },
+      );
+    void run(false);
+    return () => controller.abort();
+  }, [fallBack, known, playing, probe, video]);
 
   return {
     source,

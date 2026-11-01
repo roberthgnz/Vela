@@ -574,6 +574,7 @@ export const en: Record<keyof typeof es, string> = {
   "player.error.generic": "This source couldn't be played.",
   "player.error.http": "The source answered with HTTP {status}: the link may have expired or the file may be gone. Try another source.",
   "player.error.unreachable": "The source isn't responding. Check your connection or try another source.",
+  "player.mpvHint": "The built-in player can't decode part of this file ({problems}): you may not hear or see all of it. Embedded mpv plays it as it is.",
   "player.needsMpv": "The built-in player can't open this file ({problems}). Embedded mpv plays it as it is, without converting it.",
   "player.hls.needsExternal": "This format needs an external player.",
   "player.hls.network": "The HLS playlist or its segments aren't responding. The server may require headers or be blocking the request.",

@@ -576,6 +576,7 @@ export const es = {
   "player.error.generic": "Esta fuente no se ha podido reproducir.",
   "player.error.http": "La fuente respondió con HTTP {status}: puede que el enlace haya caducado o que el archivo ya no exista. Prueba otra fuente.",
   "player.error.unreachable": "La fuente no responde. Comprueba la conexión o prueba otra fuente.",
+  "player.mpvHint": "El reproductor integrado no decodifica parte de este archivo ({problems}): puede que no se oiga o no se vea entero. mpv integrado lo reproduce tal cual.",
   "player.needsMpv": "El reproductor integrado no puede abrir este archivo ({problems}). mpv integrado lo reproduce tal cual, sin conversión.",
   "player.hls.needsExternal": "Este formato necesita un reproductor externo.",
   "player.hls.network": "La lista HLS o sus segmentos no responden. Puede que el servidor exija cabeceras o bloquee la petición.",

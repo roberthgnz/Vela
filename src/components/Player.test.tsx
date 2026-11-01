@@ -1,7 +1,22 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 // The player's collaborators that reach the network or the desktop: none answer in this test.
 vi.mock("../lib/transport", () => ({
@@ -14,7 +29,8 @@ vi.mock("../lib/protocol", async (importOriginal) => ({
   getSubtitles: vi.fn(() => Promise.resolve([])),
 }));
 vi.mock("../lib/streamingServer", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../lib/streamingServer")>();
+  const actual =
+    await importOriginal<typeof import("../lib/streamingServer")>();
   return {
     torrentStats: vi.fn(() => Promise.reject(new Error("no service"))),
     probe: vi.fn(() => Promise.reject(new Error("no service"))),
@@ -37,19 +53,37 @@ vi.mock("../lib/externalPlayback", () => ({
   playExternally: vi.fn(() => Promise.reject(new Error("no player"))),
   externalPlayerName: () => "",
 }));
-vi.mock("../lib/mkvChapters", () => ({ readMkvChapters: vi.fn(() => Promise.reject(new Error("not mkv"))) }));
+vi.mock("../lib/mkvChapters", () => ({
+  readMkvChapters: vi.fn(() => Promise.reject(new Error("not mkv"))),
+}));
+vi.mock("../lib/mediaProbe", () => ({
+  probeFile: vi.fn(() => Promise.resolve(undefined)),
+}));
 vi.mock("../lib/embeddedMpv", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/embeddedMpv")>()),
   useEmbeddedLibrary: vi.fn(() => null),
-  libmpvInfo: vi.fn(async () => ({ version: "20261101-914a11c30c", size: 29_021_126, license: "LGPL-2.1-or-later", source: "x", path: null })),
+  libmpvInfo: vi.fn(async () => ({
+    version: "20261101-914a11c30c",
+    size: 29_021_126,
+    license: "LGPL-2.1-or-later",
+    source: "x",
+    path: null,
+  })),
   installLibmpv: vi.fn(async () => "C:/Vela/libmpv/libmpv-2.dll"),
 }));
 
 import type { Episode } from "../lib/contracts";
 import { installLibmpv, useEmbeddedLibrary } from "../lib/embeddedMpv";
+import { probeFile } from "../lib/mediaProbe";
 import { readMkvChapters } from "../lib/mkvChapters";
 import { requestRange } from "../lib/transport";
-import { prepareTorrent, probe, removeTorrent, setTorrentProfile, torrentProfile } from "../lib/streamingServer";
+import {
+  prepareTorrent,
+  probe,
+  removeTorrent,
+  setTorrentProfile,
+  torrentProfile,
+} from "../lib/streamingServer";
 import { Player, type Playing } from "./Player";
 
 const play = vi.fn(() => Promise.resolve());
@@ -57,7 +91,12 @@ const pause = vi.fn();
 
 beforeAll(() => {
   // jsdom has no media playback and no <dialog>; the player only needs their surface.
-  Object.assign(HTMLMediaElement.prototype, { play, pause, load: vi.fn(), canPlayType: () => "" });
+  Object.assign(HTMLMediaElement.prototype, {
+    play,
+    pause,
+    load: vi.fn(),
+    canPlayType: () => "",
+  });
   Object.assign(HTMLDialogElement.prototype, {
     showModal() {
       (this as HTMLDialogElement).setAttribute("open", "");
@@ -67,7 +106,12 @@ beforeAll(() => {
     },
   });
   Object.assign(globalThis, {
-    MediaError: { MEDIA_ERR_ABORTED: 1, MEDIA_ERR_NETWORK: 2, MEDIA_ERR_DECODE: 3, MEDIA_ERR_SRC_NOT_SUPPORTED: 4 },
+    MediaError: {
+      MEDIA_ERR_ABORTED: 1,
+      MEDIA_ERR_NETWORK: 2,
+      MEDIA_ERR_DECODE: 3,
+      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
+    },
   });
 });
 
@@ -88,7 +132,11 @@ function movie(): Playing {
     meta: { id: "bbb", type: "movie", name: "Big Buck Bunny" },
     addonUrl: "http://addon.test/manifest.json",
     videoId: "bbb",
-    stream: { addonName: "Demo", addonUrl: "http://addon.test/manifest.json", url },
+    stream: {
+      addonName: "Demo",
+      addonUrl: "http://addon.test/manifest.json",
+      url,
+    },
     url,
     externalUrl: url,
     serviceUrl: "http://127.0.0.1:11470",
@@ -106,8 +154,17 @@ function series(): Playing {
   };
 }
 
-function setup(playing: Playing, handlers: Partial<Parameters<typeof Player>[0]> = {}) {
-  const props = { playing, onClose: vi.fn(), onStarted: vi.fn(), onFailed: vi.fn(), ...handlers };
+function setup(
+  playing: Playing,
+  handlers: Partial<Parameters<typeof Player>[0]> = {},
+) {
+  const props = {
+    playing,
+    onClose: vi.fn(),
+    onStarted: vi.fn(),
+    onFailed: vi.fn(),
+    ...handlers,
+  };
   render(<Player {...props} />);
   const video = document.querySelector("video")!;
   return { ...props, video };
@@ -116,8 +173,13 @@ function setup(playing: Playing, handlers: Partial<Parameters<typeof Player>[0]>
 describe("Player", () => {
   it("shows the title and the loading cover until the video plays", () => {
     const { video } = setup(movie());
-    expect(screen.getByRole("dialog", { name: "Reproduciendo Big Buck Bunny" })).toBeTruthy();
-    expect(document.querySelector(".player")).toHaveAttribute("data-status", "loading");
+    expect(
+      screen.getByRole("dialog", { name: "Reproduciendo Big Buck Bunny" }),
+    ).toBeTruthy();
+    expect(document.querySelector(".player")).toHaveAttribute(
+      "data-status",
+      "loading",
+    );
     expect(screen.getByRole("status").textContent).toContain("Cargando");
     expect(video.getAttribute("src")).toBe("http://media.test/bunny.mp4");
   });
@@ -126,7 +188,10 @@ describe("Player", () => {
     const { video, onStarted } = setup(movie());
     fireEvent.playing(video);
     expect(onStarted).toHaveBeenCalledTimes(1);
-    expect(document.querySelector(".player")).toHaveAttribute("data-status", "playing");
+    expect(document.querySelector(".player")).toHaveAttribute(
+      "data-status",
+      "playing",
+    );
     expect(screen.getByRole("button", { name: "Pausar" })).toBeTruthy();
     fireEvent.pause(video);
     fireEvent.playing(video);
@@ -140,7 +205,12 @@ describe("Player", () => {
     const base = movie();
     const playing: Playing = {
       ...base,
-      stream: { addonName: "Demo", addonUrl: base.addonUrl, infoHash: hash, fileIdx: 3 },
+      stream: {
+        addonName: "Demo",
+        addonUrl: base.addonUrl,
+        infoHash: hash,
+        fileIdx: 3,
+      },
       url,
       externalUrl: url,
       transcodeUrl: `${service}/hlsv2/x/master.m3u8?mediaURL=${encodeURIComponent(url)}`,
@@ -158,17 +228,29 @@ describe("Player", () => {
     vi.mocked(torrentProfile).mockResolvedValueOnce("default");
     vi.mocked(setTorrentProfile).mockResolvedValueOnce();
     vi.mocked(removeTorrent).mockResolvedValueOnce();
-    vi.mocked(prepareTorrent).mockResolvedValueOnce({ url, fileIdx: 3, subtitles: [] });
+    vi.mocked(prepareTorrent).mockResolvedValueOnce({
+      url,
+      fileIdx: 3,
+      subtitles: [],
+    });
     setup(playing);
     await act(async () => {});
     expect(screen.getByText(/necesita unos 7[.,]7 MB\/s/)).toBeTruthy();
     const loads = vi.mocked(HTMLMediaElement.prototype.load).mock.calls.length;
-    fireEvent.click(screen.getByRole("button", { name: "Usar el perfil «Rápido»" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Usar el perfil «Rápido»" }),
+    );
     await act(async () => {});
     expect(setTorrentProfile).toHaveBeenCalledWith(service, "fast");
     expect(removeTorrent).toHaveBeenCalledWith(service, hash);
-    expect(prepareTorrent).toHaveBeenCalledWith(service, playing.stream, undefined);
-    expect(vi.mocked(HTMLMediaElement.prototype.load).mock.calls.length).toBeGreaterThan(loads);
+    expect(prepareTorrent).toHaveBeenCalledWith(
+      service,
+      playing.stream,
+      undefined,
+    );
+    expect(
+      vi.mocked(HTMLMediaElement.prototype.load).mock.calls.length,
+    ).toBeGreaterThan(loads);
     expect(screen.queryByText(/necesita unos/)).toBeNull();
   });
 
@@ -185,12 +267,17 @@ describe("Player", () => {
 
   it("explains a decoding error, offers the alternatives and reports the failure", () => {
     const { video, onFailed } = setup(movie());
-    Object.defineProperty(video, "error", { value: { code: 3, message: "" }, configurable: true });
+    Object.defineProperty(video, "error", {
+      value: { code: 3, message: "" },
+      configurable: true,
+    });
     fireEvent.error(video);
     const alert = screen.getByRole("alert");
     expect(alert.textContent).toContain("No se puede reproducir aquí");
     expect(alert.textContent).toContain("HEVC");
-    expect(screen.getByRole("button", { name: /reproductor externo/ })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /reproductor externo/ }),
+    ).toBeTruthy();
     expect(onFailed).toHaveBeenCalledWith(expect.stringContaining("HEVC"));
     // Without a conversion URL there is nothing to convert with.
     expect(screen.queryByRole("button", { name: /Convertir/ })).toBeNull();
@@ -216,7 +303,10 @@ describe("Player", () => {
     }
     render(<Parent />);
     const video = document.querySelector("video")!;
-    Object.defineProperty(video, "error", { value: { code: 4, message: "" }, configurable: true });
+    Object.defineProperty(video, "error", {
+      value: { code: 4, message: "" },
+      configurable: true,
+    });
     act(() => {
       fireEvent.error(video);
     });
@@ -227,11 +317,20 @@ describe("Player", () => {
   it("offers to download mpv when the file cannot be decoded and the machine has no libmpv, then plays with it", async () => {
     const onEmbedded = vi.fn();
     const { video } = setup(movie(), { onEmbedded });
-    Object.defineProperty(video, "error", { value: { code: 3, message: "" }, configurable: true });
+    Object.defineProperty(video, "error", {
+      value: { code: 3, message: "" },
+      configurable: true,
+    });
     video.currentTime = 12;
     fireEvent.error(video);
-    expect(screen.queryByRole("button", { name: /Reproducir con mpv integrado/ })).toBeNull();
-    fireEvent.click(await screen.findByRole("button", { name: "Descargar mpv y reproducir (29 MB)" }));
+    expect(
+      screen.queryByRole("button", { name: /Reproducir con mpv integrado/ }),
+    ).toBeNull();
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Descargar mpv y reproducir (29 MB)",
+      }),
+    );
     await waitFor(() => expect(onEmbedded).toHaveBeenCalledTimes(1));
     expect(installLibmpv).toHaveBeenCalledTimes(1);
     expect(onEmbedded).toHaveBeenCalledWith(12);
@@ -241,7 +340,10 @@ describe("Player", () => {
     vi.mocked(useEmbeddedLibrary).mockReturnValue("C:/mpv/libmpv-2.dll");
     try {
       const onEmbedded = vi.fn();
-      const { video } = setup({ ...movie(), resume: 95, unsupported: ["contenedor AVI"] }, { onEmbedded });
+      const { video } = setup(
+        { ...movie(), resume: 95, unsupported: ["contenedor AVI"] },
+        { onEmbedded },
+      );
       await act(async () => {});
       expect(onEmbedded).toHaveBeenCalledTimes(1);
       expect(onEmbedded).toHaveBeenCalledWith(95);
@@ -257,41 +359,172 @@ describe("Player", () => {
     setup({ ...movie(), unsupported: ["contenedor AVI"] }, { onEmbedded });
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("contenedor AVI");
-    const download = await screen.findByRole("button", { name: "Descargar mpv y reproducir (29 MB)" });
+    const download = await screen.findByRole("button", {
+      name: "Descargar mpv y reproducir (29 MB)",
+    });
     expect(download.className).toContain("primary");
     expect(onEmbedded).not.toHaveBeenCalled();
   });
 
   it("starts with the conversion when the file cannot be opened and Stremio Service is there", () => {
     const canPlayType = HTMLMediaElement.prototype.canPlayType;
-    HTMLMediaElement.prototype.canPlayType = (type: string) => (type.includes("mpegurl") ? "maybe" : "");
+    HTMLMediaElement.prototype.canPlayType = (type: string) =>
+      type.includes("mpegurl") ? "maybe" : "";
     try {
-      const transcodeUrl = "http://127.0.0.1:11470/hlsv2/x/master.m3u8?mediaURL=a";
+      const transcodeUrl =
+        "http://127.0.0.1:11470/hlsv2/x/master.m3u8?mediaURL=a";
       const onEmbedded = vi.fn();
-      const { video } = setup({ ...movie(), transcodeUrl, unsupported: ["contenedor AVI"] }, { onEmbedded });
+      const { video } = setup(
+        { ...movie(), transcodeUrl, unsupported: ["contenedor AVI"] },
+        { onEmbedded },
+      );
       expect(video.getAttribute("src")).toBe(transcodeUrl);
-      expect(document.querySelector(".player-loading")?.textContent).toContain("contenedor AVI");
+      expect(document.querySelector(".player-loading")?.textContent).toContain(
+        "contenedor AVI",
+      );
       expect(onEmbedded).not.toHaveBeenCalled();
     } finally {
       HTMLMediaElement.prototype.canPlayType = canPlayType;
     }
   });
 
-  it("tells a dead link apart from a format problem, and then only offers another source", async () => {
-    vi.mocked(requestRange).mockRejectedValueOnce(new Error("El addon respondió con HTTP 404."));
+  it("reads the file's tracks itself and hands a DTS-only file to mpv without Stremio Service", async () => {
+    vi.mocked(useEmbeddedLibrary).mockReturnValue("C:/mpv/libmpv-2.dll");
+    vi.mocked(probeFile).mockResolvedValueOnce({
+      format: { name: "matroska,webm", duration: 20 },
+      streams: [
+        { id: 0, track: "video", codec: "h264" },
+        { id: 0, track: "audio", codec: "dts", channels: 6 },
+      ],
+      reads: 1,
+    });
+    try {
+      const onEmbedded = vi.fn();
+      setup({ ...movie(), resume: 40 }, { onEmbedded });
+      await act(async () => {});
+      expect(probeFile).toHaveBeenCalled();
+      expect(probe).not.toHaveBeenCalled();
+      expect(onEmbedded).toHaveBeenCalledWith(40);
+    } finally {
+      vi.mocked(useEmbeddedLibrary).mockReturnValue(null);
+    }
+  });
+
+  it("inspects a torrent again once the player has read its header, when the first read timed out", async () => {
+    vi.mocked(useEmbeddedLibrary).mockReturnValue("C:/mpv/libmpv-2.dll");
+    vi.mocked(probeFile)
+      .mockRejectedValueOnce(new Error("El addon no respondió a tiempo."))
+      .mockResolvedValueOnce({
+        format: { name: "matroska,webm" },
+        streams: [{ track: "audio", codec: "dts" }],
+        reads: 1,
+      });
+    try {
+      const onEmbedded = vi.fn();
+      const { video } = setup(movie(), { onEmbedded });
+      await act(async () => {});
+      expect(onEmbedded).not.toHaveBeenCalled();
+      await act(async () => {
+        fireEvent.loadedMetadata(video);
+      });
+      expect(probeFile).toHaveBeenCalledTimes(2);
+      expect(onEmbedded).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.mocked(useEmbeddedLibrary).mockReturnValue(null);
+    }
+  });
+
+  it("offers mpv without stopping a file that already plays in silence, when there is no libmpv", async () => {
+    let finish: (
+      value: Awaited<ReturnType<typeof probeFile>>,
+    ) => void = () => {};
+    vi.mocked(probeFile).mockReturnValueOnce(
+      new Promise((resolve) => (finish = resolve)),
+    );
     const { video } = setup(movie(), { onEmbedded: vi.fn() });
-    Object.defineProperty(video, "error", { value: { code: 4, message: "" }, configurable: true });
+    Object.defineProperty(video, "readyState", {
+      value: 4,
+      configurable: true,
+    });
+    fireEvent.playing(video);
+    await act(async () => {
+      finish({
+        format: { name: "matroska,webm" },
+        streams: [
+          { track: "video", codec: "h264" },
+          { track: "audio", codec: "truehd" },
+        ],
+        reads: 1,
+      });
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(
+      screen.getByText(
+        /no decodifica parte de este archivo \(audio TRUEHD, ninguna pista de audio compatible\)/,
+      ),
+    ).toBeTruthy();
+    expect(
+      await screen.findByRole("button", {
+        name: "Descargar mpv y reproducir (29 MB)",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("keeps a file that plays when only an unused track is foreign", async () => {
+    vi.mocked(probeFile).mockResolvedValueOnce({
+      format: { name: "matroska,webm" },
+      streams: [
+        { track: "video", codec: "h264" },
+        { track: "audio", codec: "aac" },
+        { track: "audio", codec: "dts" },
+      ],
+      reads: 1,
+    });
+    const onEmbedded = vi.fn();
+    const { video } = setup(movie(), { onEmbedded });
+    Object.defineProperty(video, "readyState", {
+      value: 4,
+      configurable: true,
+    });
+    fireEvent.playing(video);
+    await act(async () => {});
+    expect(onEmbedded).not.toHaveBeenCalled();
+    expect(screen.queryByText(/no decodifica parte/)).toBeNull();
+  });
+
+  it("tells a dead link apart from a format problem, and then only offers another source", async () => {
+    vi.mocked(requestRange).mockRejectedValueOnce(
+      new Error("El addon respondió con HTTP 404."),
+    );
+    const { video } = setup(movie(), { onEmbedded: vi.fn() });
+    Object.defineProperty(video, "error", {
+      value: { code: 4, message: "" },
+      configurable: true,
+    });
     fireEvent.error(video);
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("HTTP 404"));
-    expect(requestRange).toHaveBeenLastCalledWith("http://media.test/bunny.mp4", 0, 1);
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain("HTTP 404"),
+    );
+    expect(requestRange).toHaveBeenLastCalledWith(
+      "http://media.test/bunny.mp4",
+      0,
+      1,
+    );
     expect(screen.queryByRole("button", { name: /mpv/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /reproductor externo/ })).toBeNull();
-    expect(screen.getByRole("button", { name: "Elegir otra fuente" })).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /reproductor externo/ }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Elegir otra fuente" }),
+    ).toBeTruthy();
   });
 
   it("does not offer the download where there is no way to switch to mpv", async () => {
     const { video } = setup(movie());
-    Object.defineProperty(video, "error", { value: { code: 3, message: "" }, configurable: true });
+    Object.defineProperty(video, "error", {
+      value: { code: 3, message: "" },
+      configurable: true,
+    });
     fireEvent.error(video);
     await act(async () => {});
     expect(screen.queryByRole("button", { name: /Descargar mpv/ })).toBeNull();
@@ -307,14 +540,18 @@ describe("Player", () => {
     });
     // WebView2 plays HLS natively, so the conversion becomes the element's source.
     const canPlayType = HTMLMediaElement.prototype.canPlayType;
-    HTMLMediaElement.prototype.canPlayType = (type: string) => (type.includes("mpegurl") ? "maybe" : "");
+    HTMLMediaElement.prototype.canPlayType = (type: string) =>
+      type.includes("mpegurl") ? "maybe" : "";
     try {
-      const transcodeUrl = "http://127.0.0.1:11470/hlsv2/x/master.m3u8?mediaURL=http%3A%2F%2Fmedia.test%2Fbunny.mp4";
-      const { video } = setup({ ...movie(), transcodeUrl, convertIfNeeded: true });
+      const transcodeUrl =
+        "http://127.0.0.1:11470/hlsv2/x/master.m3u8?mediaURL=http%3A%2F%2Fmedia.test%2Fbunny.mp4";
+      const { video } = setup({ ...movie(), transcodeUrl });
       expect(video.getAttribute("src")).toBe("http://media.test/bunny.mp4");
       await act(async () => {});
       expect(video.getAttribute("src")).toBe(transcodeUrl);
-      expect(document.querySelector(".player-loading")?.textContent).toContain("vídeo HEVC");
+      expect(document.querySelector(".player-loading")?.textContent).toContain(
+        "vídeo HEVC",
+      );
     } finally {
       HTMLMediaElement.prototype.canPlayType = canPlayType;
     }
@@ -331,7 +568,9 @@ describe("Player", () => {
   it("offers the next episode of a series and starts it with N", () => {
     const onNext = vi.fn();
     setup(series(), { onNext });
-    expect(screen.getByRole("button", { name: "Siguiente episodio: T1 · E2" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Siguiente episodio: T1 · E2" }),
+    ).toBeTruthy();
     fireEvent.keyDown(window, { key: "n" });
     expect(onNext).toHaveBeenCalledWith(episodes[1]);
   });
@@ -342,7 +581,10 @@ describe("Player", () => {
     act(() => {
       fireEvent.ended(video);
     });
-    expect(document.querySelector(".player")).toHaveAttribute("data-status", "ended");
+    expect(document.querySelector(".player")).toHaveAttribute(
+      "data-status",
+      "ended",
+    );
     const card = screen.getByRole("region", { name: "Siguiente episodio" });
     expect(card.textContent).toContain("Segundo");
     fireEvent.click(screen.getByRole("button", { name: /Ver ahora/ }));

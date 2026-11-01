@@ -16,8 +16,6 @@ export type Playing = {
   headers?: Record<string, string>;
   /** HLS conversion through Stremio Service, when available. */
   transcodeUrl?: string;
-  /** Switch to the conversion if Stremio Service finds a track WebView2 cannot decode. */
-  convertIfNeeded?: boolean;
   /** Why the built-in player cannot open the file, known before trying (see `PlaybackTarget`). */
   unsupported?: string[];
   serviceUrl: string;
