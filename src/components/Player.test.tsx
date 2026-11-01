@@ -40,13 +40,15 @@ vi.mock("../lib/externalPlayback", () => ({
 vi.mock("../lib/mkvChapters", () => ({ readMkvChapters: vi.fn(() => Promise.reject(new Error("not mkv"))) }));
 vi.mock("../lib/embeddedMpv", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/embeddedMpv")>()),
+  useEmbeddedLibrary: vi.fn(() => null),
   libmpvInfo: vi.fn(async () => ({ version: "20261101-914a11c30c", size: 29_021_126, license: "LGPL-2.1-or-later", source: "x", path: null })),
   installLibmpv: vi.fn(async () => "C:/Vela/libmpv/libmpv-2.dll"),
 }));
 
 import type { Episode } from "../lib/contracts";
-import { installLibmpv } from "../lib/embeddedMpv";
+import { installLibmpv, useEmbeddedLibrary } from "../lib/embeddedMpv";
 import { readMkvChapters } from "../lib/mkvChapters";
+import { requestRange } from "../lib/transport";
 import { prepareTorrent, probe, removeTorrent, setTorrentProfile, torrentProfile } from "../lib/streamingServer";
 import { Player, type Playing } from "./Player";
 
@@ -233,6 +235,58 @@ describe("Player", () => {
     await waitFor(() => expect(onEmbedded).toHaveBeenCalledTimes(1));
     expect(installLibmpv).toHaveBeenCalledTimes(1);
     expect(onEmbedded).toHaveBeenCalledWith(12);
+  });
+
+  it("hands a file it cannot open to embedded mpv at once, from the saved position, when there is a libmpv", async () => {
+    vi.mocked(useEmbeddedLibrary).mockReturnValue("C:/mpv/libmpv-2.dll");
+    try {
+      const onEmbedded = vi.fn();
+      const { video } = setup({ ...movie(), resume: 95, unsupported: ["contenedor AVI"] }, { onEmbedded });
+      await act(async () => {});
+      expect(onEmbedded).toHaveBeenCalledTimes(1);
+      expect(onEmbedded).toHaveBeenCalledWith(95);
+      // The file is not loaded in the built-in player meanwhile.
+      expect(video.getAttribute("src")).toBeNull();
+    } finally {
+      vi.mocked(useEmbeddedLibrary).mockReturnValue(null);
+    }
+  });
+
+  it("without a libmpv or a conversion, explains why and offers to download mpv as the main action", async () => {
+    const onEmbedded = vi.fn();
+    setup({ ...movie(), unsupported: ["contenedor AVI"] }, { onEmbedded });
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("contenedor AVI");
+    const download = await screen.findByRole("button", { name: "Descargar mpv y reproducir (29 MB)" });
+    expect(download.className).toContain("primary");
+    expect(onEmbedded).not.toHaveBeenCalled();
+  });
+
+  it("starts with the conversion when the file cannot be opened and Stremio Service is there", () => {
+    const canPlayType = HTMLMediaElement.prototype.canPlayType;
+    HTMLMediaElement.prototype.canPlayType = (type: string) => (type.includes("mpegurl") ? "maybe" : "");
+    try {
+      const transcodeUrl = "http://127.0.0.1:11470/hlsv2/x/master.m3u8?mediaURL=a";
+      const onEmbedded = vi.fn();
+      const { video } = setup({ ...movie(), transcodeUrl, unsupported: ["contenedor AVI"] }, { onEmbedded });
+      expect(video.getAttribute("src")).toBe(transcodeUrl);
+      expect(document.querySelector(".player-loading")?.textContent).toContain("contenedor AVI");
+      expect(onEmbedded).not.toHaveBeenCalled();
+    } finally {
+      HTMLMediaElement.prototype.canPlayType = canPlayType;
+    }
+  });
+
+  it("tells a dead link apart from a format problem, and then only offers another source", async () => {
+    vi.mocked(requestRange).mockRejectedValueOnce(new Error("El addon respondió con HTTP 404."));
+    const { video } = setup(movie(), { onEmbedded: vi.fn() });
+    Object.defineProperty(video, "error", { value: { code: 4, message: "" }, configurable: true });
+    fireEvent.error(video);
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("HTTP 404"));
+    expect(requestRange).toHaveBeenLastCalledWith("http://media.test/bunny.mp4", 0, 1);
+    expect(screen.queryByRole("button", { name: /mpv/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /reproductor externo/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Elegir otra fuente" })).toBeTruthy();
   });
 
   it("does not offer the download where there is no way to switch to mpv", async () => {

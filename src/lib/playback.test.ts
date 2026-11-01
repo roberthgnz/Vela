@@ -26,13 +26,23 @@ vi.mock('./streamingServer', () => ({
   transcodeUrl: (_service: string, url: string) => `http://127.0.0.1:11470/hlsv2/x/master.m3u8?mediaURL=${encodeURIComponent(url)}`,
 }));
 
-import { resolvePlayback } from './playback';
+import { containerProblems, resolvePlayback } from './playback';
 import { ensureService, prepareTorrent, probe, serviceAvailable } from './streamingServer';
 import { prepareVelaTorrent } from './torrentEngine';
 
 const meta = { id: 'tt1', type: 'movie' as const, name: 'Sintel' };
 const torrent = { addonName: 'Demo', addonUrl: 'http://addon.test/manifest.json', infoHash: 'abc' };
 const service = 'http://127.0.0.1:11470';
+
+describe('containerProblems', () => {
+  it('uses the first name with an extension', () => {
+    expect(containerProblems(undefined, 'movie.AVI')).toEqual(['contenedor AVI']);
+    expect(containerProblems('Episode.mkv', 'http://x/y.avi')).toEqual([]);
+    expect(containerProblems('http://127.0.0.1:11470/abc/0', 'clip.m2ts')).toEqual(['contenedor M2TS']);
+    expect(containerProblems('http://127.0.0.1:11470/abc/0')).toEqual([]);
+    expect(containerProblems('C:\\Users\\me\\Downloads\\Vela\\film.mpg')).toEqual(['contenedor MPG']);
+  });
+});
 
 describe('resolvePlayback torrent engines', () => {
   beforeEach(() => {
@@ -111,6 +121,39 @@ describe('resolvePlayback torrent engines', () => {
     vi.mocked(ensureService).mockResolvedValue(false);
     await expect(resolvePlayback(meta, torrent, service)).rejects.toThrow(/Stremio Service/);
     expect(prepareVelaTorrent).not.toHaveBeenCalled();
+  });
+
+  it('a plain link waits half a second at most for Stremio Service (a refused connection takes two on Windows)', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(serviceAvailable).mockReturnValue(new Promise(() => {}));
+      const link = { addonName: 'Demo', addonUrl: 'http://addon.test/manifest.json', url: 'https://media.test/a.mp4' };
+      const pending = resolvePlayback(meta, link, service);
+      await vi.advanceTimersByTimeAsync(500);
+      const target = await pending;
+      expect(target.url).toBe('https://media.test/a.mp4');
+      expect(target.transcodeUrl).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('marks files whose container the built-in player cannot open, from the file name or the URL', async () => {
+    vi.mocked(serviceAvailable).mockResolvedValue(false);
+    const link = { addonName: 'Demo', addonUrl: 'http://addon.test/manifest.json', url: 'https://media.test/Old%20Film.avi?token=1' };
+    const target = await resolvePlayback(meta, link, service);
+    expect(target.unsupported).toEqual(['contenedor AVI']);
+    expect(target.transcodeUrl).toBeUndefined();
+    engine.value = 'vela';
+    vi.mocked(prepareVelaTorrent).mockResolvedValueOnce({
+      url: 'http://127.0.0.1:5000/token/abc/0',
+      fileIdx: 0,
+      fileName: 'Sintel.wmv',
+      subtitles: [],
+    } as Awaited<ReturnType<typeof prepareVelaTorrent>>);
+    expect((await resolvePlayback(meta, torrent, service)).unsupported).toEqual(['contenedor WMV']);
+    // MP4 and MKV are left to the inspection of their tracks.
+    expect((await resolvePlayback(meta, { ...link, url: 'https://media.test/a.mkv' }, service)).unsupported).toBeUndefined();
   });
 
   it('external players get the local URL of either engine', async () => {

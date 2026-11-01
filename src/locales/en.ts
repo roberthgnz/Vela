@@ -160,7 +160,7 @@ export const en: Record<keyof typeof es, string> = {
   "settings.audio.alternativeHint": "Used when there is no track in the preferred language.",
   // Settings: playback
   "settings.playback.builtIn": "Built-in player",
-  "settings.playback.builtInHint": "Plays MP4, WebM and MKV with H.264, VP9 or AV1 (and HEVC when this computer decodes it), and HLS playlists, with multiple audio tracks. DTS, TrueHD, or HEVC the computer can't decode, need Stremio Service's conversion or an external player.",
+  "settings.playback.builtInHint": "Plays MP4, WebM and MKV with H.264, VP9 or AV1 (and HEVC when this computer decodes it), and HLS playlists, with multiple audio tracks. What it can't open (DTS, TrueHD, HEVC the computer can't decode, AVI…) goes to embedded mpv, which Vela downloads when needed; if Stremio Service is running, it can also convert it.",
   "settings.playback.seekShort": "Short skip",
   "settings.playback.seekShortHint": "Left and right arrows.",
   "settings.playback.seekLong": "Long skip",
@@ -183,7 +183,7 @@ export const en: Record<keyof typeof es, string> = {
   "settings.external.player": "Player",
   "settings.external.playerHint": "Optional: path to mpv.exe or vlc.exe. If you leave it empty, Vela uses MPV (PATH, Programs or Program Files) or, if it can't find it, VLC. With either one, Vela passes the title, the subtitles and the source's headers, resumes where you left off and saves your progress when you close it.",
   // Settings: streaming
-  "settings.streaming.serviceHint": "Stremio's streaming server: it converts formats the built-in player cannot play and opens torrents when it is the chosen engine. It is not included with Vela: if Stremio is installed, Vela starts its server when needed.",
+  "settings.streaming.serviceHint": "Optional. Stremio's streaming server: it converts formats the built-in player cannot play and opens torrents when it is the chosen engine. Vela plays without it (embedded mpv and its own torrent engine). It is not included with Vela: if Stremio is installed, Vela starts its server when needed.",
   "settings.streaming.test": "Test connection",
   "settings.streaming.connected": "Connected",
   "settings.streaming.serverVersion": " · server {version}",
@@ -572,6 +572,9 @@ export const en: Record<keyof typeof es, string> = {
   "player.error.decode": "WebView2 can't decode this video. This usually happens with HEVC, DTS/TrueHD audio or damaged files.",
   "player.error.unsupported": "The source isn't responding or uses a container or codec the built-in player doesn't support (for example MKV with HEVC, or AVI).",
   "player.error.generic": "This source couldn't be played.",
+  "player.error.http": "The source answered with HTTP {status}: the link may have expired or the file may be gone. Try another source.",
+  "player.error.unreachable": "The source isn't responding. Check your connection or try another source.",
+  "player.needsMpv": "The built-in player can't open this file ({problems}). Embedded mpv plays it as it is, without converting it.",
   "player.hls.needsExternal": "This format needs an external player.",
   "player.hls.network": "The HLS playlist or its segments aren't responding. The server may require headers or be blocking the request.",
   "player.hls.decode": "The built-in player couldn't decode this HLS playlist.",

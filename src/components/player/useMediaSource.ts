@@ -40,6 +40,11 @@ export function useMediaSource(options: {
   onSwitching: () => void;
   /** hls.js switched audio tracks (also on its own, at start). */
   onHlsAudioSwitched: (key: string) => void;
+  /**
+   * The built-in player cannot decode the file and there is no conversion to switch to: the
+   * player hands it to embedded mpv (or offers to download it).
+   */
+  onUnsupported: (reasons: string[]) => void;
 }) {
   const { playing, video, save } = options;
   // The callbacks change identity every render; the mount callback must not, or React would
@@ -47,12 +52,17 @@ export function useMediaSource(options: {
   const callbacks = useRef(options);
   callbacks.current = options;
 
-  const [source, setSource] = useState(playing.url);
+  // A file known not to open (its container) starts with the conversion when there is one, and is
+  // not loaded at all otherwise: it goes to mpv.
+  const known = playing.unsupported?.length ? playing.unsupported : undefined;
+  const [source, setSource] = useState(known ? (playing.transcodeUrl ?? "") : playing.url);
   const current = useRef(source);
   current.current = source;
   const [probe, setProbe] = useState<Probe | undefined>();
-  /** Why the player switched to the conversion by itself after the inspection, if it did. */
-  const [convertedBecause, setConvertedBecause] = useState<string[]>();
+  /** Why the player switched to the conversion by itself (before or after the inspection), if it did. */
+  const [convertedBecause, setConvertedBecause] = useState<string[] | undefined>(
+    known && playing.transcodeUrl ? known : undefined,
+  );
   const [hlsAudio, setHlsAudio] = useState<Track[]>([]);
   const [hlsSubtitles, setHlsSubtitles] = useState<Track[]>([]);
   const hls = useRef<Hls | null>(null);
@@ -67,6 +77,7 @@ export function useMediaSource(options: {
     (element: HTMLVideoElement | null) => {
       if (!element) return;
       video.current = element;
+      if (!source) return;
       let destroyed = false;
       let dispose: (() => void) | undefined;
       setHlsAudio([]);
@@ -163,6 +174,11 @@ export function useMediaSource(options: {
     if (element.currentTime > 0) resumeAt.current = element.currentTime;
     element.load();
   }, [video]);
+
+  // Known before loading: there is no conversion, so mpv takes over.
+  useEffect(() => {
+    if (known && !playing.transcodeUrl) callbacks.current.onUnsupported(known);
+  }, [known, playing.transcodeUrl]);
 
   // Stremio Service inspects the file in the background (for a torrent it waits for the first
   // pieces, which the direct source is fetching anyway).
