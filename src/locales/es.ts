@@ -1029,6 +1029,7 @@ export const es = {
   "lib.playback.unsupportedLink": "Esta fuente no proporciona un enlace de vídeo compatible.",
   "lib.playback.needsProxy": "Esta fuente exige cabeceras HTTP especiales. Para verla en Vela hace falta el proxy de Stremio Service ({hint}), o ábrela con MPV.",
   "lib.playback.needsHttps": "Esta fuente exige cabeceras HTTP y no usa HTTPS; el proxy de Stremio Service solo acepta HTTPS. Ábrela con MPV desde el menú de la fuente.",
+  "lib.playback.headerHls": "HLS con cabeceras de petición",
   "lib.playback.converting": "Convirtiendo con Stremio Service ({problems})",
   "lib.server.profile.soft": "Suave",
   "lib.server.profile.softTitle": "1,6 MB/s y 35 conexiones: deja red libre y no satura el router",

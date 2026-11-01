@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const engine = { value: 'auto' as 'auto' | 'vela' | 'service' };
 
+vi.mock('./mediaProxy', () => ({
+  nativeHeaderProxyAvailable: true,
+  startMediaProxy: vi.fn(async () => 'http://127.0.0.1:5001/private/video.mp4'),
+}));
+
 vi.mock('./torrentEngine', () => ({
   velaEngineAvailable: true,
   torrentEngine: { get: () => engine.value },
@@ -29,6 +34,7 @@ vi.mock('./streamingServer', () => ({
 import { containerProblems, resolvePlayback } from './playback';
 import { ensureService, prepareTorrent, probe, serviceAvailable } from './streamingServer';
 import { prepareVelaTorrent } from './torrentEngine';
+import { startMediaProxy } from './mediaProxy';
 
 const meta = { id: 'tt1', type: 'movie' as const, name: 'Sintel' };
 const torrent = { addonName: 'Demo', addonUrl: 'http://addon.test/manifest.json', infoHash: 'abc' };
@@ -45,6 +51,36 @@ describe('containerProblems', () => {
 });
 
 describe('resolvePlayback torrent engines', () => {
+  it('hands header-protected HLS to mpv rather than breaking relative segment URLs', async () => {
+    vi.mocked(startMediaProxy).mockClear();
+    vi.mocked(serviceAvailable).mockResolvedValue(false);
+    const result = await resolvePlayback(meta, { ...torrent, infoHash: undefined, url: 'https://media.test/master.m3u8', behaviorHints: { proxyHeaders: { request: { Referer: 'https://addon.test/' } } } }, service);
+    expect(result.unsupported).toEqual(['HLS con cabeceras de petición']);
+    expect(result.externalUrl).toBe('https://media.test/master.m3u8');
+    expect(startMediaProxy).not.toHaveBeenCalled();
+  });
+  it('plays a header-protected source without starting Stremio Service', async () => {
+    vi.mocked(serviceAvailable).mockResolvedValue(false);
+    const headers = { Referer: 'https://addon.test/' };
+    const link = { ...torrent, infoHash: undefined, url: 'https://media.test/movie.mp4', behaviorHints: { proxyHeaders: { request: headers } } };
+    vi.mocked(ensureService).mockClear();
+    const result = await resolvePlayback(meta, link, service);
+    expect(ensureService).not.toHaveBeenCalled();
+    expect(startMediaProxy).toHaveBeenCalledWith(link.url, headers);
+    expect(result.mediaProxy).toBe(result.url);
+    expect(result.externalUrl).toBe(link.url);
+    expect(result.headers).toEqual(headers);
+  });
+
+  it('passes the original URL and headers directly to an external player', async () => {
+    vi.mocked(startMediaProxy).mockClear();
+    const headers = { Referer: 'https://addon.test/' };
+    const link = { ...torrent, infoHash: undefined, url: 'https://media.test/movie.mp4', behaviorHints: { proxyHeaders: { request: headers } } };
+    const result = await resolvePlayback(meta, link, service, { external: true });
+    expect(result.url).toBe(link.url);
+    expect(result.mediaProxy).toBeUndefined();
+    expect(startMediaProxy).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     vi.mocked(ensureService).mockReset();
     vi.mocked(serviceAvailable).mockReset();

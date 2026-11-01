@@ -10,6 +10,7 @@ import {
 import { prepareVelaTorrent, torrentEngine, velaEngineAvailable } from "./torrentEngine";
 import { isDirectUrl } from "./utils";
 import { t } from "./i18n";
+import { nativeHeaderProxyAvailable, startMediaProxy } from "./mediaProxy";
 
 export type PlaybackTarget = {
   /** URL for the integrated player. */
@@ -29,6 +30,8 @@ export type PlaybackTarget = {
   torrentEngine?: "vela" | "service";
   /** Size of the torrent's file on Stremio's engine, for its bitrate once the duration is known. */
   fileSize?: number;
+  /** Local proxy to release when this playback ends. */
+  mediaProxy?: string;
   /**
    * Why the built-in player cannot open the file, known before it tries (its container, from the
    * file name). The player goes to the conversion or to embedded mpv instead.
@@ -91,7 +94,7 @@ export async function resolvePlayback(
   // engine the question is asked while the torrent opens, so it costs nothing in between.
   let optionalService: Promise<boolean> | undefined;
   let service: boolean;
-  if ((torrent && !ownEngine) || needsHeaders) service = await ensureService(serviceUrl);
+  if ((torrent && !ownEngine) || (needsHeaders && !nativeHeaderProxyAvailable && !options.external)) service = await ensureService(serviceUrl);
   else if (options.external) service = false;
   else {
     // Only the conversion depends on the answer. Without a server, Windows takes about two
@@ -128,8 +131,18 @@ export async function resolvePlayback(
     return { url, externalUrl: url, torrentEngine: engineUsed };
   }
   let playable = url;
+  let mediaProxy: string | undefined;
+  // A single-file proxy cannot rewrite HLS child playlists, segments or encryption keys.
+  // mpv opens the original manifest and supplies the headers on its own requests.
+  if (needsHeaders && nativeHeaderProxyAvailable && /\.m3u8(?:$|[?#])/i.test(url)) {
+    return { url: "", externalUrl: url, headers, unsupported: [t("lib.playback.headerHls")], torrentEngine: engineUsed };
+  }
   if (needsHeaders) {
-    if (!service)
+    if (nativeHeaderProxyAvailable) {
+      playable = await startMediaProxy(url, headers);
+      mediaProxy = playable;
+    } else {
+      if (!service)
       throw new Error(
         t("lib.playback.needsProxy", { hint: serviceHint.toLowerCase() }),
       );
@@ -139,6 +152,7 @@ export async function resolvePlayback(
         t("lib.playback.needsHttps"),
       );
     playable = proxyUrl(serviceUrl, url, headers, stream.behaviorHints?.proxyHeaders?.response);
+    }
   }
   const target: PlaybackTarget = {
     url: playable,
@@ -148,6 +162,7 @@ export async function resolvePlayback(
     subtitles,
     torrentEngine: engineUsed,
     fileSize,
+    ...(mediaProxy ? { mediaProxy } : {}),
   };
   const unsupported = containerProblems(stream.behaviorHints?.filename, fileName, url);
   if (unsupported.length) target.unsupported = unsupported;
