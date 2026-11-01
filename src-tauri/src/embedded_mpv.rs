@@ -1,7 +1,8 @@
 //! mpv inside Vela's window, for files WebView2 cannot decode (HEVC, AC-3/DTS/TrueHD, AVI…).
 //!
 //! libmpv is not linked or shipped: it is loaded at run time from a copy already on the machine
-//! (the `libmpv-2.dll` that Stremio installs, or one next to the configured mpv). A native child
+//! (one next to the configured mpv, one Vela downloaded on request (`libmpv`), or the
+//! `libmpv-2.dll` that Stremio installs). A native child
 //! window covers the video area of the page, above the WebView, and mpv draws into it (`wid`);
 //! the page keeps its top bar (back, title, window buttons) and mpv's own on-screen controller
 //! handles the rest, with YouTube-style keys bound on top of mpv's defaults. Progress, the end of
@@ -274,8 +275,8 @@ pub struct EmbeddedMpv {
     busy: tokio::sync::Mutex<()>,
 }
 
-/// libmpv builds Vela knows how to find, most likely first.
-fn candidates(player_path: Option<&str>) -> Vec<PathBuf> {
+/// libmpv builds Vela knows how to find, most likely first. `own` is the one Vela downloaded.
+fn candidates(player_path: Option<&str>, own: Option<PathBuf>) -> Vec<PathBuf> {
     let mut list = Vec::new();
     if let Some(path) = std::env::var_os("VELA_LIBMPV") {
         list.push(PathBuf::from(path));
@@ -287,6 +288,7 @@ fn candidates(player_path: Option<&str>) -> Vec<PathBuf> {
         list.push(folder.join("libmpv-2.dll"));
         list.push(folder.join("mpv-2.dll"));
     }
+    list.extend(own);
     if let Some(local) = std::env::var_os("LOCALAPPDATA") {
         let local = PathBuf::from(local);
         let programs = local.join("Programs");
@@ -301,8 +303,8 @@ fn candidates(player_path: Option<&str>) -> Vec<PathBuf> {
     list
 }
 
-fn find(player_path: Option<&str>) -> Option<PathBuf> {
-    candidates(player_path)
+fn find(player_path: Option<&str>, own: Option<PathBuf>) -> Option<PathBuf> {
+    candidates(player_path, own)
         .into_iter()
         .find(|path| path.is_file())
 }
@@ -696,8 +698,14 @@ impl EmbeddedMpv {
 
 /// The libmpv Vela would use, if any.
 #[tauri::command]
-pub fn mpv_embedded_library(player_path: Option<String>) -> Option<String> {
-    find(player_path.as_deref()).map(|path| path.to_string_lossy().into_owned())
+pub fn mpv_embedded_library(app: AppHandle, player_path: Option<String>) -> Option<String> {
+    find(player_path.as_deref(), crate::libmpv::installed(&app))
+        .map(|path| path.to_string_lossy().into_owned())
+}
+
+/// Loads a libmpv just far enough to know it has what Vela calls, then lets it go.
+pub(crate) fn check_library(path: &Path) -> Result<(), String> {
+    Api::load(path).map(drop)
 }
 
 #[tauri::command]
@@ -720,8 +728,8 @@ pub async fn mpv_embedded_open(
             .trim_start_matches(r"\\?\")
             .to_owned()
     };
-    let library = find(options.player_path.as_deref()).ok_or(
-        "No se encontró libmpv. Instala Stremio (incluye libmpv-2.dll) o coloca libmpv-2.dll junto a mpv.exe.",
+    let library = find(options.player_path.as_deref(), crate::libmpv::installed(&app)).ok_or(
+        "No se encontró libmpv. Descárgala desde Ajustes › Reproducción, o instala Stremio (incluye libmpv-2.dll), o coloca libmpv-2.dll junto a mpv.exe.",
     )?;
     let api = Api::load(&library)?;
     // SAFETY: creating a handle has no preconditions.
@@ -915,7 +923,7 @@ mod tests {
 
     #[test]
     fn looks_next_to_the_configured_player_first() {
-        let list = candidates(Some(r"C:\Tools\mpv\mpv.exe"));
+        let list = candidates(Some(r"C:\Tools\mpv\mpv.exe"), None);
         let first = list
             .iter()
             .position(|path| path.ends_with("libmpv-2.dll") && path.starts_with(r"C:\Tools\mpv"));
@@ -926,7 +934,11 @@ mod tests {
         if let (Some(first), Some(stremio)) = (first, stremio) {
             assert!(first < stremio);
         }
-        assert!(candidates(Some("  ")).iter().all(|p| !p.starts_with("  ")));
+        assert!(
+            candidates(Some("  "), None)
+                .iter()
+                .all(|p| !p.starts_with("  "))
+        );
     }
 
     #[test]

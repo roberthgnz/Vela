@@ -2,6 +2,7 @@ import type { Episode, MediaItem, ResolvedStream, Subtitle } from "../../lib/con
 import { episodeCode } from "../../lib/episodes";
 import { t } from "../../lib/i18n";
 import { languageLabel, normalizeLanguage } from "../../lib/languages";
+import { requestRange } from "../../lib/transport";
 
 /** Everything the player needs to play one video. */
 export type Playing = {
@@ -13,10 +14,11 @@ export type Playing = {
   /** Original URL and headers for an external player. */
   externalUrl: string;
   headers?: Record<string, string>;
+  mediaProxy?: string;
   /** HLS conversion through Stremio Service, when available. */
   transcodeUrl?: string;
-  /** Switch to the conversion if Stremio Service finds a track WebView2 cannot decode. */
-  convertIfNeeded?: boolean;
+  /** Why the built-in player cannot open the file, known before trying (see `PlaybackTarget`). */
+  unsupported?: string[];
   serviceUrl: string;
   resume: number;
   episode?: Episode;
@@ -28,6 +30,8 @@ export type Playing = {
   fileSize?: number;
   /** Play with mpv inside Vela's window instead of the built-in player. */
   embedded?: boolean;
+  /** Enable mpv's embedded subtitles when explicitly requested from the track panel. */
+  embeddedSubtitlesAuto?: boolean;
   /** The file on disk, for downloads (mpv opens it directly). */
   filePath?: string;
 };
@@ -79,6 +83,27 @@ export function mediaErrorMessage(error: MediaError | null): string {
       return t("player.error.unsupported");
     default:
       return t("player.error.generic");
+  }
+}
+
+/**
+ * Why a source cannot be read at all (an HTTP error, no connection), asking it for its first
+ * byte; undefined when it answers (then the problem is the format) or cannot be asked (the
+ * browser build, files on disk). The desktop transport words its failures as below.
+ */
+export async function sourceProblem(
+  url: string,
+  read: (url: string, start: number, length: number) => Promise<unknown> = requestRange,
+): Promise<string | undefined> {
+  try {
+    await read(url, 0, 1);
+    return undefined;
+  } catch (cause) {
+    const text = cause instanceof Error ? cause.message : String(cause);
+    const status = /HTTP (\d{3})/.exec(text)?.[1];
+    if (status) return t("player.error.http", { status });
+    if (/No se pudo conectar|no respondió a tiempo/i.test(text)) return t("player.error.unreachable");
+    return undefined;
   }
 }
 

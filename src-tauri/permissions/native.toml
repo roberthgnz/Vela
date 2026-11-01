@@ -1,4 +1,9 @@
 [[permission]]
+identifier = "allow-media-proxy"
+description = "Prepare and stop the one-source local header proxy used by the built-in player."
+commands.allow = ["media_proxy_start", "media_proxy_stop"]
+
+[[permission]]
 identifier = "allow-native-transport"
 description = "Allow the main window to request addon and account data, keep its Stremio session in the OS credential store, explicitly launch links or a configured player (and tell which kind it is and send it subtitle URLs found after it started), and check for and install signed updates."
 commands.allow = ["request_json", "post_json", "request_text", "request_bytes", "request_range", "open_external", "launch_external_player", "external_player_kind", "external_player_subtitles", "secret_get", "secret_set", "secret_delete", "update_check", "update_install"]
@@ -30,8 +35,8 @@ commands.allow = ["torrent_warm", "torrent_prepare", "torrent_stats", "torrent_r
 
 [[permission]]
 identifier = "allow-embedded-mpv"
-description = "Allow the main window to play a source with the libmpv already installed on the machine (Stremio's or next to mpv.exe), drawn in a child window over the video area, to place, focus, pause and close it, and to add subtitle URLs found after it opened."
-commands.allow = ["mpv_embedded_library", "mpv_embedded_open", "mpv_embedded_place", "mpv_embedded_focus", "mpv_embedded_command", "mpv_embedded_subtitles", "mpv_embedded_close"]
+description = "Allow the main window to play a source with a libmpv on the machine (next to mpv.exe, Stremio's, or the one Vela downloaded), drawn in a child window over the video area, to place, focus, pause and close it, and to add subtitle URLs found after it opened. It may also download the pinned LGPL libmpv build (checked against its SHA-256) into Vela's own data folder, cancel that download and delete it."
+commands.allow = ["mpv_embedded_library", "mpv_embedded_open", "mpv_embedded_place", "mpv_embedded_focus", "mpv_embedded_command", "mpv_embedded_subtitles", "mpv_embedded_close", "mpv_install_info", "mpv_install", "mpv_install_cancel", "mpv_uninstall"]
 
 [[permission]]
 identifier = "allow-desktop-integration"

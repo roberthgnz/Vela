@@ -1,13 +1,15 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { t } from "./i18n";
 import { normalizeLanguage } from "./languages";
 import { storage } from "./storage";
 import { preferencesStore } from "./store";
 
 /**
- * mpv inside Vela's window (`embedded_mpv.rs`), using a libmpv that is already installed
- * (Stremio's, or one next to mpv.exe). It plays what WebView2 cannot decode. The built-in player
+ * mpv inside Vela's window (`embedded_mpv.rs`), using a libmpv that is already on the machine
+ * (one next to mpv.exe, Stremio's, or the LGPL build Vela downloads on request, `libmpv.rs`).
+ * It plays what WebView2 cannot decode. The built-in player
  * stays the default; «mpv integrado» can be chosen in Settings or from the player's error panel.
  */
 export type VideoPlayer = "builtin" | "mpv";
@@ -50,20 +52,74 @@ export function embeddedLibrary(): Promise<string | null> {
   return library;
 }
 
+const libraryListeners = new Set<() => void>();
+
+/** The libmpv on the machine may have changed (a download, a removal, another player path). */
 export function forgetEmbeddedLibrary() {
   library = undefined;
+  for (const listener of [...libraryListeners]) listener();
 }
 
 export function useEmbeddedLibrary(): string | null | undefined {
   const [value, setValue] = useState<string | null | undefined>(undefined);
+  const [generation, setGeneration] = useState(0);
+  useEffect(() => {
+    const changed = () => setGeneration((count) => count + 1);
+    libraryListeners.add(changed);
+    return () => {
+      libraryListeners.delete(changed);
+    };
+  }, []);
   useEffect(() => {
     let active = true;
     void embeddedLibrary().then((found) => active && setValue(found));
     return () => {
       active = false;
     };
-  }, []);
+  }, [generation]);
   return value;
+}
+
+/** The libmpv build Vela can download (`mpv_install_info`), and the one it already did. */
+export type LibmpvInfo = { version: string; size: number; license: string; source: string; path: string | null };
+
+export type LibmpvProgress = { stage: "download" | "unpack" | "check"; downloaded: number; total: number };
+
+export function libmpvInfo(): Promise<LibmpvInfo | null> {
+  if (!isTauri()) return Promise.resolve(null);
+  return invoke<LibmpvInfo>("mpv_install_info").catch(() => null);
+}
+
+function failure(error: unknown): Error {
+  return new Error(typeof error === "string" ? error : error instanceof Error ? error.message : t("mpv.install.unknown"));
+}
+
+/** Downloads the pinned libmpv (checked against its SHA-256) and resolves with where it is. */
+export async function installLibmpv(onProgress: (progress: LibmpvProgress) => void): Promise<string> {
+  const unlisten = await listen<LibmpvProgress>("mpv-install", (event) => onProgress(event.payload));
+  try {
+    return await invoke<string>("mpv_install").catch((error: unknown) => {
+      throw failure(error);
+    });
+  } finally {
+    unlisten();
+    forgetEmbeddedLibrary();
+  }
+}
+
+export function cancelLibmpvInstall(): void {
+  void invoke("mpv_install_cancel").catch(() => {});
+}
+
+/** Deletes the libmpv Vela downloaded (never Stremio's or mpv's own). */
+export async function removeLibmpv(): Promise<void> {
+  try {
+    await invoke("mpv_uninstall").catch((error: unknown) => {
+      throw failure(error);
+    });
+  } finally {
+    forgetEmbeddedLibrary();
+  }
 }
 
 /** Whether the next playback should go to mpv: chosen in Settings and a libmpv is available. */

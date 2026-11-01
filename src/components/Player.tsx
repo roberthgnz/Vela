@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   ArrowLeft,
   Captions,
@@ -23,7 +30,12 @@ import { externalPlayerName, playExternally } from "../lib/externalPlayback";
 import { formatNumber, t } from "../lib/i18n";
 import { log } from "../lib/log";
 import { readMkvChapters, type Chapter } from "../lib/mkvChapters";
-import { activeSegment, skipMarks, skipSegments, useSeriesMarks } from "../lib/skipSegments";
+import {
+  activeSegment,
+  skipMarks,
+  skipSegments,
+  useSeriesMarks,
+} from "../lib/skipSegments";
 import { storage } from "../lib/storage";
 import { preferencesStore, usePreferences } from "../lib/store";
 import {
@@ -39,12 +51,26 @@ import {
 import { streamQuality } from "../lib/streams";
 import { releaseVelaTorrent } from "../lib/torrentEngine";
 import { useEmbeddedLibrary } from "../lib/embeddedMpv";
+import { LibmpvInstall } from "./LibmpvInstall";
 import { requestRange } from "../lib/transport";
 import { clock, errorMessage, safeImage } from "../lib/utils";
 import { Dialog } from "./Primitives";
-import { native, setFullscreen, useWindowState, WindowControls } from "./WindowControls";
+import {
+  native,
+  setFullscreen,
+  useWindowState,
+  WindowControls,
+} from "./WindowControls";
 import { SpeedPanel, TrackPanel } from "./player/panels";
-import { episodeText, mediaErrorMessage, stepSpeed, volumeKey, type Playing, type Status } from "./player/shared";
+import {
+  episodeText,
+  mediaErrorMessage,
+  sourceProblem,
+  stepSpeed,
+  volumeKey,
+  type Playing,
+  type Status,
+} from "./player/shared";
 import { handleShortcut, usePlayerShortcuts } from "./player/shortcuts";
 import { useAudioTracks } from "./player/useAudioTracks";
 import { useMediaSource } from "./player/useMediaSource";
@@ -66,9 +92,16 @@ function CoverArt({ meta }: { meta: MediaItem }) {
   const logo = logoFailed ? undefined : safeImage(meta.logo);
   return (
     <>
-      {background && <img className="player-cover-art" src={background} alt="" />}
+      {background && (
+        <img className="player-cover-art" src={background} alt="" />
+      )}
       {logo ? (
-        <img className="player-cover-logo" src={logo} alt={meta.name} onError={() => setLogoFailed(true)} />
+        <img
+          className="player-cover-logo"
+          src={logo}
+          alt={meta.name}
+          onError={() => setLogoFailed(true)}
+        />
       ) : (
         <strong className="player-cover-name">{meta.name}</strong>
       )}
@@ -77,22 +110,42 @@ function CoverArt({ meta }: { meta: MediaItem }) {
 }
 
 /** The player while Vela resolves the source (torrent metadata, probing): only its cover. */
-export function PreparingPlayer({ meta, episode, onClose }: { meta: MediaItem; episode?: Episode; onClose: () => void }) {
+export function PreparingPlayer({
+  meta,
+  episode,
+  onClose,
+}: {
+  meta: MediaItem;
+  episode?: Episode;
+  onClose: () => void;
+}) {
   const { fullscreen } = useWindowState();
   return (
-    <Dialog title={t("player.preparingTitle", { name: meta.name })} onClose={onClose} className="player-dialog preparing" hideClose>
+    <Dialog
+      title={t("player.preparingTitle", { name: meta.name })}
+      onClose={onClose}
+      className="player-dialog preparing"
+      hideClose
+    >
       <div className="player" data-status="loading">
         <div className="player-loading cover" role="status">
           <CoverArt meta={meta} />
           <span>{t("player.preparingSource")}</span>
         </div>
         <div className="player-top" data-tauri-drag-region>
-          <button className="player-icon" aria-label={t("common.back")} title={t("player.backTitle")} onClick={onClose}>
+          <button
+            className="player-icon"
+            aria-label={t("common.back")}
+            title={t("player.backTitle")}
+            onClick={onClose}
+          >
             <ArrowLeft size={20} />
           </button>
           <div className="player-title" data-tauri-drag-region>
             <strong data-tauri-drag-region>{meta.name}</strong>
-            {episode && <span data-tauri-drag-region>{episodeText(episode)}</span>}
+            {episode && (
+              <span data-tauri-drag-region>{episodeText(episode)}</span>
+            )}
           </div>
           {!fullscreen && <WindowControls onError={() => undefined} />}
         </div>
@@ -124,7 +177,7 @@ export function Player({
   onStarted?: () => void;
   onFailed?: (message: string) => void;
   /** Switch this source to mpv inside Vela's window, from the given position. */
-  onEmbedded?: (time: number) => void;
+  onEmbedded?: (time: number, subtitles?: boolean) => void;
 }) {
   const prefs = usePreferences();
   const embeddedLibrary = useEmbeddedLibrary();
@@ -147,15 +200,26 @@ export function Player({
   const [muted, setMuted] = useState(false);
   const [rate, setRate] = useState(1);
   const [error, setError] = useState("");
+  /** The source answered with an HTTP error or not at all: no other player would do better. */
+  const [sourceDown, setSourceDown] = useState(false);
+  /** Why the built-in player cannot decode this file, when there is no conversion (see below). */
+  const [unsupported, setUnsupported] = useState<string[]>();
+  /** A file that plays but not fully (its picture without sound): mpv is offered without stopping it. */
+  const [mpvHint, setMpvHint] = useState("");
   const [notice, setNotice] = useState("");
   const [externalBusy, setExternalBusy] = useState(false);
   /** The open popover (audio and subtitles, or speed), aligned with the button that opened it. */
-  const [popover, setPopover] = useState<{ kind: "tracks" | "speed"; right: number } | null>(null);
+  const [popover, setPopover] = useState<{
+    kind: "tracks" | "speed";
+    right: number;
+  } | null>(null);
   const openPopover = (kind: "tracks" | "speed", button: HTMLElement) =>
     setPopover((current) => {
       if (current?.kind === kind) return null;
       const box = surface.current?.getBoundingClientRect();
-      const right = box ? Math.max(12, box.right - button.getBoundingClientRect().right) : 12;
+      const right = box
+        ? Math.max(12, box.right - button.getBoundingClientRect().right)
+        : 12;
       return { kind, right };
     });
   const [hover, setHover] = useState<{ x: number; time: number } | null>(null);
@@ -166,10 +230,14 @@ export function Player({
   const [begun, setBegun] = useState(false);
   const seriesId = playing.meta.type === "series" ? playing.meta.id : "";
   const marks = useSeriesMarks(seriesId);
-  const next = useMemo(() => nextEpisode(playing.meta, playing.videoId), [playing.meta, playing.videoId]);
+  const next = useMemo(
+    () => nextEpisode(playing.meta, playing.videoId),
+    [playing.meta, playing.videoId],
+  );
   const episodeLine = episodeText(playing.episode);
 
-  const { idle, setIdle, flash, showFlash, pulse, showPulse, wake } = useOverlay(video);
+  const { idle, setIdle, flash, showFlash, pulse, showPulse, wake } =
+    useOverlay(video);
   const progress = useWatchProgress(playing, next, video);
   const media = useMediaSource({
     playing,
@@ -182,8 +250,22 @@ export function Player({
       showFlash(t("player.switchingToConversion"));
     },
     onHlsAudioSwitched: (key) => audio.setAudioKey(key),
+    onUnsupported: setUnsupported,
   });
-  const { source, converting, convertedBecause, usingHls, probe, hls, pending, resumeAt, mount, hlsAudio, hlsSubtitles, switchToConversion } = media;
+  const {
+    source,
+    converting,
+    convertedBecause,
+    usingHls,
+    probe,
+    hls,
+    pending,
+    resumeAt,
+    mount,
+    hlsAudio,
+    hlsSubtitles,
+    switchToConversion,
+  } = media;
   const audio = useAudioTracks({
     video,
     hls,
@@ -198,6 +280,39 @@ export function Player({
     switchToConversion,
   });
   const { audioTracks, audioKey, chooseAudio } = audio;
+
+  // Without a conversion, a file the built-in player cannot decode goes to embedded mpv, from where
+  // it was, when the machine has a libmpv; otherwise the error panel offers to download one.
+  const onEmbeddedRef = useRef(onEmbedded);
+  onEmbeddedRef.current = onEmbedded;
+  const handedToMpv = useRef(false);
+  useEffect(() => {
+    if (
+      !unsupported?.length ||
+      embeddedLibrary === undefined ||
+      handedToMpv.current
+    )
+      return;
+    const problems = unsupported.join(", ");
+    if (embeddedLibrary && onEmbeddedRef.current) {
+      handedToMpv.current = true;
+      log.info(
+        `player: built-in player cannot decode (${problems}), switching to embedded mpv`,
+      );
+      onEmbeddedRef.current(
+        video.current && video.current.currentTime > 0
+          ? video.current.currentTime
+          : resumeAt.current,
+      );
+    } else if (started.current) setMpvHint(problems);
+    else setError(t("player.needsMpv", { problems }));
+  }, [embeddedLibrary, resumeAt, unsupported]);
+
+  /** Where mpv starts when the user switches to it: the position, or the saved one before playing. */
+  const mpvStart = () =>
+    video.current && video.current.currentTime > 0
+      ? video.current.currentTime
+      : resumeAt.current;
   const subs = useSubtitles({
     video,
     hls,
@@ -212,7 +327,18 @@ export function Player({
     setNotice,
     showFlash,
   });
-  const { subtitleTracks, subtitleKey, activeSubtitle, cues, shown, delay, subtitleBusy, chooseSubtitle, changeDelay, cycleSubtitles } = subs;
+  const {
+    subtitleTracks,
+    subtitleKey,
+    activeSubtitle,
+    cues,
+    shown,
+    delay,
+    subtitleBusy,
+    chooseSubtitle,
+    changeDelay,
+    cycleSubtitles,
+  } = subs;
 
   /* ---------- Intro and credits ---------- */
 
@@ -223,7 +349,9 @@ export function Player({
     if (!begun) return;
     const controller = new AbortController();
     setChapters([]);
-    readMkvChapters((start, length) => requestRange(playing.url, start, length, controller.signal))
+    readMkvChapters((start, length) =>
+      requestRange(playing.url, start, length, controller.signal),
+    )
       .then((list) => !controller.signal.aborted && setChapters(list))
       .catch(() => {
         /* No chapters: files that are not MKV, servers without ranges, the browser build. */
@@ -246,7 +374,8 @@ export function Player({
   }, [volume, muted]);
 
   useEffect(() => {
-    const update = () => setBrowserFullscreen(Boolean(document.fullscreenElement));
+    const update = () =>
+      setBrowserFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", update);
     return () => {
       document.removeEventListener("fullscreenchange", update);
@@ -254,14 +383,27 @@ export function Player({
     };
   }, []);
 
+  // Reported once per message. The callback is read from a ref: the parent passes a new one on
+  // every render, and recording the failure re-renders it (the storage status changes), so
+  // depending on the callback reported again and again in a loop that froze the window.
+  const onFailedRef = useRef(onFailed);
+  onFailedRef.current = onFailed;
   useEffect(() => {
-    if (error && !started.current) onFailed?.(error);
-  }, [error, onFailed]);
+    if (error && !started.current) onFailedRef.current?.(error);
+  }, [error]);
 
   const waiting = status === "loading" || status === "buffering";
   const slow = useSlowWait(waiting, waitingSince);
-  const infoHash = playing.stream.infoHash && !playing.stream.url ? playing.stream.infoHash : undefined;
-  const { swarm, starved } = useTorrentSwarm(infoHash, playing.serviceUrl, waiting, playing.torrentEngine);
+  const infoHash =
+    playing.stream.infoHash && !playing.stream.url
+      ? playing.stream.infoHash
+      : undefined;
+  const { swarm, starved } = useTorrentSwarm(
+    infoHash,
+    playing.serviceUrl,
+    waiting,
+    playing.torrentEngine,
+  );
   // Vela's engine deletes a torrent once the player is done with it (after a grace period).
   useEffect(() => {
     if (!infoHash || playing.torrentEngine !== "vela") return;
@@ -271,23 +413,40 @@ export function Player({
   // On Stremio's engine, a file whose bitrate (its size over the duration the inspection found)
   // is above the download limit of the server's torrent profile stops to load again and again:
   // the faster profile is offered.
-  const [profileHint, setProfileHint] = useState<{ profile: TorrentProfile; current: TorrentProfile; rate: number }>();
+  const [profileHint, setProfileHint] = useState<{
+    profile: TorrentProfile;
+    current: TorrentProfile;
+    rate: number;
+  }>();
   const probedDuration = probe?.format.duration;
   useEffect(() => {
-    if (!infoHash || playing.torrentEngine !== "service" || !playing.fileSize || !probedDuration || probedDuration <= 0)
+    if (
+      !infoHash ||
+      playing.torrentEngine !== "service" ||
+      !playing.fileSize ||
+      !probedDuration ||
+      probedDuration <= 0
+    )
       return;
     const rate = playing.fileSize / probedDuration;
     let active = true;
     void torrentProfile(playing.serviceUrl)
       .then((current) => {
         const profile = suggestedProfile(current, rate);
-        if (active && current && profile) setProfileHint({ profile, current, rate });
+        if (active && current && profile)
+          setProfileHint({ profile, current, rate });
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, [infoHash, playing.fileSize, playing.serviceUrl, playing.torrentEngine, probedDuration]);
+  }, [
+    infoHash,
+    playing.fileSize,
+    playing.serviceUrl,
+    playing.torrentEngine,
+    probedDuration,
+  ]);
   const applyProfile = async (profile: TorrentProfile) => {
     setProfileHint(undefined);
     const name = torrentProfiles[profile].label;
@@ -298,7 +457,11 @@ export function Player({
       // there the profile applies to the next one.
       if (infoHash && !converting) {
         await removeTorrent(playing.serviceUrl, infoHash);
-        await prepareTorrent(playing.serviceUrl, playing.stream, playing.episode);
+        await prepareTorrent(
+          playing.serviceUrl,
+          playing.stream,
+          playing.episode,
+        );
         media.reload();
         showFlash(t("player.profile.applied", { name }));
       } else setNotice(t("player.profile.nextTime", { name }));
@@ -337,14 +500,18 @@ export function Player({
     const element = video.current;
     if (!element) return;
     const kind = element.paused || element.ended ? "play" : "pause";
-    if (kind === "play") void element.play().catch(() => setNotice(t("player.pressPlay")));
+    if (kind === "play")
+      void element.play().catch(() => setNotice(t("player.pressPlay")));
     else element.pause();
     showPulse(kind);
   };
   const seekBy = (seconds: number) => {
     const element = video.current;
     if (!element || !Number.isFinite(element.duration)) return;
-    element.currentTime = Math.max(0, Math.min(element.duration, element.currentTime + seconds));
+    element.currentTime = Math.max(
+      0,
+      Math.min(element.duration, element.currentTime + seconds),
+    );
     showFlash(`${seconds > 0 ? "+" : "−"}${Math.abs(seconds)} s`);
     wake();
   };
@@ -352,10 +519,14 @@ export function Player({
     const nextVolume = Math.max(0, Math.min(1, Math.round(value * 100) / 100));
     setVolume(nextVolume);
     setMuted(nextVolume === 0);
-    showFlash(t("player.volumeFlash", { percent: Math.round(nextVolume * 100) }));
+    showFlash(
+      t("player.volumeFlash", { percent: Math.round(nextVolume * 100) }),
+    );
   };
   const toggleFullscreen = () =>
-    void setFullscreen(surface.current, !fullscreen).catch(() => setNotice(t("player.fullscreenFailed")));
+    void setFullscreen(surface.current, !fullscreen).catch(() =>
+      setNotice(t("player.fullscreenFailed")),
+    );
   const external = async () => {
     setExternalBusy(true);
     try {
@@ -369,7 +540,11 @@ export function Player({
         stream: playing.stream,
       });
       video.current?.pause();
-      showFlash(launch.ipc ? t("player.openedIn", { player: externalPlayerName(launch) }) : t("player.openedExternal"));
+      showFlash(
+        launch.ipc
+          ? t("player.openedIn", { player: externalPlayerName(launch) })
+          : t("player.openedExternal"),
+      );
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -383,25 +558,39 @@ export function Player({
 
   const percent = duration ? (time / duration) * 100 : 0;
   const quality = streamQuality(playing.stream);
-  const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  const VolumeIcon =
+    muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const remaining = duration - time;
-  const segments = useMemo(() => skipSegments(chapters, marks, duration), [chapters, duration, marks]);
+  const segments = useMemo(
+    () => skipSegments(chapters, marks, duration),
+    [chapters, duration, marks],
+  );
   const segment = activeSegment(segments, time);
   const inCredits = segment?.kind === "credits";
   const showNext = Boolean(
     next &&
-      onNext &&
-      !nextDismissed &&
-      !error &&
-      (status === "ended" || inCredits || (duration > 120 && remaining <= 30 && remaining > 0)),
+    onNext &&
+    !nextDismissed &&
+    !error &&
+    (status === "ended" ||
+      inCredits ||
+      (duration > 120 && remaining <= 30 && remaining > 0)),
   );
   // With a next episode, its card is how credits are skipped; otherwise a button jumps past them.
-  const skip = segment && !(inCredits && showNext) && !error ? segment : undefined;
+  const skip =
+    segment && !(inCredits && showNext) && !error ? segment : undefined;
   const skipSegment = () => {
     const element = video.current;
     if (!element || !skip) return;
-    element.currentTime = Math.min(skip.end, Number.isFinite(element.duration) ? element.duration : skip.end);
-    showFlash(skip.kind === "intro" ? t("player.introSkipped") : t("player.creditsSkipped"));
+    element.currentTime = Math.min(
+      skip.end,
+      Number.isFinite(element.duration) ? element.duration : skip.end,
+    );
+    showFlash(
+      skip.kind === "intro"
+        ? t("player.introSkipped")
+        : t("player.creditsSkipped"),
+    );
     wake();
   };
 
@@ -428,7 +617,11 @@ export function Player({
         seekBy,
         volumeBy: (delta) => changeVolume((muted ? 0 : volume) + delta),
         toggleMute: () => {
-          showFlash(muted ? t("player.volumeFlash", { percent: Math.round(volume * 100) }) : t("player.muted"));
+          showFlash(
+            muted
+              ? t("player.volumeFlash", { percent: Math.round(volume * 100) })
+              : t("player.muted"),
+          );
           setMuted((value) => !value);
         },
         toStart: () => {
@@ -441,7 +634,11 @@ export function Player({
         },
         // Frame by frame while paused (about 24 frames per second).
         frameStep: (direction) => {
-          if (element) element.currentTime = Math.max(0, element.currentTime + direction / 24);
+          if (element)
+            element.currentTime = Math.max(
+              0,
+              element.currentTime + direction / 24,
+            );
         },
         speedStep: (direction) => {
           const nextRate = stepSpeed(rate, direction);
@@ -452,7 +649,9 @@ export function Player({
         cycleSubtitles,
         delayBy: (seconds) => changeDelay(delay + seconds),
         cycleAudio: () => {
-          const index = audioTracks.findIndex((track) => track.key === audioKey);
+          const index = audioTracks.findIndex(
+            (track) => track.key === audioKey,
+          );
           const nextTrack = audioTracks[(index + 1) % audioTracks.length];
           chooseAudio(nextTrack);
           showFlash(t("player.audioFlash", { track: nextTrack.label }));
@@ -476,8 +675,14 @@ export function Player({
     "--subtitle-color": settings.subtitleColor,
   } as CSSProperties;
   const busy = status === "loading" || status === "buffering";
+  const canConvert = Boolean(playing.transcodeUrl && !converting);
   return (
-    <Dialog title={t("player.playingTitle", { name: playing.meta.name })} onClose={close} className="player-dialog" hideClose>
+    <Dialog
+      title={t("player.playingTitle", { name: playing.meta.name })}
+      onClose={close}
+      className="player-dialog"
+      hideClose
+    >
       <div
         ref={surface}
         className={`player ${idle && status === "playing" && !popover ? "idle" : ""}`}
@@ -495,9 +700,15 @@ export function Player({
             const element = event.currentTarget;
             element.volume = volume;
             element.playbackRate = rate;
-            setDuration(Number.isFinite(element.duration) ? element.duration : 0);
+            setDuration(
+              Number.isFinite(element.duration) ? element.duration : 0,
+            );
             const resumeTo = resumeAt.current;
-            if (resumeTo > 0 && (!Number.isFinite(element.duration) || resumeTo < element.duration - 10)) {
+            if (
+              resumeTo > 0 &&
+              (!Number.isFinite(element.duration) ||
+                resumeTo < element.duration - 10)
+            ) {
               element.currentTime = resumeTo;
               if (resumeTo === playing.resume && !converting) {
                 setResumed(true);
@@ -506,13 +717,20 @@ export function Player({
             }
           }}
           onDurationChange={(event) =>
-            setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)
+            setDuration(
+              Number.isFinite(event.currentTarget.duration)
+                ? event.currentTarget.duration
+                : 0,
+            )
           }
           onProgress={(event) => {
             const element = event.currentTarget;
             const ranges = element.buffered;
             for (let index = 0; index < ranges.length; index++)
-              if (ranges.start(index) <= element.currentTime && ranges.end(index) >= element.currentTime)
+              if (
+                ranges.start(index) <= element.currentTime &&
+                ranges.end(index) >= element.currentTime
+              )
                 setBuffered(ranges.end(index));
           }}
           onTimeUpdate={(event) => {
@@ -529,18 +747,25 @@ export function Player({
               onStarted?.();
             }
             setStatus("playing");
-            setNotice((value) => (value === t("player.pressPlay") ? "" : value));
+            setNotice((value) =>
+              value === t("player.pressPlay") ? "" : value,
+            );
           }}
           onPause={(event) => {
             const element = event.currentTarget;
             if (element.ended) return;
-            setStatus((value) => (value === "loading" && element.readyState < 3 ? value : "paused"));
+            setStatus((value) =>
+              value === "loading" && element.readyState < 3 ? value : "paused",
+            );
             setIdle(false);
             progress.save(element);
           }}
           onCanPlay={(event) => {
             // Ready is reported only when playback actually starts; a blocked autoplay stays paused.
-            if (event.currentTarget.paused) setStatus((value) => (value === "loading" || value === "buffering" ? "paused" : value));
+            if (event.currentTarget.paused)
+              setStatus((value) =>
+                value === "loading" || value === "buffering" ? "paused" : value,
+              );
           }}
           onWaiting={() => {
             setStatus((value) => (value === "loading" ? value : "buffering"));
@@ -554,34 +779,64 @@ export function Player({
           }}
           onError={(event) => {
             const mediaError = event.currentTarget.error;
-            log.warn(`player: media error code ${mediaError?.code ?? "?"}`, mediaError?.message || undefined);
+            log.warn(
+              `player: media error code ${mediaError?.code ?? "?"}`,
+              mediaError?.message || undefined,
+            );
             setError(mediaErrorMessage(mediaError));
+            // "Not supported" and network errors are also what a dead link gives: ask the source,
+            // so the panel does not offer other players for a file that is not there.
+            const code = mediaError?.code;
+            if ((code === 2 || code === 4) && !playing.headers && !converting)
+              void sourceProblem(playing.url).then((message) => {
+                if (!message) return;
+                setSourceDown(true);
+                setError(message);
+              });
           }}
           onClick={() => (popover ? setPopover(null) : toggle())}
           onDoubleClick={toggleFullscreen}
         />
         {shown.length > 0 && (
-          <div className="player-subtitles" style={subtitleStyle} aria-live="off">
+          <div
+            className="player-subtitles"
+            style={subtitleStyle}
+            aria-live="off"
+          >
             {(["top", "bottom"] as const).map((place) => {
-              const lines = shown.filter((cue) => Boolean(cue.top) === (place === "top"));
+              const lines = shown.filter(
+                (cue) => Boolean(cue.top) === (place === "top"),
+              );
               return lines.length ? (
                 <div className={`player-subtitle ${place}`} key={place}>
-                  {lines.flatMap((cue) => cue.text.split("\n")).map((line, index) => (
-                    <span key={index}>{line}</span>
-                  ))}
+                  {lines
+                    .flatMap((cue) => cue.text.split("\n"))
+                    .map((line, index) => (
+                      <span key={index}>{line}</span>
+                    ))}
                 </div>
               ) : null;
             })}
           </div>
         )}
         <div className="player-top" data-tauri-drag-region>
-          <button className="player-icon" aria-label={t("common.back")} title={t("player.backTitle")} onClick={close}>
+          <button
+            className="player-icon"
+            aria-label={t("common.back")}
+            title={t("player.backTitle")}
+            onClick={close}
+          >
             <ArrowLeft size={20} />
           </button>
           <div className="player-title" data-tauri-drag-region>
             <strong data-tauri-drag-region>{playing.meta.name}</strong>
             <span data-tauri-drag-region>
-              {[episodeLine, playing.stream.addonName, quality, converting && t("player.convertedByService")]
+              {[
+                episodeLine,
+                playing.stream.addonName,
+                quality,
+                converting && t("player.convertedByService"),
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
@@ -589,22 +844,28 @@ export function Player({
           {!fullscreen && <WindowControls onError={setNotice} />}
         </div>
         {busy && !error && (
-          <div className={`player-loading${status === "loading" ? " cover" : ""}`} role="status">
-            {status === "loading" ? <CoverArt meta={playing.meta} /> : <LoaderCircle className="spin" size={34} strokeWidth={1.5} />}
+          <div
+            className={`player-loading${status === "loading" ? " cover" : ""}`}
+            role="status"
+          >
+            {status === "loading" ? (
+              <CoverArt meta={playing.meta} />
+            ) : (
+              <LoaderCircle className="spin" size={34} strokeWidth={1.5} />
+            )}
             <span>
               {status === "buffering"
                 ? t("player.loadingMore")
                 : converting
                   ? convertedBecause
-                    ? t("lib.playback.converting", { problems: convertedBecause.join(", ") })
+                    ? t("lib.playback.converting", {
+                        problems: convertedBecause.join(", "),
+                      })
                     : t("player.converting")
                   : playing.note || t("player.loading")}
             </span>
             {swarm && (
-              <span
-                className="player-swarm"
-                title={t("player.swarmHint")}
-              >
+              <span className="player-swarm" title={t("player.swarmHint")}>
                 {describeTorrent(swarm.stats)}
               </span>
             )}
@@ -612,7 +873,10 @@ export function Player({
               <div className="player-slow">
                 <p>
                   {starved
-                    ? t("player.torrentStarved", { unchoked: swarm!.stats.unchoked, peers: swarm!.stats.peers })
+                    ? t("player.torrentStarved", {
+                        unchoked: swarm!.stats.unchoked,
+                        peers: swarm!.stats.peers,
+                      })
                     : t("player.slowSource")}
                 </p>
                 <div>
@@ -622,11 +886,18 @@ export function Player({
                     </button>
                   )}
                   {playing.transcodeUrl && !converting && !infoHash && (
-                    <button className="button small subtle" onClick={() => switchToConversion({})}>
+                    <button
+                      className="button small subtle"
+                      onClick={() => switchToConversion({})}
+                    >
                       {t("player.tryService")}
                     </button>
                   )}
-                  <button className="button small subtle" disabled={externalBusy} onClick={() => void external()}>
+                  <button
+                    className="button small subtle"
+                    disabled={externalBusy}
+                    onClick={() => void external()}
+                  >
                     {t("player.openExternal")}
                   </button>
                 </div>
@@ -634,35 +905,74 @@ export function Player({
             )}
           </div>
         )}
-        {flash && <div className="player-flash" aria-live="polite">{flash}</div>}
+        {flash && (
+          <div className="player-flash" aria-live="polite">
+            {flash}
+          </div>
+        )}
         {pulse && (
           <div className="player-pulse" key={pulse.id} aria-hidden="true">
-            {pulse.kind === "play" ? <Play size={34} fill="currentColor" /> : <Pause size={34} fill="currentColor" />}
+            {pulse.kind === "play" ? (
+              <Play size={34} fill="currentColor" />
+            ) : (
+              <Pause size={34} fill="currentColor" />
+            )}
           </div>
         )}
         {notice && !error && (
           <div className="player-notice" role="status">
             <span>{notice}</span>
-            <button className="button small subtle" onClick={() => setNotice("")}>
+            <button
+              className="button small subtle"
+              onClick={() => setNotice("")}
+            >
               {t("common.close")}
             </button>
           </div>
         )}
-        {profileHint && !notice && !error && (
+        {mpvHint && !notice && !error && (
+          <div className="player-notice" role="status">
+            <span>{t("player.mpvHint", { problems: mpvHint })}</span>
+            {embeddedLibrary === null && onEmbedded && (
+              <LibmpvInstall play onDone={() => onEmbedded(mpvStart())} />
+            )}
+            <button
+              className="button small subtle"
+              onClick={() => setMpvHint("")}
+            >
+              {t("common.close")}
+            </button>
+          </div>
+        )}
+        {profileHint && !notice && !error && !mpvHint && (
           <div className="player-notice" role="status">
             <span>
               {t("player.profile.suggest", {
-                needed: formatNumber(profileHint.rate / 1048576, { maximumFractionDigits: 1 }),
-                profile: torrentProfiles[profileHint.current].label,
-                limit: formatNumber(torrentProfiles[profileHint.current].values.btDownloadSpeedHardLimit / 1048576, {
+                needed: formatNumber(profileHint.rate / 1048576, {
                   maximumFractionDigits: 1,
                 }),
+                profile: torrentProfiles[profileHint.current].label,
+                limit: formatNumber(
+                  torrentProfiles[profileHint.current].values
+                    .btDownloadSpeedHardLimit / 1048576,
+                  {
+                    maximumFractionDigits: 1,
+                  },
+                ),
               })}
             </span>
-            <button className="button small" onClick={() => void applyProfile(profileHint.profile)}>
-              {t("player.profile.use", { name: torrentProfiles[profileHint.profile].label })}
+            <button
+              className="button small"
+              onClick={() => void applyProfile(profileHint.profile)}
+            >
+              {t("player.profile.use", {
+                name: torrentProfiles[profileHint.profile].label,
+              })}
             </button>
-            <button className="button small subtle" onClick={() => setProfileHint(undefined)}>
+            <button
+              className="button small subtle"
+              onClick={() => setProfileHint(undefined)}
+            >
               {t("common.close")}
             </button>
           </div>
@@ -682,24 +992,40 @@ export function Player({
           </div>
         )}
         {skip && (
-          <button className="button player-skip" onClick={skipSegment} aria-keyshortcuts="S">
-            <SkipForward size={15} /> {skip.kind === "intro" ? t("player.skipIntro") : t("player.skipCredits")}
+          <button
+            className="button player-skip"
+            onClick={skipSegment}
+            aria-keyshortcuts="S"
+          >
+            <SkipForward size={15} />{" "}
+            {skip.kind === "intro"
+              ? t("player.skipIntro")
+              : t("player.skipCredits")}
           </button>
         )}
         {showNext && next && (
           <section className="player-next" aria-label={t("player.nextEpisode")}>
             <span className="player-next-label">
-              {countdown !== null ? t("player.nextEpisodeIn", { seconds: countdown }) : t("player.nextEpisode")}
+              {countdown !== null
+                ? t("player.nextEpisodeIn", { seconds: countdown })
+                : t("player.nextEpisode")}
             </span>
             <strong>
               {episodeCode(next)}
               {next.title ? ` · ${next.title}` : ""}
             </strong>
             <div>
-              <button className="button primary small" data-autofocus onClick={() => playNext(next)}>
+              <button
+                className="button primary small"
+                data-autofocus
+                onClick={() => playNext(next)}
+              >
                 <SkipForward size={14} /> {t("player.watchNow")}
               </button>
-              <button className="button small subtle" onClick={() => setNextDismissed(true)}>
+              <button
+                className="button small subtle"
+                onClick={() => setNextDismissed(true)}
+              >
                 {countdown !== null ? t("common.cancel") : t("player.hide")}
               </button>
             </div>
@@ -709,39 +1035,67 @@ export function Player({
           <div className="player-error" role="alert">
             <h2>{t("player.cannotPlay")}</h2>
             <p>{error}</p>
-            <div>
-              {playing.transcodeUrl && !converting && (
-                <button className="button primary" onClick={() => switchToConversion({})}>
-                  <RefreshCw size={15} />
-                  {t("player.convertWithService")}
+            {sourceDown ? (
+              <div>
+                <button className="button primary" onClick={onClose}>
+                  {t("player.chooseOtherSource")}
                 </button>
-              )}
-              {embeddedLibrary && onEmbedded && (
+              </div>
+            ) : (
+              <div>
+                {canConvert && (
+                  <button
+                    className="button primary"
+                    onClick={() => switchToConversion({})}
+                  >
+                    <RefreshCw size={15} />
+                    {t("player.convertWithService")}
+                  </button>
+                )}
+                {embeddedLibrary && onEmbedded && (
+                  <button
+                    className={`button ${canConvert ? "secondary" : "primary"}`}
+                    onClick={() => onEmbedded(mpvStart())}
+                  >
+                    <MonitorPlay size={15} />
+                    {t("mpv.embedded.playWith")}
+                  </button>
+                )}
+                {embeddedLibrary === null && onEmbedded && (
+                  <LibmpvInstall
+                    play
+                    primary={!canConvert}
+                    onDone={() => onEmbedded(mpvStart())}
+                  />
+                )}
                 <button
-                  className={`button ${playing.transcodeUrl && !converting ? "secondary" : "primary"}`}
-                  onClick={() => onEmbedded(video.current?.currentTime ?? 0)}
+                  className={`button ${canConvert || onEmbedded ? "secondary" : "primary"}`}
+                  disabled={externalBusy}
+                  onClick={() => void external()}
                 >
                   <MonitorPlay size={15} />
-                  {t("mpv.embedded.playWith")}
+                  {t("player.openExternal")}
                 </button>
-              )}
-              <button
-                className={`button ${(playing.transcodeUrl && !converting) || (embeddedLibrary && onEmbedded) ? "secondary" : "primary"}`}
-                disabled={externalBusy}
-                onClick={() => void external()}
-              >
-                <MonitorPlay size={15} />
-                {t("player.openExternal")}
-              </button>
-              <button className="button secondary" onClick={onClose}>
-                {t("player.chooseOtherSource")}
-              </button>
-            </div>
+                <button className="button secondary" onClick={onClose}>
+                  {t("player.chooseOtherSource")}
+                </button>
+              </div>
+            )}
           </div>
         )}
         {popover?.kind === "tracks" && (
           <TrackPanel
             right={popover.right}
+            embeddedAction={!playing.transcodeUrl && probe?.streams.some((track) => track.track === "subtitle") && onEmbedded ? (
+              <div>
+                <p>{t("player.subs.embeddedMpv")}</p>
+                {embeddedLibrary ? (
+                  <button className="button small" onClick={() => onEmbedded(mpvStart(), true)}>{t("player.subs.openMpv")}</button>
+                ) : embeddedLibrary === null ? (
+                  <LibmpvInstall play onDone={() => onEmbedded(mpvStart(), true)} />
+                ) : null}
+              </div>
+            ) : undefined}
             audio={audioTracks}
             audioKey={audioKey}
             subtitles={subtitleTracks}
@@ -768,7 +1122,9 @@ export function Player({
                     value: marks,
                     time,
                     duration,
-                    fromChapters: segments.filter((item) => item.source === "chapters").map((item) => item.kind),
+                    fromChapters: segments
+                      .filter((item) => item.source === "chapters")
+                      .map((item) => item.kind),
                     onChange: (value) => skipMarks.set(seriesId, value),
                   }
                 : undefined
@@ -780,27 +1136,44 @@ export function Player({
             className="seek"
             onMouseMove={(event) => {
               const rect = event.currentTarget.getBoundingClientRect();
-              const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-              setHover({ x: Math.min(rect.width - 28, Math.max(28, ratio * rect.width)), time: ratio * duration });
+              const ratio = Math.min(
+                1,
+                Math.max(0, (event.clientX - rect.left) / rect.width),
+              );
+              setHover({
+                x: Math.min(rect.width - 28, Math.max(28, ratio * rect.width)),
+                time: ratio * duration,
+              });
             }}
             onMouseLeave={() => setHover(null)}
           >
             <div className="seek-track">
-              <span className="seek-buffer" style={{ width: `${duration ? Math.min(100, (buffered / duration) * 100) : 0}%` }} />
+              <span
+                className="seek-buffer"
+                style={{
+                  width: `${duration ? Math.min(100, (buffered / duration) * 100) : 0}%`,
+                }}
+              />
               {duration > 0 &&
                 segments.map((item) => (
                   <span
                     key={`${item.kind}-${item.start}`}
                     className="seek-segment"
                     aria-hidden="true"
-                    style={{ left: `${(item.start / duration) * 100}%`, width: `${((item.end - item.start) / duration) * 100}%` }}
+                    style={{
+                      left: `${(item.start / duration) * 100}%`,
+                      width: `${((item.end - item.start) / duration) * 100}%`,
+                    }}
                   />
                 ))}
               <span className="seek-fill" style={{ width: `${percent}%` }} />
             </div>
             <input
               aria-label={t("player.seekPosition")}
-              aria-valuetext={t("player.timeOf", { time: clock(time), duration: clock(duration) })}
+              aria-valuetext={t("player.timeOf", {
+                time: clock(time),
+                duration: clock(duration),
+              })}
               type="range"
               min="0"
               max={duration || 1}
@@ -809,7 +1182,8 @@ export function Player({
               disabled={!duration}
               style={{ "--thumb": `${percent}%` } as CSSProperties}
               onChange={(event) => {
-                if (video.current) video.current.currentTime = Number(event.target.value);
+                if (video.current)
+                  video.current.currentTime = Number(event.target.value);
               }}
             />
             {hover && duration > 0 && (
@@ -821,8 +1195,16 @@ export function Player({
           <div className="player-row">
             <button
               className="player-icon"
-              aria-label={status === "playing" || status === "buffering" ? t("player.pause") : t("player.play")}
-              title={status === "playing" ? t("player.pauseKey") : t("player.playKey")}
+              aria-label={
+                status === "playing" || status === "buffering"
+                  ? t("player.pause")
+                  : t("player.play")
+              }
+              title={
+                status === "playing"
+                  ? t("player.pauseKey")
+                  : t("player.playKey")
+              }
               onClick={toggle}
             >
               {status === "playing" || status === "buffering" ? (
@@ -833,7 +1215,9 @@ export function Player({
             </button>
             <button
               className="player-icon"
-              aria-label={t("player.rewindLabel", { seconds: settings.seekLong })}
+              aria-label={t("player.rewindLabel", {
+                seconds: settings.seekLong,
+              })}
               title={t("player.rewindTitle", { seconds: settings.seekLong })}
               onClick={() => seekBy(-settings.seekLong)}
             >
@@ -841,7 +1225,9 @@ export function Player({
             </button>
             <button
               className="player-icon"
-              aria-label={t("player.forwardLabel", { seconds: settings.seekLong })}
+              aria-label={t("player.forwardLabel", {
+                seconds: settings.seekLong,
+              })}
               title={t("player.forwardTitle", { seconds: settings.seekLong })}
               onClick={() => seekBy(settings.seekLong)}
             >
@@ -850,8 +1236,12 @@ export function Player({
             {next && onNext && (
               <button
                 className="player-icon"
-                aria-label={t("player.nextEpisodeLabel", { code: episodeCode(next) })}
-                title={t("player.nextEpisodeTitle", { code: episodeCode(next) })}
+                aria-label={t("player.nextEpisodeLabel", {
+                  code: episodeCode(next),
+                })}
+                title={t("player.nextEpisodeTitle", {
+                  code: episodeCode(next),
+                })}
                 onClick={() => playNext(next)}
               >
                 <SkipForward size={18} />
@@ -873,7 +1263,11 @@ export function Player({
                 max="1"
                 step="0.05"
                 value={muted ? 0 : volume}
-                style={{ "--thumb": `${(muted ? 0 : volume) * 100}%` } as CSSProperties}
+                style={
+                  {
+                    "--thumb": `${(muted ? 0 : volume) * 100}%`,
+                  } as CSSProperties
+                }
                 onChange={(event) => changeVolume(Number(event.target.value))}
               />
             </div>
@@ -895,7 +1289,11 @@ export function Player({
               }
               onClick={(event) => openPopover("tracks", event.currentTarget)}
             >
-              {subtitleBusy ? <LoaderCircle className="spin" size={18} /> : <Captions size={19} />}
+              {subtitleBusy ? (
+                <LoaderCircle className="spin" size={18} />
+              ) : (
+                <Captions size={19} />
+              )}
             </button>
             <button
               className={`player-icon ${rate !== 1 ? "active" : ""} ${popover?.kind === "speed" ? "pressed" : ""}`}
@@ -905,7 +1303,11 @@ export function Player({
               title={t("player.speed")}
               onClick={(event) => openPopover("speed", event.currentTarget)}
             >
-              {rate !== 1 ? <span className="rate">{rate}×</span> : <Gauge size={19} />}
+              {rate !== 1 ? (
+                <span className="rate">{rate}×</span>
+              ) : (
+                <Gauge size={19} />
+              )}
             </button>
             {native && (
               <button
@@ -920,8 +1322,14 @@ export function Player({
             )}
             <button
               className="player-icon"
-              aria-label={fullscreen ? t("player.exitFullscreen") : t("player.fullscreen")}
-              title={fullscreen ? t("player.exitFullscreenKey") : t("player.fullscreenKey")}
+              aria-label={
+                fullscreen ? t("player.exitFullscreen") : t("player.fullscreen")
+              }
+              title={
+                fullscreen
+                  ? t("player.exitFullscreenKey")
+                  : t("player.fullscreenKey")
+              }
               onClick={toggleFullscreen}
             >
               {fullscreen ? <Minimize size={19} /> : <Maximize size={19} />}

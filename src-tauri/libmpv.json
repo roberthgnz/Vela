@@ -1,0 +1,12 @@
+{
+  "version": "20261101-914a11c30c",
+  "sha256": "9509c1483c1eb2888042ac1d45ac05e5d0138ebaa2505d6f488ea9f03ba6df6c",
+  "size": 29021126,
+  "entry": "libmpv-2.dll",
+  "license": "LGPL-2.1-or-later",
+  "source": "https://github.com/zhongfly/mpv-winbuild",
+  "urls": [
+    "https://github.com/roberthgnz/Vela/releases/download/libmpv-20261101-914a11c30c/mpv-dev-lgpl-x86_64-20261101-git-914a11c30c.7z",
+    "https://github.com/zhongfly/mpv-winbuild/releases/download/2026-11-01-914a11c30c/mpv-dev-lgpl-x86_64-20261101-git-914a11c30c.7z"
+  ]
+}

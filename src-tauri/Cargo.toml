@@ -1,6 +1,6 @@
 [package]
 name = "vela"
-version = "1.2.0"
+version = "1.3.0"
 description = "Desktop client compatible with Stremio addons"
 authors = ["Vela contributors"]
 license = "MIT"
@@ -26,6 +26,8 @@ rusqlite = { version = "=0.41.1", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 librqbit = { version = "=9.1.0", default-features = false, features = ["rust-tls"] }
 libloading = "0.8"
+sha2 = "0.10"
+sevenz-rust2 = { version = "0.24", default-features = false }
 tauri-plugin-single-instance = "=2.5.5"
 
 [target.'cfg(windows)'.dependencies]
@@ -34,6 +36,7 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_Wi
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt", "net", "io-util"] }
+sevenz-rust2 = { version = "0.24", default-features = false, features = ["compress", "util"] }
 
 [profile.release]
 codegen-units = 1

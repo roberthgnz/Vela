@@ -27,7 +27,8 @@ import { episodeCode, nextEpisode, pickNextStream } from "./lib/episodes";
 import { externalPlayerName, onExternalClosed, playExternally } from "./lib/externalPlayback";
 import { defaultAddons, getStreams, loadManifest } from "./lib/protocol";
 import { metaAddon, RouteStateProvider, useNavigation, type Route, type Section } from "./lib/navigation";
-import { resolvePlayback } from "./lib/playback";
+import { containerProblems, resolvePlayback } from "./lib/playback";
+import { stopMediaProxy } from "./lib/mediaProxy";
 import { CREDITS_THRESHOLD, mediaKey, preferencesStore, usePreferences } from "./lib/store";
 import { openExternal } from "./lib/transport";
 import { useUiSetting } from "./lib/ui";
@@ -56,7 +57,7 @@ import { CollectionPickerHost } from "./components/Collections";
 import { profiles, useProfiles } from "./lib/profiles";
 import { native, WindowControls } from "./components/WindowControls";
 import { sourceHistory } from "./lib/sourceHistory";
-import { useStorageStatus } from "./lib/storage";
+import { useStorageProblem } from "./lib/storage";
 import { updates } from "./lib/updates";
 import { t } from "./lib/i18n";
 
@@ -84,7 +85,8 @@ function editable(target: EventTarget | null): boolean {
 
 export default function App() {
   const prefs = usePreferences();
-  const storageStatus = useStorageStatus();
+  // Not the whole status: it changes on every write, and the app would re-render each time.
+  const storageStatus = useStorageProblem();
   const accountState = useAccount();
   const nav = useNavigation();
   const menu = useMenu();
@@ -103,6 +105,10 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [installRequest, setInstallRequest] = useState<{ id: number; url?: string }>({ id: 0 });
   const [playing, setPlaying] = useState<Playing | null>(null);
+  const mediaProxy = playing?.mediaProxy;
+  useEffect(() => () => {
+    if (mediaProxy) stopMediaProxy(mediaProxy);
+  }, [mediaProxy]);
   /** Title whose source is being prepared: the player opens on its cover right away. */
   const [preparing, setPreparing] = useState<{ meta: MediaItem; episode?: Episode } | null>(null);
   /** Increases with every preparation; a result whose number is stale was cancelled. */
@@ -201,6 +207,7 @@ export default function App() {
     }
     const ownTorrent = target.torrentEngine === "vela" && stream.infoHash ? stream.infoHash : undefined;
     if (token !== preparation.current) {
+      if (target.mediaProxy) stopMediaProxy(target.mediaProxy);
       if (ownTorrent) releaseVelaTorrent(ownTorrent);
       return;
     }
@@ -237,7 +244,8 @@ export default function App() {
       externalUrl: target.externalUrl,
       headers: target.headers,
       transcodeUrl: target.transcodeUrl,
-      convertIfNeeded: target.convertIfNeeded,
+      mediaProxy: target.mediaProxy,
+      unsupported: target.unsupported,
       torrentEngine: target.torrentEngine,
       fileSize: target.fileSize,
       embedded,
@@ -262,6 +270,7 @@ export default function App() {
       externalUrl: item.url,
       filePath: item.path,
       headers: item.headers,
+      unsupported: containerProblems(item.path),
       serviceUrl: prefs.serviceUrl,
       note: t("app.downloadedFile"),
       episode: item.episode,
@@ -724,7 +733,7 @@ export default function App() {
               onFailed={(message) =>
                 sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "failed", message)
               }
-              onEmbedded={(time) => setPlaying({ ...playing, embedded: true, resume: time })}
+              onEmbedded={(time, subtitles) => setPlaying({ ...playing, embedded: true, resume: time, embeddedSubtitlesAuto: subtitles })}
               onClose={() => {
                 setPlaying(null);
                 void account.sync();

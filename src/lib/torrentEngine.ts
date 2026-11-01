@@ -3,13 +3,12 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { Episode, ResolvedStream, Subtitle } from "./contracts";
 import { t } from "./i18n";
 import { storage } from "./storage";
-import { isLocalService, serviceAvailable, serviceInstalled, type TorrentStats } from "./streamingServer";
+import type { TorrentStats } from "./streamingServer";
 
 /**
  * Which engine opens torrent sources. Vela has its own (librqbit, see `torrent.rs`); Stremio's
  * streaming server, when installed, also offers HLS conversion and probing of the file's tracks.
- * «auto» keeps using Stremio's server when it answers (or can be started) and falls back to
- * Vela's engine otherwise, so nothing changes for people who already have Stremio.
+ * «auto» uses Vela's engine on desktop; Stremio Service remains an explicit choice.
  */
 export type TorrentEngine = "auto" | "vela" | "service";
 export const torrentEngines: TorrentEngine[] = ["auto", "vela", "service"];
@@ -49,20 +48,13 @@ export function useTorrentEngine(): TorrentEngine {
 }
 
 /**
- * Starts Vela's engine ahead of the first torrent when it is the one that will open them: chosen
- * in Settings, or in «auto» when Stremio's server neither answers nor can be started (the choice
- * `resolvePlayback` makes). Its DHT then has its nodes and its port is open when a torrent is
- * played, instead of starting with it. Nothing is started for people who stream through Stremio.
+ * Starts Vela's engine ahead of the first torrent in «auto» and «vela». Its DHT and listening
+ * port are ready before playback. The explicit Stremio Service selection leaves it stopped.
  */
-export async function warmVelaEngine(serviceUrl: string): Promise<boolean> {
+export async function warmVelaEngine(_serviceUrl: string): Promise<boolean> {
   if (!velaEngineAvailable) return false;
   const engine = torrentEngine.get();
   if (engine === "service") return false;
-  if (
-    engine === "auto" &&
-    ((await serviceAvailable(serviceUrl)) || (isLocalService(serviceUrl) && (await serviceInstalled())))
-  )
-    return false;
   return invoke("torrent_warm").then(
     () => true,
     () => false,

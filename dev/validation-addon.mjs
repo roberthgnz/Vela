@@ -24,6 +24,8 @@ const media = {
   "subs-en.srt": generated("subs-en.srt"),
   "subs-es-1252.srt": generated("subs-es-1252.srt"),
   "broken.srt": generated("broken.srt"),
+  "old.avi": generated("old.avi"),
+  "dts.mkv": generated("dts.mkv"),
 };
 const trackers = [
   "tracker:udp://tracker.opentrackr.org:1337/announce",
@@ -78,6 +80,9 @@ const streams = [
   { name: "Directo\nCabeceras", title: "MP4 que exige X-Vela-Token", url: `${base}/protected/h264.mp4`, behaviorHints: { proxyHeaders: { request: { "X-Vela-Token": "ok" } } } },
   { name: "Directo\nHEVC", title: "MKV con vídeo HEVC · requiere conversión o MPV", url: `${base}/media/hevc.mkv`, behaviorHints: { notWebReady: true } },
   { name: "Directo\nH.264", title: "MP4 H.264/AAC compatible", url: `${base}/media/h264.mp4` },
+  { name: "Directo\n404", title: "Fuente que ya no existe: debe mostrar el aviso de error", url: `${base}/media/missing.mp4` },
+  { name: "Directo\nAVI", title: "AVI (MPEG-4 Part 2 + MP2) · WebView2 no lo abre", url: `${base}/media/old.avi` },
+  { name: "Directo\nDTS", title: "MKV H.264 con audio DTS · la imagen se ve, sin sonido", url: `${base}/media/dts.mkv` },
   // Many audio languages, written as torrent addons do, to check that the language filter folds.
   {
     name: "Directo\nIdiomas",
@@ -141,7 +146,13 @@ function file(req, res, path) {
     return;
   }
   const size = statSync(path).size;
-  const type = path.endsWith(".mkv") ? "video/x-matroska" : /\.(srt|ass)$/.test(path) ? "text/plain" : "video/mp4";
+  const type = path.endsWith(".mkv")
+    ? "video/x-matroska"
+    : path.endsWith(".avi")
+      ? "video/x-msvideo"
+      : /\.(srt|ass)$/.test(path)
+        ? "text/plain"
+        : "video/mp4";
   const range = /bytes=(\d+)-(\d*)/.exec(req.headers.range || "");
   if (range) {
     const start = Number(range[1]);

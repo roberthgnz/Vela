@@ -20,7 +20,8 @@ Interesan especialmente:
 - Inyección de argumentos o cabeceras al lanzar un reproductor externo.
 - Formas de que la actualización automática instale algo no firmado con la clave de Vela.
 - Acceso desde la página o desde la red al servidor local del motor de torrents (127.0.0.1, ruta con un token aleatorio) o a archivos fuera de lo que sirve.
-- Que mpv integrado cargue una biblioteca que no sea una libmpv instalada en las rutas conocidas, o abra archivos locales fuera de Descargas\Vela.
+- Que mpv integrado cargue una biblioteca que no sea una libmpv instalada en las rutas conocidas o descargada por Vela, o abra archivos locales fuera de Descargas\Vela.
+- Que la descarga opcional de libmpv acepte un archivo cuyo tamaño o SHA-256 no sean los fijados en `src-tauri/libmpv.json`, siga una redirección fuera de HTTPS, o extraiga algo distinto de `libmpv-2.dll` a su carpeta.
 
 ## Política de contenido (CSP) de la ventana
 

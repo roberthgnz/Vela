@@ -4,6 +4,7 @@ mod clock;
 mod desktop;
 mod downloads;
 mod embedded_mpv;
+mod libmpv;
 mod logging;
 mod mpv;
 mod proxy;
@@ -360,10 +361,12 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updater::PendingUpdate::default())
         .manage(client)
+        .manage(proxy::PlaybackProxy::default())
         .manage(downloads::Downloads::new().expect("could not initialize downloads"))
         .manage(service::Service::default())
         .manage(torrent::Engine::default())
         .manage(embedded_mpv::EmbeddedMpv::default())
+        .manage(libmpv::Installer::default())
         .manage(desktop::Desktop::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_data_dir() {
@@ -420,6 +423,8 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            proxy::media_proxy_start,
+            proxy::media_proxy_stop,
             request_json,
             post_json,
             request_text,
@@ -463,6 +468,10 @@ fn main() {
             embedded_mpv::mpv_embedded_command,
             embedded_mpv::mpv_embedded_subtitles,
             embedded_mpv::mpv_embedded_close,
+            libmpv::mpv_install_info,
+            libmpv::mpv_install,
+            libmpv::mpv_install_cancel,
+            libmpv::mpv_uninstall,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_delete,

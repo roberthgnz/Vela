@@ -79,7 +79,12 @@ export function EmbeddedPlayer({
   // is loaded.
   useEffect(() => {
     let cancelled = false;
+    let opened = false;
     void (async () => {
+      // StrictMode rehearses setup/cleanup synchronously. Do not create a native player for
+      // the abandoned setup: its late completion would close the real session.
+      await Promise.resolve();
+      if (cancelled) return;
       const box = area.current;
       if (!box) return;
       const found = getSubtitles(preferencesStore.getSnapshot().addons, playing.meta.type, playing.videoId, playing.stream).catch(() => []);
@@ -94,7 +99,7 @@ export function EmbeddedPlayer({
           subtitles: urls,
           audioLanguages: mpvLanguages(settings.audioLanguage, settings.audioSecondary),
           subtitleLanguages: mpvLanguages(settings.subtitleLanguage, settings.subtitleSecondary),
-          subtitlesAuto: settings.subtitlesAuto,
+          subtitlesAuto: playing.embeddedSubtitlesAuto ?? settings.subtitlesAuto,
           volume: Number.isFinite(saved) && saved > 0 && saved <= 1 ? saved : 1,
           rect: rectOf(box),
         });
@@ -102,6 +107,7 @@ export function EmbeddedPlayer({
           void closeEmbedded();
           return;
         }
+        opened = true;
         void found.then((items) => {
           const late = [...new Set(items.map((item) => item.url))].filter((url) => !urls.includes(url));
           if (!cancelled && late.length) void addEmbeddedSubtitles(late).catch(() => {});
@@ -118,6 +124,7 @@ export function EmbeddedPlayer({
     })();
     return () => {
       cancelled = true;
+      if (opened && !closed.current) void closeEmbedded();
     };
     // The player is keyed by the source in App: one open per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,7 +221,6 @@ export function EmbeddedPlayer({
   // Leaving the player in any other way (the app closes it, a new source) also closes mpv.
   useEffect(
     () => () => {
-      if (!closed.current) void closeEmbedded();
       if (infoHash && playing.torrentEngine === "vela") releaseVelaTorrent(infoHash);
     },
     [infoHash, playing.torrentEngine],

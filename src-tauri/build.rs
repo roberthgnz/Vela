@@ -6,6 +6,8 @@ fn main() {
             "request_text",
             "request_bytes",
             "request_range",
+            "media_proxy_start",
+            "media_proxy_stop",
             "download_folder",
             "download_start",
             "download_cancel",

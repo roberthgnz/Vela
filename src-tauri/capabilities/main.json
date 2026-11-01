@@ -19,6 +19,7 @@
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-native-transport",
+    "allow-media-proxy",
     "allow-downloads",
     "allow-storage",
     "allow-logging",

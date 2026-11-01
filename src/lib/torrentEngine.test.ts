@@ -37,20 +37,22 @@ describe('warmVelaEngine', () => {
     expect(serviceAvailable).not.toHaveBeenCalled();
   });
 
-  it('leaves it stopped when Stremio opens them', async () => {
+  it('leaves it stopped only for the explicit service selection', async () => {
     torrentEngine.set('service');
     expect(await warmVelaEngine(local)).toBe(false);
+    expect(invoke).not.toHaveBeenCalled();
     torrentEngine.set('auto');
     vi.mocked(serviceAvailable).mockResolvedValue(true);
-    expect(await warmVelaEngine(local)).toBe(false);
-    // «auto» starts Stremio's server when it is installed, so Vela's engine is not used either.
+    expect(await warmVelaEngine(local)).toBe(true);
+    // Installed or running Stremio does not change the engine selected by «auto».
     vi.mocked(serviceAvailable).mockResolvedValue(false);
     vi.mocked(serviceInstalled).mockResolvedValue(true);
-    expect(await warmVelaEngine(local)).toBe(false);
-    expect(invoke).not.toHaveBeenCalled();
+    expect(await warmVelaEngine(local)).toBe(true);
+    expect(serviceAvailable).not.toHaveBeenCalled();
+    expect(serviceInstalled).not.toHaveBeenCalled();
   });
 
-  it('starts it in «auto» when Stremio can neither answer nor be started', async () => {
+  it('starts it in «auto» without probing the configured service', async () => {
     torrentEngine.set('auto');
     vi.mocked(serviceAvailable).mockResolvedValue(false);
     vi.mocked(serviceInstalled).mockResolvedValue(false);
