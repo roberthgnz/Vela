@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The player's collaborators that reach the network or the desktop: none answer in this test.
@@ -37,8 +37,14 @@ vi.mock("../lib/externalPlayback", () => ({
   externalPlayerName: () => "",
 }));
 vi.mock("../lib/mkvChapters", () => ({ readMkvChapters: vi.fn(() => Promise.reject(new Error("not mkv"))) }));
+vi.mock("../lib/embeddedMpv", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/embeddedMpv")>()),
+  libmpvInfo: vi.fn(async () => ({ version: "20261101-914a11c30c", size: 29_021_126, license: "LGPL-2.1-or-later", source: "x", path: null })),
+  installLibmpv: vi.fn(async () => "C:/Vela/libmpv/libmpv-2.dll"),
+}));
 
 import type { Episode } from "../lib/contracts";
+import { installLibmpv } from "../lib/embeddedMpv";
 import { readMkvChapters } from "../lib/mkvChapters";
 import { prepareTorrent, probe, removeTorrent, setTorrentProfile, torrentProfile } from "../lib/streamingServer";
 import { Player, type Playing } from "./Player";
@@ -185,6 +191,27 @@ describe("Player", () => {
     expect(onFailed).toHaveBeenCalledWith(expect.stringContaining("HEVC"));
     // Without a conversion URL there is nothing to convert with.
     expect(screen.queryByRole("button", { name: /Convertir/ })).toBeNull();
+  });
+
+  it("offers to download mpv when the file cannot be decoded and the machine has no libmpv, then plays with it", async () => {
+    const onEmbedded = vi.fn();
+    const { video } = setup(movie(), { onEmbedded });
+    Object.defineProperty(video, "error", { value: { code: 3, message: "" }, configurable: true });
+    video.currentTime = 12;
+    fireEvent.error(video);
+    expect(screen.queryByRole("button", { name: /Reproducir con mpv integrado/ })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Descargar mpv y reproducir (29 MB)" }));
+    await waitFor(() => expect(onEmbedded).toHaveBeenCalledTimes(1));
+    expect(installLibmpv).toHaveBeenCalledTimes(1);
+    expect(onEmbedded).toHaveBeenCalledWith(12);
+  });
+
+  it("does not offer the download where there is no way to switch to mpv", async () => {
+    const { video } = setup(movie());
+    Object.defineProperty(video, "error", { value: { code: 3, message: "" }, configurable: true });
+    fireEvent.error(video);
+    await act(async () => {});
+    expect(screen.queryByRole("button", { name: /Descargar mpv/ })).toBeNull();
   });
 
   it("starts with the file and switches to the conversion when the inspection finds a track it cannot decode", async () => {
