@@ -33,15 +33,43 @@ export type PlaybackTarget = {
   torrentEngine?: "vela" | "service";
   /** Size of the torrent's file on Stremio's engine, for its bitrate once the duration is known. */
   fileSize?: number;
+  /**
+   * Why the built-in player cannot open the file, known before it tries (its container, from the
+   * file name). The player goes to the conversion or to embedded mpv instead.
+   */
+  unsupported?: string[];
 };
+
+/** Containers WebView2 cannot open, by extension. MP4, MOV, WebM and MKV are left to the inspection. */
+const foreignContainers = /\.(avi|divx|wmv|asf|flv|mpe?g|vob|m2?ts|mts|rmvb?|ogm|wtv)$/i;
+
+/** The container problem of the first name that has a known extension (file names and URL paths). */
+export function containerProblems(...names: (string | undefined)[]): string[] {
+  for (const raw of names) {
+    if (!raw) continue;
+    let name = raw;
+    try {
+      name = decodeURIComponent(new URL(raw).pathname);
+    } catch {
+      /* A file name, not a URL. */
+    }
+    const extension = /\.([a-z0-9]{2,5})$/i.exec(name.trim())?.[1];
+    if (!extension) continue;
+    return foreignContainers.test(`.${extension}`)
+      ? [t("lib.server.problem.container", { name: extension.toUpperCase() })]
+      : [];
+  }
+  return [];
+}
 
 const serviceHint =
   t("lib.playback.serviceHint");
 
 /**
- * How long a torrent on Vela's engine waits, once open, for the answer about Stremio Service,
- * which it asked for meanwhile. The server answers at once when it runs (or the connection is
- * refused); only a host that hangs takes longer, and then the conversion is not offered.
+ * How long a source waits for the answer about Stremio Service (a torrent on Vela's engine asks
+ * while it opens, so it waits only what is left). The server answers /settings in milliseconds
+ * when it runs; a refused connection takes about two seconds on Windows and a hung host longer,
+ * and then the conversion is not offered.
  */
 const SERVICE_GRACE = 500;
 
@@ -69,18 +97,22 @@ export async function resolvePlayback(
   let service: boolean;
   if ((torrent && !ownEngine) || needsHeaders) service = await ensureService(serviceUrl);
   else if (options.external) service = false;
-  else if (ownEngine) {
+  else {
+    // Only the conversion depends on the answer. Without a server, Windows takes about two
+    // seconds to report a refused connection on 127.0.0.1, and playback should not wait for that.
     optionalService = serviceAvailable(serviceUrl);
     service = false;
-  } else service = await serviceAvailable(serviceUrl);
+  }
   const useVela = ownEngine || (torrent && velaEngineAvailable && engine === "auto" && !service);
   let url = stream.url;
   let note: string | undefined;
   let fileSize: number | undefined;
   let subtitles: Subtitle[] = [];
+  let fileName: string | undefined;
   if (torrent && useVela) {
     const prepared = await prepareVelaTorrent(stream, options.episode);
     url = prepared.url;
+    fileName = prepared.fileName;
     subtitles = prepared.subtitles;
     note = t("lib.playback.connectingFile", { file: prepared.fileName });
   } else if (torrent) {
@@ -88,6 +120,7 @@ export async function resolvePlayback(
       throw new Error(t("lib.playback.torrentNeedsService", { hint: serviceHint }));
     const prepared = await prepareTorrent(serviceUrl, stream, options.episode);
     url = prepared.url;
+    fileName = prepared.fileName;
     fileSize = prepared.fileSize;
     subtitles = prepared.subtitles;
     note = prepared.fileName ? t("lib.playback.connectingFile", { file: prepared.fileName }) : t("lib.playback.connecting");
@@ -120,6 +153,8 @@ export async function resolvePlayback(
     torrentEngine: engineUsed,
     fileSize,
   };
+  const unsupported = containerProblems(stream.behaviorHints?.filename, fileName, url);
+  if (unsupported.length) target.unsupported = unsupported;
   if (optionalService) service = await within(optionalService, SERVICE_GRACE);
   if (!service || /\.m3u8(?:$|[?#])/i.test(playable)) return target;
   target.transcodeUrl = transcodeUrl(serviceUrl, playable, mediaCapabilities());

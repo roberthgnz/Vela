@@ -162,7 +162,7 @@ export const es = {
   "settings.audio.alternativeHint": "Se usa si no hay pista en el idioma preferido.",
   // Settings: playback
   "settings.playback.builtIn": "Reproductor integrado",
-  "settings.playback.builtInHint": "Reproduce MP4, WebM y MKV con H.264, VP9 o AV1 (y HEVC si el equipo lo decodifica) y listas HLS, con varias pistas de audio. DTS, TrueHD o HEVC sin soporte del equipo necesitan la conversión de Stremio Service o un reproductor externo.",
+  "settings.playback.builtInHint": "Reproduce MP4, WebM y MKV con H.264, VP9 o AV1 (y HEVC si el equipo lo decodifica) y listas HLS, con varias pistas de audio. Lo que no puede abrir (DTS, TrueHD, HEVC sin soporte del equipo, AVI…) pasa a mpv integrado, que Vela descarga si hace falta; si Stremio Service está en marcha, también puede convertirlo.",
   "settings.playback.seekShort": "Salto corto",
   "settings.playback.seekShortHint": "Flechas izquierda y derecha.",
   "settings.playback.seekLong": "Salto largo",
@@ -185,7 +185,7 @@ export const es = {
   "settings.external.player": "Reproductor",
   "settings.external.playerHint": "Opcional: ruta de mpv.exe o vlc.exe. Si la dejas vacía, Vela usa MPV (PATH, Programas o Program Files) o, si no lo encuentra, VLC. Con los dos, Vela pasa el título, los subtítulos y las cabeceras de la fuente, reanuda donde lo dejaste y guarda el progreso al cerrarlo.",
   // Settings: streaming
-  "settings.streaming.serviceHint": "Servidor de streaming de Stremio: convierte formatos que el reproductor integrado no admite y abre torrents si el motor elegido es el suyo. No se incluye con Vela: si Stremio está instalado, Vela inicia su servidor cuando hace falta.",
+  "settings.streaming.serviceHint": "Opcional. Servidor de streaming de Stremio: convierte formatos que el reproductor integrado no admite y abre torrents si el motor elegido es el suyo. Vela reproduce sin él (mpv integrado y su propio motor de torrents). No se incluye con Vela: si Stremio está instalado, Vela inicia su servidor cuando hace falta.",
   "settings.streaming.test": "Probar conexión",
   "settings.streaming.connected": "Conectado",
   "settings.streaming.serverVersion": " · servidor {version}",
@@ -574,6 +574,9 @@ export const es = {
   "player.error.decode": "WebView2 no puede decodificar este vídeo. Suele ocurrir con HEVC, audio DTS/TrueHD o archivos dañados.",
   "player.error.unsupported": "La fuente no responde o usa un contenedor o códec que el reproductor integrado no admite (por ejemplo MKV con HEVC o AVI).",
   "player.error.generic": "Esta fuente no se ha podido reproducir.",
+  "player.error.http": "La fuente respondió con HTTP {status}: puede que el enlace haya caducado o que el archivo ya no exista. Prueba otra fuente.",
+  "player.error.unreachable": "La fuente no responde. Comprueba la conexión o prueba otra fuente.",
+  "player.needsMpv": "El reproductor integrado no puede abrir este archivo ({problems}). mpv integrado lo reproduce tal cual, sin conversión.",
   "player.hls.needsExternal": "Este formato necesita un reproductor externo.",
   "player.hls.network": "La lista HLS o sus segmentos no responden. Puede que el servidor exija cabeceras o bloquee la petición.",
   "player.hls.decode": "No se ha podido decodificar esta lista HLS en el reproductor integrado.",

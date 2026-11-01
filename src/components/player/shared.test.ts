@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeAll, describe, expect, it } from "vitest";
-import { episodeText, mediaErrorMessage, numbered, stepSpeed, trackName, typing } from "./shared";
+import { episodeText, mediaErrorMessage, numbered, sourceProblem, stepSpeed, trackName, typing } from "./shared";
 
 // jsdom has no MediaError; the player only reads its codes.
 beforeAll(() => {
@@ -36,6 +36,20 @@ describe("mediaErrorMessage", () => {
     expect(mediaErrorMessage(error(MediaError.MEDIA_ERR_DECODE))).toMatch(/HEVC/);
     expect(mediaErrorMessage(error(MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED))).toMatch(/códec/);
     expect(mediaErrorMessage(null)).toBe("Esta fuente no se ha podido reproducir.");
+  });
+});
+
+describe("sourceProblem", () => {
+  it("reports HTTP errors and missing connections, and leaves format problems alone", async () => {
+    const failing = (message: string) => async () => {
+      throw new Error(message);
+    };
+    expect(await sourceProblem("http://x/a.mp4", failing("El addon respondió con HTTP 403."))).toMatch(/HTTP 403/);
+    expect(await sourceProblem("http://x/a.mp4", failing("No se pudo conectar con el addon. Comprueba su dirección y la conexión."))).toMatch(
+      /no responde/,
+    );
+    expect(await sourceProblem("http://x/a.mp4", failing("El servidor no admite lecturas parciales."))).toBeUndefined();
+    expect(await sourceProblem("http://x/a.mp4", async () => new Uint8Array(1))).toBeUndefined();
   });
 });
 

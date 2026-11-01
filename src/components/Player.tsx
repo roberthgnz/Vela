@@ -45,7 +45,15 @@ import { clock, errorMessage, safeImage } from "../lib/utils";
 import { Dialog } from "./Primitives";
 import { native, setFullscreen, useWindowState, WindowControls } from "./WindowControls";
 import { SpeedPanel, TrackPanel } from "./player/panels";
-import { episodeText, mediaErrorMessage, stepSpeed, volumeKey, type Playing, type Status } from "./player/shared";
+import {
+  episodeText,
+  mediaErrorMessage,
+  sourceProblem,
+  stepSpeed,
+  volumeKey,
+  type Playing,
+  type Status,
+} from "./player/shared";
 import { handleShortcut, usePlayerShortcuts } from "./player/shortcuts";
 import { useAudioTracks } from "./player/useAudioTracks";
 import { useMediaSource } from "./player/useMediaSource";
@@ -148,6 +156,10 @@ export function Player({
   const [muted, setMuted] = useState(false);
   const [rate, setRate] = useState(1);
   const [error, setError] = useState("");
+  /** The source answered with an HTTP error or not at all: no other player would do better. */
+  const [sourceDown, setSourceDown] = useState(false);
+  /** Why the built-in player cannot decode this file, when there is no conversion (see below). */
+  const [unsupported, setUnsupported] = useState<string[]>();
   const [notice, setNotice] = useState("");
   const [externalBusy, setExternalBusy] = useState(false);
   /** The open popover (audio and subtitles, or speed), aligned with the button that opened it. */
@@ -183,6 +195,7 @@ export function Player({
       showFlash(t("player.switchingToConversion"));
     },
     onHlsAudioSwitched: (key) => audio.setAudioKey(key),
+    onUnsupported: setUnsupported,
   });
   const { source, converting, convertedBecause, usingHls, probe, hls, pending, resumeAt, mount, hlsAudio, hlsSubtitles, switchToConversion } = media;
   const audio = useAudioTracks({
@@ -199,6 +212,24 @@ export function Player({
     switchToConversion,
   });
   const { audioTracks, audioKey, chooseAudio } = audio;
+
+  // Without a conversion, a file the built-in player cannot decode goes to embedded mpv, from where
+  // it was, when the machine has a libmpv; otherwise the error panel offers to download one.
+  const onEmbeddedRef = useRef(onEmbedded);
+  onEmbeddedRef.current = onEmbedded;
+  const handedToMpv = useRef(false);
+  useEffect(() => {
+    if (!unsupported?.length || embeddedLibrary === undefined || handedToMpv.current) return;
+    const problems = unsupported.join(", ");
+    if (embeddedLibrary && onEmbeddedRef.current) {
+      handedToMpv.current = true;
+      log.info(`player: built-in player cannot decode (${problems}), switching to embedded mpv`);
+      onEmbeddedRef.current(resumeAt.current);
+    } else setError(t("player.needsMpv", { problems }));
+  }, [embeddedLibrary, resumeAt, unsupported]);
+
+  /** Where mpv starts when the user switches to it: the position, or the saved one before playing. */
+  const mpvStart = () => (video.current && video.current.currentTime > 0 ? video.current.currentTime : resumeAt.current);
   const subs = useSubtitles({
     video,
     hls,
@@ -482,6 +513,7 @@ export function Player({
     "--subtitle-color": settings.subtitleColor,
   } as CSSProperties;
   const busy = status === "loading" || status === "buffering";
+  const canConvert = Boolean(playing.transcodeUrl && !converting);
   return (
     <Dialog title={t("player.playingTitle", { name: playing.meta.name })} onClose={close} className="player-dialog" hideClose>
       <div
@@ -562,6 +594,15 @@ export function Player({
             const mediaError = event.currentTarget.error;
             log.warn(`player: media error code ${mediaError?.code ?? "?"}`, mediaError?.message || undefined);
             setError(mediaErrorMessage(mediaError));
+            // "Not supported" and network errors are also what a dead link gives: ask the source,
+            // so the panel does not offer other players for a file that is not there.
+            const code = mediaError?.code;
+            if ((code === 2 || code === 4) && !playing.headers && !converting)
+              void sourceProblem(playing.url).then((message) => {
+                if (!message) return;
+                setSourceDown(true);
+                setError(message);
+              });
           }}
           onClick={() => (popover ? setPopover(null) : toggle())}
           onDoubleClick={toggleFullscreen}
@@ -715,37 +756,42 @@ export function Player({
           <div className="player-error" role="alert">
             <h2>{t("player.cannotPlay")}</h2>
             <p>{error}</p>
-            <div>
-              {playing.transcodeUrl && !converting && (
-                <button className="button primary" onClick={() => switchToConversion({})}>
-                  <RefreshCw size={15} />
-                  {t("player.convertWithService")}
+            {sourceDown ? (
+              <div>
+                <button className="button primary" onClick={onClose}>
+                  {t("player.chooseOtherSource")}
                 </button>
-              )}
-              {embeddedLibrary && onEmbedded && (
+              </div>
+            ) : (
+              <div>
+                {canConvert && (
+                  <button className="button primary" onClick={() => switchToConversion({})}>
+                    <RefreshCw size={15} />
+                    {t("player.convertWithService")}
+                  </button>
+                )}
+                {embeddedLibrary && onEmbedded && (
+                  <button className={`button ${canConvert ? "secondary" : "primary"}`} onClick={() => onEmbedded(mpvStart())}>
+                    <MonitorPlay size={15} />
+                    {t("mpv.embedded.playWith")}
+                  </button>
+                )}
+                {embeddedLibrary === null && onEmbedded && (
+                  <LibmpvInstall play primary={!canConvert} onDone={() => onEmbedded(mpvStart())} />
+                )}
                 <button
-                  className={`button ${playing.transcodeUrl && !converting ? "secondary" : "primary"}`}
-                  onClick={() => onEmbedded(video.current?.currentTime ?? 0)}
+                  className={`button ${canConvert || onEmbedded ? "secondary" : "primary"}`}
+                  disabled={externalBusy}
+                  onClick={() => void external()}
                 >
                   <MonitorPlay size={15} />
-                  {t("mpv.embedded.playWith")}
+                  {t("player.openExternal")}
                 </button>
-              )}
-              {embeddedLibrary === null && onEmbedded && (
-                <LibmpvInstall play onDone={() => onEmbedded(video.current?.currentTime ?? 0)} />
-              )}
-              <button
-                className={`button ${(playing.transcodeUrl && !converting) || (embeddedLibrary && onEmbedded) ? "secondary" : "primary"}`}
-                disabled={externalBusy}
-                onClick={() => void external()}
-              >
-                <MonitorPlay size={15} />
-                {t("player.openExternal")}
-              </button>
-              <button className="button secondary" onClick={onClose}>
-                {t("player.chooseOtherSource")}
-              </button>
-            </div>
+                <button className="button secondary" onClick={onClose}>
+                  {t("player.chooseOtherSource")}
+                </button>
+              </div>
+            )}
           </div>
         )}
         {popover?.kind === "tracks" && (

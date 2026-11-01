@@ -27,7 +27,7 @@ import { episodeCode, nextEpisode, pickNextStream } from "./lib/episodes";
 import { externalPlayerName, onExternalClosed, playExternally } from "./lib/externalPlayback";
 import { defaultAddons, getStreams, loadManifest } from "./lib/protocol";
 import { metaAddon, RouteStateProvider, useNavigation, type Route, type Section } from "./lib/navigation";
-import { resolvePlayback } from "./lib/playback";
+import { containerProblems, resolvePlayback } from "./lib/playback";
 import { CREDITS_THRESHOLD, mediaKey, preferencesStore, usePreferences } from "./lib/store";
 import { openExternal } from "./lib/transport";
 import { useUiSetting } from "./lib/ui";
@@ -239,6 +239,7 @@ export default function App() {
       headers: target.headers,
       transcodeUrl: target.transcodeUrl,
       convertIfNeeded: target.convertIfNeeded,
+      unsupported: target.unsupported,
       torrentEngine: target.torrentEngine,
       fileSize: target.fileSize,
       embedded,
@@ -263,6 +264,7 @@ export default function App() {
       externalUrl: item.url,
       filePath: item.path,
       headers: item.headers,
+      unsupported: containerProblems(item.path),
       serviceUrl: prefs.serviceUrl,
       note: t("app.downloadedFile"),
       episode: item.episode,

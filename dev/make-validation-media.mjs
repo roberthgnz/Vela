@@ -78,4 +78,18 @@ for (const episode of [1, 2, 3]) {
 
 // HEVC copy of the H.264 fixture, for the conversion test.
 ffmpeg("-i", fileURLToPath(new URL("./media/playback.mp4", import.meta.url)), "-c:v", "libx265", "-tag:v", "hvc1", "-c:a", "copy", path("hevc.mkv"));
+
+// Files WebView2 cannot play without help: an AVI (MPEG-4 Part 2 + MP2) and an MKV whose only
+// audio is DTS (the picture plays, in silence).
+ffmpeg(
+  "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=24:duration=20",
+  "-f", "lavfi", "-i", "sine=frequency=660:duration=20",
+  "-c:v", "mpeg4", "-q:v", "5", "-c:a", "mp2", path("old.avi"),
+);
+ffmpeg(
+  "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=24:duration=20",
+  "-f", "lavfi", "-i", "sine=frequency=550:duration=20",
+  "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+  "-c:a", "dca", "-strict", "-2", "-ar", "48000", "-ac", "2", "-metadata:s:a:0", "language=eng", path("dts.mkv"),
+);
 console.log(`Media written to ${out}`);

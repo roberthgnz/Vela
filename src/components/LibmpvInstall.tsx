@@ -14,7 +14,16 @@ import { t } from "../lib/i18n";
  * user's consent; the file is checked against the SHA-256 pinned in the app before it is used.
  * `play` is the variant in the player's error panel: it carries on with mpv once it is there.
  */
-export function LibmpvInstall({ play = false, onDone }: { play?: boolean; onDone?: () => void }) {
+export function LibmpvInstall({
+  play = false,
+  primary = play,
+  onDone,
+}: {
+  play?: boolean;
+  /** Whether the button is the panel's main action (by default, in the player). */
+  primary?: boolean;
+  onDone?: () => void;
+}) {
   const [info, setInfo] = useState<LibmpvInfo | null>(null);
   const [progress, setProgress] = useState<LibmpvProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +97,7 @@ export function LibmpvInstall({ play = false, onDone }: { play?: boolean; onDone
 
   return (
     <div className="mpv-install">
-      <button className={`button ${play ? "primary" : "secondary"} small`} onClick={start}>
+      <button className={`button ${primary ? "primary" : "secondary"} small`} onClick={start}>
         {play ? <MonitorPlay size={14} /> : <Download size={14} />}
         {play ? t("mpv.install.getAndPlay", { size: megabytes }) : t("mpv.install.button", { size: megabytes })}
       </button>
