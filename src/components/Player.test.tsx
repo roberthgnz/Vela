@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The player's collaborators that reach the network or the desktop: none answer in this test.
@@ -191,6 +192,34 @@ describe("Player", () => {
     expect(onFailed).toHaveBeenCalledWith(expect.stringContaining("HEVC"));
     // Without a conversion URL there is nothing to convert with.
     expect(screen.queryByRole("button", { name: /Convertir/ })).toBeNull();
+  });
+
+  it("reports a failure once even when reporting it re-renders the parent with a new callback", () => {
+    // In the desktop app, recording the failure writes to storage, whose status re-renders the
+    // whole app, so the player receives a new `onFailed` on every report. Reporting again on each
+    // new callback looped forever and froze the window. Capped so a regression fails instead of hanging.
+    const reports = vi.fn();
+    function Parent() {
+      const [, setWrites] = useState(0);
+      return (
+        <Player
+          playing={movie()}
+          onClose={() => {}}
+          onFailed={(message) => {
+            reports(message);
+            if (reports.mock.calls.length < 20) setWrites((count) => count + 1);
+          }}
+        />
+      );
+    }
+    render(<Parent />);
+    const video = document.querySelector("video")!;
+    Object.defineProperty(video, "error", { value: { code: 4, message: "" }, configurable: true });
+    act(() => {
+      fireEvent.error(video);
+    });
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(reports).toHaveBeenCalledTimes(1);
   });
 
   it("offers to download mpv when the file cannot be decoded and the machine has no libmpv, then plays with it", async () => {

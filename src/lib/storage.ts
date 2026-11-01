@@ -260,6 +260,19 @@ export function useStorageStatus(): StorageStatus {
   return useSyncExternalStore(subscribeStorage, getStorageStatus, getStorageStatus);
 }
 
+const statusBackend = () => getStorageStatus().backend;
+const statusError = () => getStorageStatus().error;
+
+/**
+ * Only where the data lives and the last failure. The status changes on every write (the pending
+ * count), so a component that only shows failures re-renders when they change, not on every write.
+ */
+export function useStorageProblem(): Pick<StorageStatus, "backend" | "error"> {
+  const backend = useSyncExternalStore(subscribeStorage, statusBackend, statusBackend);
+  const error = useSyncExternalStore(subscribeStorage, statusError, statusError);
+  return { backend, error };
+}
+
 export type StorageInfo = {
   path: string;
   folder: string;

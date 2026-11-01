@@ -56,7 +56,7 @@ import { CollectionPickerHost } from "./components/Collections";
 import { profiles, useProfiles } from "./lib/profiles";
 import { native, WindowControls } from "./components/WindowControls";
 import { sourceHistory } from "./lib/sourceHistory";
-import { useStorageStatus } from "./lib/storage";
+import { useStorageProblem } from "./lib/storage";
 import { updates } from "./lib/updates";
 import { t } from "./lib/i18n";
 
@@ -84,7 +84,8 @@ function editable(target: EventTarget | null): boolean {
 
 export default function App() {
   const prefs = usePreferences();
-  const storageStatus = useStorageStatus();
+  // Not the whole status: it changes on every write, and the app would re-render each time.
+  const storageStatus = useStorageProblem();
   const accountState = useAccount();
   const nav = useNavigation();
   const menu = useMenu();

@@ -255,9 +255,14 @@ export function Player({
     };
   }, []);
 
+  // Reported once per message. The callback is read from a ref: the parent passes a new one on
+  // every render, and recording the failure re-renders it (the storage status changes), so
+  // depending on the callback reported again and again in a loop that froze the window.
+  const onFailedRef = useRef(onFailed);
+  onFailedRef.current = onFailed;
   useEffect(() => {
-    if (error && !started.current) onFailed?.(error);
-  }, [error, onFailed]);
+    if (error && !started.current) onFailedRef.current?.(error);
+  }, [error]);
 
   const waiting = status === "loading" || status === "buffering";
   const slow = useSlowWait(waiting, waitingSince);
