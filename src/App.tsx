@@ -733,7 +733,7 @@ export default function App() {
               onFailed={(message) =>
                 sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "failed", message)
               }
-              onEmbedded={(time) => setPlaying({ ...playing, embedded: true, resume: time })}
+              onEmbedded={(time, subtitles) => setPlaying({ ...playing, embedded: true, resume: time, embeddedSubtitlesAuto: subtitles })}
               onClose={() => {
                 setPlaying(null);
                 void account.sync();

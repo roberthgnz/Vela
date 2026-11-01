@@ -537,6 +537,8 @@ export const en: Record<keyof typeof es, string> = {
   "player.subtitleLanguage": "Subtitle language",
   "player.subtitlesOff": "Off",
   "player.noSubtitles": "No subtitles for this video.",
+  "player.subs.embeddedMpv": "This file contains embedded subtitles. You can view them with embedded mpv.",
+  "player.subs.openMpv": "View embedded subtitles with mpv",
   "player.audio": "Audio",
   "player.audioTrack": "Audio track",
   "player.version": "Version",

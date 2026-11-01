@@ -171,6 +171,23 @@ function setup(
 }
 
 describe("Player", () => {
+  it("offers embedded subtitles through mpv without inventing server tracks", async () => {
+    vi.mocked(useEmbeddedLibrary).mockReturnValue("C:/mpv/libmpv-2.dll");
+    vi.mocked(probeFile).mockResolvedValueOnce({ format: { name: "matroska,webm" }, streams: [{ track: "video", codec: "h264" }, { track: "subtitle", codec: "ass", language: "spa" }], reads: 1 });
+    try {
+      const onEmbedded = vi.fn();
+      const { video } = setup(movie(), { onEmbedded });
+      await act(async () => {});
+      video.currentTime = 23;
+      fireEvent.click(screen.getByRole("button", { name: "Audio y subtítulos" }));
+      expect(screen.getByText(/Este archivo contiene subtítulos incrustados/)).toBeTruthy();
+      expect(screen.queryByText("No hay subtítulos para este vídeo.")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Ver subtítulos incrustados con mpv" }));
+      expect(onEmbedded).toHaveBeenCalledWith(23, true);
+    } finally {
+      vi.mocked(useEmbeddedLibrary).mockReturnValue(null);
+    }
+  });
   it("shows the title and the loading cover until the video plays", () => {
     const { video } = setup(movie());
     expect(

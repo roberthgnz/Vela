@@ -177,7 +177,7 @@ export function Player({
   onStarted?: () => void;
   onFailed?: (message: string) => void;
   /** Switch this source to mpv inside Vela's window, from the given position. */
-  onEmbedded?: (time: number) => void;
+  onEmbedded?: (time: number, subtitles?: boolean) => void;
 }) {
   const prefs = usePreferences();
   const embeddedLibrary = useEmbeddedLibrary();
@@ -1086,6 +1086,16 @@ export function Player({
         {popover?.kind === "tracks" && (
           <TrackPanel
             right={popover.right}
+            embeddedAction={!playing.transcodeUrl && probe?.streams.some((track) => track.track === "subtitle") && onEmbedded ? (
+              <div>
+                <p>{t("player.subs.embeddedMpv")}</p>
+                {embeddedLibrary ? (
+                  <button className="button small" onClick={() => onEmbedded(mpvStart(), true)}>{t("player.subs.openMpv")}</button>
+                ) : embeddedLibrary === null ? (
+                  <LibmpvInstall play onDone={() => onEmbedded(mpvStart(), true)} />
+                ) : null}
+              </div>
+            ) : undefined}
             audio={audioTracks}
             audioKey={audioKey}
             subtitles={subtitleTracks}
