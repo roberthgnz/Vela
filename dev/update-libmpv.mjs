@@ -54,6 +54,10 @@ if (args.has("--mirror")) {
   gh(
     "release", "create", `libmpv-${version}`, file,
     "--repo", mirror,
+    // The updater reads releases/latest/download/latest.json: this one must never become "Latest".
+    // `--latest=false` alone was not enough (it still took the label); a pre-release cannot have it.
+    "--prerelease",
+    "--latest=false",
     "--title", `libmpv ${version}`,
     "--notes",
     `Unmodified copy of ${asset.name} from ${manifest.source}/releases/tag/${release.tag_name} (LGPL-2.1-or-later build; sources and build scripts at the upstream repository). SHA-256 ${sha256}. Vela downloads it only when the user asks for embedded mpv.`,
