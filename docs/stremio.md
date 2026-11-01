@@ -333,6 +333,14 @@ Esta medición demuestra el coste de lectura de esa estrategia de extracción co
 
 Verificado en Tauri con el MKV sintético multipista sin servicio: el panel muestra la acción y cambia a mpv, que empieza a reproducir. La activación de subtítulos de la sesión se cubre también con prueba de componente; no se ha comprobado cada códec de subtítulo ni una muestra con fuentes adjuntas.
 
+## Automático y prueba con piezas de 4 MiB
+
+«Automático» usa el motor de Vela en escritorio y lo precalienta al abrir la aplicación, aunque Stremio esté instalado o responda. La opción explícita Stremio Service conserva su comportamiento. Un servicio que ya esté disponible puede seguir ofreciendo conversión opcional; Automático no lo inicia para abrir torrents.
+
+El magnet de Dune ya no estaba disponible. En su lugar, `cargo test --locked large_piece_loopback_benchmark -- --ignored --nocapture` crea un archivo sintético de 64 MiB con piezas de 4 MiB, un seed y tres sesiones de descarga con cachés vacías. Sin DHT, trackers ni descubrimiento local: un peer TCP conocido en loopback. Se solicitan a la vez el principio y el último MiB del archivo a través del servidor HTTP del motor de Vela. Los bytes entregados en orden y los descargados coinciden con 67.108.864 en cada ejecución; se comprueba además el contenido de una petición Range.
+
+Resultado en compilación de depuración: primer byte a 93/72/90 ms, archivo completo a 627/633/728 ms y último MiB a 58/42/53 ms. Ventana de peticiones de producción para esas piezas: 128 bloques. Es una prueba controlada del flujo de red, verificación de piezas y entrega HTTP; no mide DHT, NAT, latencia de Internet, peers lentos ni reproducción de Dune. No se extrapola esa velocidad a enjambres públicos y no se ajustan parámetros de red a partir de este resultado. La prueba es optativa para no meter 192 MiB de tráfico de loopback en cada suite.
+
 ## Estado de «Vela sin Stremio» (1 de noviembre de 2026)
 
 - Punto 1: implementado en `fix/player-error-freeze`, PR #3 contra `libmpv-download`.
@@ -342,7 +350,8 @@ Verificado en Tauri con el MKV sintético multipista sin servicio: el panel mues
   - Ventana Tauri de desarrollo por CDP, sin servicio (`127.0.0.1:11999`): lectura real de H.264 MP4, DTS MKV, MP4 con dos audios y MKV con dos audios y tres subtítulos. Una petición por archivo, hasta 256 KiB, 9–28 ms en el servidor local de validación (no mide una red externa ni un torrent). DTS cambia a mpv integrado y comunica progreso de 0 a 4,1 s de 20 s durante la observación. StrictMode queda activado: el montaje descartado ya no abre una sesión nativa que luego cierre la válida.
 - Punto 4: implementado en `feat/native-header-proxy`, desde el punto 3. Proxy Rust para `<video>`, con pruebas reales HTTP y HTTPS; 340 pruebas frontend y 59 Rust correctas (2 ignoradas), build, formato y Clippy correctos.
 - Punto 5: implementado en `feat/embedded-subtitles-without-service`, desde el punto 4. Medición reproducible y alternativa mpv explícita en el panel; 341 pruebas frontend, 59 Rust correctas (2 ignoradas), build, formato y Clippy correctos.
-- Puntos 6–7 pendientes: benchmark/valor por defecto Automático, documentación de límites y validación de temporada. El usuario ya no tiene el magnet de Dune: se usará contenido libre con piezas de al menos 4 MiB para el punto 6; Dune queda sin verificar.
+- Punto 6: implementado en `feat/automatic-vela-engine`, desde el punto 5. Automático usa Vela aunque Stremio responda. Benchmark reproducible con datos sintéticos, peer TCP y piezas de 4 MiB completado; no mide un enjambre público. Dune sigue sin verificar porque el usuario ya no tiene su magnet. 341 pruebas frontend y 59 Rust correctas (3 ignoradas, una de ellas el benchmark ejecutado aparte), build, formato y Clippy correctos.
+- Punto 7 pendiente: documentación de límites, RAR, fuentes adjuntas y validación de temporada completa con el motor de Vela.
 - Worktree: `C:\Users\reliu\Documents\Vela-standalone`; target de Cargo propio en `src-tauri/target`. Pruebas de ventana con `.tmp/vela-dev.exe` (identificador dev), perfil `.tmp/wv2` y `LOCALAPPDATA` aislado. No tocar los datos de `com.vela.desktop` ni los procesos de otras sesiones. El registro de `vela://` comprobado al cerrar esta revisión apunta al ejecutable instalado, no al de desarrollo: se conserva.
 
 ## Orden de trabajo pendiente
