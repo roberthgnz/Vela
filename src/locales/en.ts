@@ -1030,6 +1030,7 @@ export const en: Record<keyof typeof es, string> = {
   "lib.playback.needsProxy": "This source requires special HTTP headers. To watch it in Vela you need the Stremio Service proxy ({hint}), or open it with MPV.",
   "lib.playback.needsHttps": "This source requires HTTP headers and doesn't use HTTPS; the Stremio Service proxy only accepts HTTPS. Open it with MPV from the source menu.",
   "lib.playback.headerHls": "HLS with request headers",
+  "lib.playback.archive": "This source is an archive. Vela does not extract RAR, ZIP or 7z: choose an unarchived video source.",
   "lib.playback.converting": "Converting with Stremio Service ({problems})",
   "lib.server.profile.soft": "Gentle",
   "lib.server.profile.softTitle": "1.6 MB/s and 35 connections: leaves bandwidth free and doesn't overload the router",
