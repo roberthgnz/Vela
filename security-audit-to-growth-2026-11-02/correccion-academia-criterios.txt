@@ -1,0 +1,25 @@
+CORRECCIÓN PROPUESTA: CONTENIDO DE ACADEMIA RESERVADO A FUNDADOR
+
+Problema comprobado
+El archivo público /js/academia-datos.js?v=6 entrega 141 resúmenes y 423 puntos clave. El usuario confirma que son material de pago. El bloqueo actual del visor sucede después de haber entregado los datos.
+
+Cambio requerido
+1. Separar el catálogo promocional (identificadores, títulos y descripciones autorizadas) del material exclusivo.
+2. Sacar el material exclusivo del árbol público y de los bundles descargables.
+3. Incorporar una ruta protegida de lectura de lección. Ejemplo de contrato, no ruta actualmente existente: GET /api/academia/lecciones/:id.
+4. Resolver la identidad desde una sesión/token verificado; consultar el plan/rol en una fuente del servidor. No aceptar como prueba de pago localStorage, un campo del cuerpo, parámetros de URL ni metadatos editables por el cliente.
+5. Comprobar la autorización antes de leer y devolver summary/keyTakeaways. Para el esquema observado, founder o admin son los valores que la aplicación trata como autorizados, pero la regla final debe confirmarse con producto.
+6. Evitar caché compartida del contenido protegido. Una opción conservadora es Cache-Control:private,no-store y excluir esas respuestas de reglas CDN que cacheen contenido privado.
+7. El cliente obtiene los datos después de la autorización. Una modificación del cliente solo podrá cambiar la interfaz; no podrá obtener el contenido protegido del servidor.
+8. Retirar/purgar la versión pública actual y cualquier versión antigua todavía servida con ese material. Revisar bundles y mapas de fuentes. No es posible recuperar las copias previamente descargadas.
+
+Pruebas de aceptación
+- Sin sesión: el endpoint protegido rechaza la petición.
+- Cuenta gratuita: rechaza la petición aunque el cliente declare is_vip=true o altere el indicador local.
+- Cuenta Fundador válida: entrega la lección solicitada.
+- Token inválido/caducado: no entrega contenido.
+- La lectura directa de JavaScript, bundles y mapas de fuentes públicos no contiene los resúmenes/puntos clave exclusivos.
+- La CDN no entrega a un visitante anónimo una respuesta protegida obtenida previamente por un usuario autorizado.
+
+Estado
+Especificación de corrección, no implementada ni desplegada. Para modificar el sitio hace falta acceso a su repositorio/configuración; esta auditoría usa el navegador de producción.

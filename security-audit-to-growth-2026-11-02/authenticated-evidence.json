@@ -1,0 +1,154 @@
+{
+  "date": "2026-11-02",
+  "scope": "Browser production, authorized account, no record edits",
+  "baseline": {
+    "authenticated": true,
+    "cookieNames": [
+      "_ga",
+      "_ga_NSECQP7QL3"
+    ],
+    "profile": {
+      "plan": "free",
+      "role": "user"
+    },
+    "profileError": null,
+    "session": {
+      "aal": "aal1",
+      "expiresAt": 1793615097,
+      "issuedAt": 1793611497,
+      "role": "authenticated"
+    },
+    "storage": [
+      {
+        "key": "to_growth_is_vip",
+        "length": 5
+      },
+      {
+        "key": "to_growth_saved_leads_dueno",
+        "length": 36
+      },
+      {
+        "key": "sb-qrxjznkxsexdylqcvehj-auth-token",
+        "length": 2306
+      },
+      {
+        "key": "to_growth_consentimiento",
+        "length": 82
+      },
+      {
+        "key": "to_growth_tour_visto",
+        "length": 1
+      },
+      {
+        "key": "to_growth_authenticated_user",
+        "length": 123
+      },
+      {
+        "key": "to_growth_profile",
+        "length": 47
+      }
+    ]
+  },
+  "requests": [
+    {
+      "body": {
+        "keys": [
+          "leads"
+        ],
+        "leadCount": 0
+      },
+      "cacheControl": "no-store",
+      "contentType": "application/json; charset=utf-8",
+      "hsts": null,
+      "method": "GET",
+      "path": "/api/sync/leads",
+      "status": 200
+    },
+    {
+      "body": {
+        "keys": [
+          "codigo",
+          "porcentaje",
+          "clics",
+          "registros",
+          "fundadores",
+          "pendiente",
+          "solicitado",
+          "pagado",
+          "comisiones"
+        ]
+      },
+      "cacheControl": "no-store",
+      "contentType": "application/json; charset=utf-8",
+      "hsts": null,
+      "method": "GET",
+      "path": "/api/afiliados/resumen",
+      "status": 200
+    },
+    {
+      "body": "{\"error\":\"Conectar tu cuenta de Apollo es del Plan Fundador.\"}",
+      "cacheControl": "no-store",
+      "contentType": "application/json; charset=utf-8",
+      "hsts": null,
+      "method": "GET",
+      "path": "/api/integraciones/apollo",
+      "status": 402
+    },
+    {
+      "body": "{\"error\":\"No encontrado.\"}",
+      "cacheControl": "no-store",
+      "contentType": "application/json; charset=utf-8",
+      "hsts": null,
+      "method": "POST",
+      "path": "/api/acceso-admin",
+      "status": 404
+    },
+    {
+      "body": "No encontrado",
+      "cacheControl": "no-store",
+      "contentType": "text/plain;charset=UTF-8",
+      "hsts": null,
+      "method": "GET",
+      "path": "/admin/",
+      "status": 404
+    }
+  ],
+  "rlsAndJwt": [
+    {
+      "error": null,
+      "status": 200,
+      "test": "profiles_self",
+      "visibleRows": 1
+    },
+    {
+      "error": null,
+      "status": 200,
+      "test": "profiles_others",
+      "visibleRows": 0
+    },
+    {
+      "body": "{\"error\":\"Inicia sesion.\"}",
+      "path": "/api/sync/leads",
+      "status": 401,
+      "test": "tampered_jwt"
+    },
+    {
+      "body": "{\"error\":\"Inicia sesion.\"}",
+      "path": "/api/integraciones/apollo",
+      "status": 401,
+      "test": "tampered_jwt"
+    }
+  ],
+  "academy": "{\"planIsFounder\":false,\"modules\":28,\"lessons\":141,\"nonemptyVideoCount\":0,\"nonemptySummaryCount\":141,\"lessonFieldNames\":[\"id\",\"title\",\"duration\",\"tipo\",\"ia\",\"summary\",\"keyTakeaways\",\"video\"],\"videoReferences\":[],\"planCheckSource\":\"esFundador(){return typeof window.checkIsVIP==\\\"function\\\"?window.checkIsVIP():localStorage.getItem(\\\"to_growth_is_vip\\\")===\\\"true\\\"}\"}",
+  "anonymousAcademy": {
+    "characters": 88657,
+    "containsLessonData": true,
+    "containsSummaryFields": true,
+    "containsTakeawayFields": true,
+    "contentType": "text/javascript",
+    "credentials": "omit",
+    "path": "/js/academia-datos.js?v=6",
+    "status": 200,
+    "videoReferencesFound": 0
+  }
+}

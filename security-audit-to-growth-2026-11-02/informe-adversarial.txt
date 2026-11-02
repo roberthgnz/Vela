@@ -1,0 +1,42 @@
+REVISIÓN ADVERSARIAL — 2 NOVIEMBRE 2026
+
+CORRECCIÓN DEL ALCANCE ANTERIOR
+Las pruebas previas eran verificaciones parciales de autorización. Un GET con un user_id añadido no demuestra un IDOR si la ruta no utiliza ese parámetro. Un conteo vacío en una tabla no demuestra que sus políticas sean correctas. Esta revisión formula hipótesis de impacto y verifica el estado desde la cuenta objetivo, sin convertir resultados negativos en una garantía global de seguridad.
+
+HALLAZGO NUEVO: EL EXPORTADOR CONSERVA FÓRMULAS CSV
+Estado demostrado: el dato introducido como nombre de una empresa llega al CSV como una celda de fórmula sin neutralización.
+Prueba dinámica mediante el flujo normal:
+1. En la cuenta A se añadió una empresa manual de prueba llamada =1+1, sin email ni web y con un teléfono ficticio de ceros.
+2. Se abrió el organizador de llamadas y se pulsó Exportar CSV.
+3. Se leyó el Blob real generado por la aplicación mediante un observador temporal de URL.createObjectURL que conservaba el comportamiento original. No se sustituyó el contenido exportado. Después se restauró la función original y se eliminó el observador.
+4. El registro exportado empieza por: "=1+1";"";"";"000000000";
+El código de crm.js únicamente entrecomilla y duplica comillas; no neutraliza prefijos de fórmula. Las comillas CSV delimitan la celda, no fijan su tipo como texto.
+
+Impacto y condiciones:
+Una hoja de cálculo que interprete esas celdas como fórmulas puede evaluar valores controlados mediante los datos exportados. En esta prueba solo se usó una fórmula aritmética inocua. No se abrió Excel/LibreOffice ni se demostró ejecución, solicitud de red, exfiltración o ejecución de comandos.
+La demostración cubre entrada manual -> almacenamiento de la app -> exportador. No se ha probado el tramo inicial tercero/proveedor externo -> ficha de otra cuenta. Sin ese tramo, no debe presentarse como una explotación remota de otros usuarios. El riesgo aumenta si un tercero puede controlar nombres u otros campos que un usuario exporta.
+Prioridad sugerida: corregir la neutralización de texto exportado y validar en los clientes de hoja de cálculo soportados. Para exportaciones XLSX, fijar explícitamente el tipo de los campos textuales. Para CSV, no depender del entrecomillado: neutralizar prefijos interpretables como fórmula y tratar por separado valores numéricos legítimos. Probar también prefijos +, -, @ y caracteres de control/espacios relevantes.
+La ficha de prueba se eliminó desde la interfaz; la limpieza de servidor se documenta por separado.
+
+HIPÓTESIS: BYPASS DE CAMPOS PROTEGIDOS MEDIANTE UPSERT
+Se intentó la autoasignación role=admin mediante POST a profiles con on_conflict=id y Prefer:resolution=merge-duplicates, en lugar del PATCH ya probado.
+Resultado: HTTP 403, código 42501, permission denied for table profiles. Lectura posterior: role=user, plan_type=free. No se guardó elevación.
+Esta ruta alternativa concreta está bloqueada; no cubre cualquier operación de inserción ni todas las funciones de base de datos.
+
+HIPÓTESIS: SOBRESCRITURA ENTRE CUENTAS POR COLISIÓN DE IDENTIFICADOR
+Se guardó desde B una ficha temporal con identificador aleatorio audit-... y se confirmó su persistencia en el servidor.
+A envió después a POST /api/sync/leads una ficha con el MISMO identificador, un nombre diferente y user_id de B tanto en el objeto como en el nivel superior del cuerpo.
+Resultado: el servidor guardó la ficha modificada en el espacio de A; desde B seguía apareciendo su ficha original, sin el nombre del atacante. No se observó colisión entre cuentas ni sobrescritura de B.
+Se restauraron las listas originales de ambas cuentas mediante la propia API y se verificó la restauración. La prueba utiliza escritura real con identificador conocido de la otra cuenta; es más informativa que añadir parámetros a una lectura.
+
+SUPERFICIE RPC Y CONTENIDO DE PAGO
+- El documento OpenAPI de Supabase no se entrega a la clave pública: 401, requiere service_role. Se comprobó que el token de usuario seguía siendo válido para evitar confundirlo con una sesión caducada.
+- Se probó la RPC perfiles_publicos_de con los dos identificadores controlados. Su respuesta expone una proyección pública: id, nombre, agency_name, agency_type, avatar_url, user_bio, web, linkedin, role. No devolvió columnas privadas adicionales en esa respuesta. No se deduce de ello la seguridad de otras RPC no conocidas.
+- Las consultas directas desde una cuenta gratuita a comunidad_posts, comunidad_respuestas y academia_comentarios devolvieron cero filas visibles. Sin un registro conocido de pago, ese resultado es INCONCLUYENTE; no demuestra que exista control de plan en esas tablas.
+
+RESULTADO GLOBAL DE ESTA RONDA
+Nuevo defecto reproducido en la salida CSV; no se logró elevación mediante upsert ni escritura cruzada mediante colisión de leads. No se obtuvo control administrativo ni se demostró lectura de datos privados ajenos.
+El texto de academia público descrito antes solo debe tratarse como vulnerabilidad si se pretende reservar ese texto a compradores; la intención de producto no se ha confirmado. La aceptación de TLS antiguo está demostrada, pero no demuestra por sí sola interceptación de conexiones modernas.
+La revisión sigue siendo externa. Quedan fuera el código de servidor, definiciones SQL completas, configuración de webhooks, registros y auditoría de dependencias. No se presenta como un pentest exhaustivo ni como descarte de backdoors.
+
+Evidencias: adversarial-evidence.json y adversarial-cleanup.json. No contienen contraseñas ni tokens.

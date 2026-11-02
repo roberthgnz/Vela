@@ -1,9 +1,6 @@
 import type { CatalogLayout, CatalogSource } from './contracts';
 import { t } from './i18n';
 
-/** Rows shown on Home until the user arranges them (Cinemeta's two plus eight more). */
-export const DEFAULT_HOME_ROWS = 10;
-
 export const emptyLayout: CatalogLayout = { order: [], hidden: {}, names: {} };
 
 export type HomeRow = {
@@ -29,7 +26,7 @@ export function catalogTitle(source: CatalogSource, layout: CatalogLayout, fallb
 
 /**
  * Every Home-eligible catalog in display order. Without a layout, Cinemeta's popular movies and
- * series come first, then the other catalogs in addon order, and only the first ten are visible.
+ * series come first, then the other catalogs in addon order. All are visible unless hidden by the user.
  * Arranged catalogs keep their place; new ones are appended in default order.
  */
 export function homeRows(sources: CatalogSource[], layout: CatalogLayout): HomeRow[] {
@@ -44,7 +41,7 @@ export function homeRows(sources: CatalogSource[], layout: CatalogLayout): HomeR
   const ordered = defaults
     .map((source, index) => ({ source, index }))
     .sort((a, b) => (rank.get(a.source.key) ?? Infinity) - (rank.get(b.source.key) ?? Infinity) || a.index - b.index);
-  return ordered.map(({ source, index }) => {
+  return ordered.map(({ source }) => {
     const type = source.catalog.type;
     const browse = type === 'movie' || type === 'series' ? type : undefined;
     // «Populares» describes Cinemeta's top catalogs; any other addon keeps its own catalog name.
@@ -55,7 +52,7 @@ export function homeRows(sources: CatalogSource[], layout: CatalogLayout): HomeR
       source,
       title: catalogTitle(source, layout, defaultTitle),
       defaultTitle,
-      visible: hidden === undefined ? index < DEFAULT_HOME_ROWS : !hidden,
+      visible: !hidden,
       browse,
     };
   });
@@ -71,7 +68,7 @@ export function moveRow(rows: HomeRow[], layout: CatalogLayout, key: string, ste
   return { ...layout, order };
 }
 
-/** Shows or hides a row; its current visibility is frozen so the default limit no longer applies. */
+/** Shows or hides a row explicitly for this profile. */
 export function toggleRow(layout: CatalogLayout, row: HomeRow): CatalogLayout {
   return { ...layout, hidden: { ...layout.hidden, [row.source.key]: row.visible } };
 }

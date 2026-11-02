@@ -1,0 +1,24 @@
+[
+  {
+    "requested": "TLSv1",
+    "negotiated": "TLSv1",
+    "cipher": [
+      "ECDHE-RSA-AES128-SHA",
+      "TLSv1.0",
+      128
+    ],
+    "certificate_validation": true,
+    "response": "HTTP/1.1 200 OK\r\nDate: Mon, 02 Nov 2026 09:16:08 GMT\r\nContent-Type: text/html\r\nConnection: close\r\nCF-Cache-Status: HIT\r\nCache-Control: public, max-age=0, must-revalidate\r\nStrict-Transport-Security: max-age=31536000; includeSubDomains\r\ncontent-security-policy: default-src 'self'; script-src 'self' https://cloud.umami.is https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self'; connect-src 'self' https://cloud.umami.is https://gateway.umami.is https://qrxjznkxsexdylqcvehj.supabase.co wss://qrxjznkxsexdylqcvehj.supabase.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://stats.g.doubleclick.net https://cloudflareinsights.com; frame-src https://www.youtube-nocookie.com https://calendar.google.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests\r\ncross-origin-opener-policy: same-origin\r\npermissions-policy: geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()\r\nreferrer-policy: strict-origin-when-cross-origin\r\nx-content-type-options: "
+  },
+  {
+    "requested": "TLSv1_1",
+    "negotiated": "TLSv1.1",
+    "cipher": [
+      "ECDHE-RSA-AES128-SHA",
+      "TLSv1.0",
+      128
+    ],
+    "certificate_validation": true,
+    "response": "HTTP/1.1 200 OK\r\nDate: Mon, 02 Nov 2026 09:16:08 GMT\r\nContent-Type: text/html\r\nConnection: close\r\nCF-Cache-Status: HIT\r\nCache-Control: public, max-age=0, must-revalidate\r\nStrict-Transport-Security: max-age=31536000; includeSubDomains\r\ncontent-security-policy: default-src 'self'; script-src 'self' https://cloud.umami.is https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self'; connect-src 'self' https://cloud.umami.is https://gateway.umami.is https://qrxjznkxsexdylqcvehj.supabase.co wss://qrxjznkxsexdylqcvehj.supabase.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://stats.g.doubleclick.net https://cloudflareinsights.com; frame-src https://www.youtube-nocookie.com https://calendar.google.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests\r\ncross-origin-opener-policy: same-origin\r\npermissions-policy: geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()\r\nreferrer-policy: strict-origin-when-cross-origin\r\nx-content-type-options: "
+  }
+]

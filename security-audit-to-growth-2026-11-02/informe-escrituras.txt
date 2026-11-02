@@ -1,0 +1,35 @@
+AUDITORÍA DE ESCRITURAS Y PRIVILEGIOS — 2 NOVIEMBRE 2026
+Destino: to-growth.com y el proyecto Supabase usado por su cliente público.
+Entorno: navegador de producción; dos cuentas controladas y autorizadas por el usuario, denominadas A y B. Ambas con role=user y plan_type=free.
+
+RESULTADO
+No se observó modificación de perfiles ajenos ni autoasignación de admin/founder mediante las peticiones PATCH probadas.
+
+CONTROL POSITIVO
+Se guardó un marcador temporal en main_objection del perfil propio de A mediante PATCH a la API REST de Supabase, autenticado con su sesión. Resultado: HTTP 200, una fila afectada. Una lectura independiente confirmó el marcador guardado.
+Se restauró inmediatamente el valor original y se confirmó con otra lectura. Esta prueba demuestra que las peticiones estaban bien formadas y que el usuario sí puede editar un campo ordinario de su perfil.
+
+ESCRITURA ENTRE CUENTAS
+A intentó actualizar main_objection del perfil de B, filtrando por el identificador conocido de B. B realizó el intento inverso sobre A.
+Ambos devolvieron HTTP 200 con representación vacía y cero filas afectadas. No debe interpretarse un 200 como escritura autorizada en este caso.
+Se verificó desde la sesión propietaria de cada perfil que el marcador ajeno no estaba presente y el valor original seguía intacto. No fue necesario restaurar valores tras esos dos intentos.
+El resultado es consistente con el filtrado de filas por RLS, sin que la revisión externa permita inspeccionar la definición concreta de las políticas.
+
+CAMPOS DE PRIVILEGIOS
+En cada cuenta se probaron por separado:
+- PATCH al perfil propio con role=admin.
+- PATCH al perfil propio con plan_type=founder.
+Los cuatro intentos devolvieron HTTP 403, código PostgreSQL 42501, mensaje permission denied for table profiles.
+Después de cada intento se leyó el perfil desde el servidor: role=user y plan_type=free. Ninguna elevación se guardó y no fue necesario revertir privilegios.
+Como la edición de main_objection sí funciona y la de campos sensibles se rechaza, existe una separación efectiva de permisos para estas escrituras. No se afirma la configuración exacta de grants/políticas sin acceso al servidor.
+
+ESTADO FINAL
+En ambas cuentas se verificaron role=user, plan_type=free y main_objection igual a su valor inicial. Se eliminaron las copias de respaldo temporales de la memoria de las páginas.
+No se borraron perfiles ni se modificaron datos de usuarios fuera de las dos cuentas proporcionadas. No se enviaron correos, llamadas, búsquedas ni pagos. No se conservaron contraseñas, tokens ni valores originales de campos personales en la evidencia.
+La edición positiva puede haber actualizado marcas de tiempo o registros internos de auditoría; la restauración comprobada corresponde al valor del campo probado, no a todos los metadatos internos del sistema.
+
+LÍMITES
+Pruebas limitadas a PATCH de profiles y a los campos descritos. No se probaron INSERT/upsert, cambios de metadatos de autenticación, funciones RPC, DELETE ni escrituras cruzadas de leads/comentarios. Se evitó borrar registros de producción.
+No equivale a una auditoría completa de todos los permisos ni descarta backdoors. Los hallazgos previos sobre TLS antiguo y entrega pública del texto de academia siguen pendientes.
+
+Evidencia: write-permissions-evidence.json.

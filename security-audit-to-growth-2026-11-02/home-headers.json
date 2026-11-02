@@ -1,0 +1,23 @@
+{
+  "Date": "Mon, 02 Nov 2026 09:11:54 GMT",
+  "Content-Type": "text/html",
+  "Transfer-Encoding": "chunked",
+  "Connection": "keep-alive",
+  "CF-Cache-Status": "HIT",
+  "Cache-Control": "public, max-age=0, must-revalidate",
+  "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "content-security-policy": "default-src 'self'; script-src 'self' https://cloud.umami.is https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self'; connect-src 'self' https://cloud.umami.is https://gateway.umami.is https://qrxjznkxsexdylqcvehj.supabase.co wss://qrxjznkxsexdylqcvehj.supabase.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://stats.g.doubleclick.net https://cloudflareinsights.com; frame-src https://www.youtube-nocookie.com https://calendar.google.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+  "cross-origin-opener-policy": "same-origin",
+  "permissions-policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "x-permitted-cross-domain-policies": "none",
+  "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=oqldhfcpXgoB9cb1JrgRDVqC37XCr7wjRtr5zPdJ7mQ86LThprrx5aZntHJYOvkaqY9UnH0P8m0PY6X2zGv4NCdHc2mJZciMBfSMCqVk4ocYSG9erf6o7juur7YiZru3\"}]}",
+  "ETag": "W/\"8c80209bd57e08844e3cae0c4f2287ba\"",
+  "Content-Encoding": "gzip",
+  "Server": "cloudflare",
+  "CF-RAY": "a54203b7688a9ae4-MAD",
+  "alt-svc": "h3=\":443\"; ma=86400"
+}

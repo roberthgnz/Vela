@@ -199,7 +199,7 @@ export function Player({
   });
   const [muted, setMuted] = useState(false);
   const [rate, setRate] = useState(1);
-  const [error, setError] = useState("");
+  const [playbackError, setError] = useState("");
   /** The source answered with an HTTP error or not at all: no other player would do better. */
   const [sourceDown, setSourceDown] = useState(false);
   /** Why the built-in player cannot decode this file, when there is no conversion (see below). */
@@ -228,6 +228,14 @@ export function Player({
   const [chapters, setChapters] = useState<Chapter[]>([]);
   /** The video played for the first time (the player is mounted again for every source). */
   const [begun, setBegun] = useState(false);
+  // Inspection can finish before playback starts. Its compatibility warning must stop
+  // blocking the picture as soon as the element proves it can play.
+  const error = playbackError || (
+    !begun && unsupported?.length && embeddedLibrary !== undefined &&
+    !(embeddedLibrary && onEmbedded)
+      ? t("player.needsMpv", { problems: unsupported.join(", ") })
+      : ""
+  );
   const seriesId = playing.meta.type === "series" ? playing.meta.id : "";
   const marks = useSeriesMarks(seriesId);
   const next = useMemo(
@@ -305,8 +313,7 @@ export function Player({
           : resumeAt.current,
       );
     } else if (started.current) setMpvHint(problems);
-    else setError(t("player.needsMpv", { problems }));
-  }, [embeddedLibrary, resumeAt, unsupported]);
+  }, [begun, embeddedLibrary, resumeAt, unsupported]);
 
   /** Where mpv starts when the user switches to it: the position, or the saved one before playing. */
   const mpvStart = () =>

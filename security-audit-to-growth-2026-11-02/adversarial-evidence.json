@@ -1,0 +1,112 @@
+{
+  "date": "2026-11-02",
+  "scope": "Adversarial hypotheses limited to two controlled production accounts",
+  "upsertRole": {
+    "elevated": false,
+    "error": {
+      "code": "42501",
+      "message": "permission denied for table profiles"
+    },
+    "restored": true,
+    "rows": null,
+    "status": 403,
+    "test": "upsert_own_role_admin"
+  },
+  "schemaDiscovery": {
+    "paths": [],
+    "profileDefinition": null,
+    "status": 401
+  },
+  "paidContentAndRpc": {
+    "content": [
+      {
+        "error": null,
+        "sampleRows": 0,
+        "sampleTextLength": 0,
+        "status": 200,
+        "table": "comunidad_posts",
+        "visibleRows": 0
+      },
+      {
+        "error": null,
+        "sampleRows": 0,
+        "sampleTextLength": 0,
+        "status": 200,
+        "table": "comunidad_respuestas",
+        "visibleRows": 0
+      },
+      {
+        "error": null,
+        "sampleRows": 0,
+        "sampleTextLength": 0,
+        "status": 200,
+        "table": "academia_comentarios",
+        "visibleRows": 0
+      }
+    ],
+    "freeAccount": true,
+    "publicProfileRpc": {
+      "error": null,
+      "returnedColumns": [
+        "id",
+        "nombre",
+        "agency_name",
+        "agency_type",
+        "avatar_url",
+        "user_bio",
+        "web",
+        "linkedin",
+        "role"
+      ],
+      "rows": 1,
+      "status": 200
+    }
+  },
+  "collisionSetup": {
+    "error": null,
+    "markerId": "audit-6720044d-79ca-4f73-920f-a85271299c07",
+    "markerPersisted": true,
+    "responseKeys": [
+      "ok",
+      "total"
+    ],
+    "serverCount": 1,
+    "status": 200
+  },
+  "collisionAttempt": {
+    "error": null,
+    "ownAlteredMarkerVisible": true,
+    "serverCount": 1,
+    "status": 200
+  },
+  "collisionVictim": {
+    "attackerMarkerVisible": false,
+    "originalBMarkerIntact": true,
+    "serverCount": 1,
+    "status": 200
+  },
+  "collisionCleanup": [
+    {
+      "account": "A",
+      "result": {
+        "restored": true,
+        "serverCount": 0,
+        "status": 200
+      }
+    },
+    {
+      "account": "B",
+      "result": {
+        "restored": true,
+        "serverCount": 0,
+        "status": 200
+      }
+    }
+  ],
+  "csvExporter": {
+    "captured": true,
+    "csv": "\"Empresa\";\"Decisor\";\"Cargo\";\"Teléfono\";\"Email\";\"Web\";\"Ubicación\";\"Sector\";\"Valoración\";\"Reseñas\";\"Señales\";\"Etapa\";\"Importe venta\";\"Fecha venta\"\n\"=1+1\";\"\";\"\";\"000000000\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"Contactos guardados\";\"0\";\"\"",
+    "formulaUnneutralized": true,
+    "source": "Actual app export Blob observed after clicking Exportar CSV"
+  }
+}

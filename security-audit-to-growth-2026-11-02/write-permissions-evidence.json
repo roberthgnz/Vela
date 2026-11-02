@@ -1,0 +1,197 @@
+{
+  "date": "2026-11-02",
+  "scope": "Authorized production security audit via browser; two controlled free accounts",
+  "baseline": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "account": "A",
+        "columns": "agency_name, agency_type, target_niche, target_location, main_offer, main_cta, pitch_tone, main_objection, user_bio, caso_exito, diferenciador, nombre, avatar_url, web, linkedin, acepta_novedades, notif_comunidad",
+        "error": null,
+        "expectedAccount": true,
+        "plan": "free",
+        "profileKeys": [
+          "id",
+          "role",
+          "plan_type",
+          "agency_name",
+          "agency_type",
+          "target_niche",
+          "target_location",
+          "main_offer",
+          "main_cta",
+          "pitch_tone",
+          "main_objection",
+          "user_bio",
+          "caso_exito",
+          "diferenciador",
+          "nombre",
+          "avatar_url",
+          "web",
+          "linkedin",
+          "acepta_novedades",
+          "notif_comunidad"
+        ],
+        "role": "user"
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "account": "B",
+        "columns": "agency_name, agency_type, target_niche, target_location, main_offer, main_cta, pitch_tone, main_objection, user_bio, caso_exito, diferenciador, nombre, avatar_url, web, linkedin, acepta_novedades, notif_comunidad",
+        "error": null,
+        "expectedAccount": true,
+        "plan": "free",
+        "profileKeys": [
+          "id",
+          "role",
+          "plan_type",
+          "agency_name",
+          "agency_type",
+          "target_niche",
+          "target_location",
+          "main_offer",
+          "main_cta",
+          "pitch_tone",
+          "main_objection",
+          "user_bio",
+          "caso_exito",
+          "diferenciador",
+          "nombre",
+          "avatar_url",
+          "web",
+          "linkedin",
+          "acepta_novedades",
+          "notif_comunidad"
+        ],
+        "role": "user"
+      }
+    }
+  ],
+  "ownWritePositiveControl": {
+    "affectedRows": 1,
+    "error": null,
+    "markerPersisted": true,
+    "originalRestored": true,
+    "restoreStatus": 200,
+    "status": 200,
+    "test": "own_profile_positive_control"
+  },
+  "crossAccountWrites": [
+    {
+      "from": "A",
+      "to": "B",
+      "attempt": {
+        "affectedRows": 0,
+        "error": null,
+        "status": 200
+      },
+      "verification": {
+        "markerObserved": false,
+        "originalRestored": true,
+        "restoreStatus": null
+      }
+    },
+    {
+      "from": "B",
+      "to": "A",
+      "attempt": {
+        "affectedRows": 0,
+        "error": null,
+        "status": 200
+      },
+      "verification": {
+        "markerObserved": false,
+        "originalRestored": true,
+        "restoreStatus": null
+      }
+    }
+  ],
+  "privilegeWrites": [
+    {
+      "account": "A",
+      "result": {
+        "affectedRows": null,
+        "attemptedValue": "admin",
+        "elevationPersisted": false,
+        "error": {
+          "code": "42501",
+          "message": "permission denied for table profiles"
+        },
+        "field": "role",
+        "originalPrivilegesRestored": true,
+        "status": 403
+      }
+    },
+    {
+      "account": "A",
+      "result": {
+        "affectedRows": null,
+        "attemptedValue": "founder",
+        "elevationPersisted": false,
+        "error": {
+          "code": "42501",
+          "message": "permission denied for table profiles"
+        },
+        "field": "plan_type",
+        "originalPrivilegesRestored": true,
+        "status": 403
+      }
+    },
+    {
+      "account": "B",
+      "result": {
+        "affectedRows": null,
+        "attemptedValue": "admin",
+        "elevationPersisted": false,
+        "error": {
+          "code": "42501",
+          "message": "permission denied for table profiles"
+        },
+        "field": "role",
+        "originalPrivilegesRestored": true,
+        "status": 403
+      }
+    },
+    {
+      "account": "B",
+      "result": {
+        "affectedRows": null,
+        "attemptedValue": "founder",
+        "elevationPersisted": false,
+        "error": {
+          "code": "42501",
+          "message": "permission denied for table profiles"
+        },
+        "field": "plan_type",
+        "originalPrivilegesRestored": true,
+        "status": 403
+      }
+    }
+  ],
+  "cleanup": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "account": "A",
+        "inMemoryBackupRemoved": true,
+        "originalProfileFieldRestored": true,
+        "plan": "free",
+        "privilegesUnchanged": true,
+        "role": "user"
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "account": "B",
+        "inMemoryBackupRemoved": true,
+        "originalProfileFieldRestored": true,
+        "plan": "free",
+        "privilegesUnchanged": true,
+        "role": "user"
+      }
+    }
+  ]
+}

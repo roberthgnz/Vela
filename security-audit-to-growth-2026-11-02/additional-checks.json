@@ -1,0 +1,152 @@
+[
+  {
+    "method": "GET",
+    "url": "https://to-growth.com/api/sync/leads",
+    "request_headers": {
+      "Origin": "https://auditoria.example"
+    },
+    "status": 401,
+    "headers": {
+      "Date": "Mon, 02 Nov 2026 09:14:34 GMT",
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": "26",
+      "Connection": "keep-alive",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=8tcijGtQru6APu2dVAhkPs3x1xIZi3XpTsOPXdY4pIOhmqVZPnMWdua37x9%2B6PZQOla%2FveWI3LllRF379FU8n7%2FrCHVgo5k%2F2WhiXbsGkyQngnLZFs77VPKXJnAmIjz5\"}]}",
+      "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+      "Server": "cloudflare",
+      "CF-RAY": "a542079e8a9d5ac6-MAD",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    },
+    "body": "{\"error\":\"Inicia sesion.\"}"
+  },
+  {
+    "method": "GET",
+    "url": "https://to-growth.com/api/sync/leads",
+    "request_headers": {
+      "Authorization": "Bearer invalid-audit-token"
+    },
+    "status": 401,
+    "headers": {
+      "Date": "Mon, 02 Nov 2026 09:14:35 GMT",
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": "26",
+      "Connection": "keep-alive",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=aDBiyus8Z6nhHqdTXXUs74iGTZ0KmkCcMAaK0i6pwYadWfpIBVgBfTNx1L3bQVexjS0y2lGVlLx0GvF0eej3b2MsxpCri4nFPIZYCkdYaZj7UFvRVjzamOB4%2FwHN4uiS\"}]}",
+      "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+      "Server": "cloudflare",
+      "CF-RAY": "a54207a12ee11bb7-MAD",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    },
+    "body": "{\"error\":\"Inicia sesion.\"}"
+  },
+  {
+    "method": "OPTIONS",
+    "url": "https://to-growth.com/api/sync/leads",
+    "request_headers": {
+      "Origin": "https://auditoria.example",
+      "Access-Control-Request-Method": "GET",
+      "Access-Control-Request-Headers": "authorization"
+    },
+    "status": 405,
+    "headers": {
+      "Date": "Mon, 02 Nov 2026 09:14:35 GMT",
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": "32",
+      "Connection": "keep-alive",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=z77uxWJB483Nx97Zv20Xmx%2F1Rx7IXhe6ly7%2FJEh86aXAZZJxVj7ePcZnJrWGXrHyLz7szvNAELGcFgCKjHUqtYzhOAJwW7xufH2wvvTFxyfGI3T71pLYXO3F33zZ0eob\"}]}",
+      "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+      "Server": "cloudflare",
+      "CF-RAY": "a54207a49b1cf871-MAD",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    },
+    "body": "{\"error\":\"Metodo no permitido.\"}"
+  },
+  {
+    "method": "POST",
+    "url": "https://to-growth.com/api/acceso-admin",
+    "request_headers": {
+      "Content-Type": "application/json"
+    },
+    "status": 404,
+    "headers": {
+      "Date": "Mon, 02 Nov 2026 09:14:36 GMT",
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": "26",
+      "Connection": "keep-alive",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=V5xQ8p%2BxO3g8TbKjI%2B7mVb3VXcOuKlaWaTHkHN4ik6GUJaAFY3GvNW0cnRUHpDT%2F2k2ZrkcqzbJeVh0QHvNivTyX6v0DfH9h0gzEkv53SmhZhMNo%2BwB%2FU8e%2BVRmBreCE\"}]}",
+      "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+      "Server": "cloudflare",
+      "CF-RAY": "a54207a76de8b770-MAD",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    },
+    "body": "{\"error\":\"No encontrado.\"}"
+  },
+  {
+    "method": "GET",
+    "url": "https://to-growth.com/legal/cookies",
+    "request_headers": {},
+    "status": 200,
+    "headers": {
+      "Date": "Mon, 02 Nov 2026 09:14:36 GMT",
+      "Content-Type": "text/html",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "CF-Cache-Status": "HIT",
+      "Cache-Control": "public, max-age=0, must-revalidate",
+      "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "content-security-policy": "default-src 'self'; script-src 'self' https://cloud.umami.is https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self'; connect-src 'self' https://cloud.umami.is https://gateway.umami.is https://qrxjznkxsexdylqcvehj.supabase.co wss://qrxjznkxsexdylqcvehj.supabase.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://stats.g.doubleclick.net https://cloudflareinsights.com; frame-src https://www.youtube-nocookie.com https://calendar.google.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+      "cross-origin-opener-policy": "same-origin",
+      "permissions-policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()",
+      "referrer-policy": "strict-origin-when-cross-origin",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=LcgHx%2Bv2sxFTWobVVBEYg9nawLhtIqdz1RSt63sAcF8p9fBBYat%2BZDhtLeLr19%2Bv%2B51nbnCJKv7PVmkyHTW69AB%2FhevGnXOcOB9lqYZ75QiKpYSn3s6u4ZITmD22rL3X\"}]}",
+      "ETag": "W/\"27b273f25c8c0adeaa7569bba9ccb5b1\"",
+      "Content-Encoding": "gzip",
+      "Server": "cloudflare",
+      "CF-RAY": "a54207aa380fc6bd-MAD",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    },
+    "body": "<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Política de Cookies | To Growth</title>\n<meta name=\"description\" content=\"Qué cookies usa To Growth, para qué sirve cada una y cómo cambiar tus preferencias en cualquier momento.\">\n<link rel=\"canonical\" href=\"https://to-growth.com/legal/cookies\">\n<meta name=\"robots\" content=\"index, follow\">\n<link rel=\"stylesheet\" href=\"../styles.css\">\n<link rel=\"stylesheet\" href=\"legal.css\">\n<link rel=\"icon\" type=\"image/png\" href=\"/favicon.png\">\n<link rel=\"icon\" href=\"/favicon.ico\" sizes=\"48x48\">\n<link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\">\n<meta property=\"og:image\" content=\"https://to-growth.com/og-image.jpg\">\n<meta name=\"twitter:card\" content=\"summary_large_image\">\n</head>\n<body class=\"dark-theme legal-doc\">\n\n<div class=\"legal-wrap\">\n\n  <a class=\"legal-volver\" href=\"/\">&larr; Volver a To Growth</a>\n\n  <h1>Política de Cookies</h1>\n  <p class=\"legal-fecha\">Última actualización: 28 de octubre de 2026</p>\n\n  <p>\n    Una cookie es un archivo pequeño que una web guarda en tu navegador. Algunas\n    hacen falta para que la web funcione; otras solo sirven para medir o para\n    publicidad, y esas <strong>solo se activan si tú lo autorizas</strong>.\n  </p>\n\n  <div class=\"legal-destacado\">\n    <p style=\"margin:0;\">\n      <strong>Nada de análisis ni publicidad se carga antes de que aceptes.</strong>\n      No es que se cargue y luego se desactive: el script de Google ni siquiera se\n      descarga hasta que das tu consentimiento.\n    </p>\n  </div>\n\n  <h2>Qué usamos exactamente</h2>\n\n  <h3>Necesarias · siempre activas</h3>\n  <p>Sin estas la plataforma no puede funcionar, así que no requieren consentimiento.</p>\n  <table class=\"legal-tabla\">\n    <tr><th>Nombre</th><th>Para qué</th><th>Duración</th></tr>\n    <tr>\n      <td><code>sb-*-auth-token</code></td>\n      <td>Mantiene tu sesión iniciada (Supabase)</td>\n      <td>Sesión / 1 año</td>\n    </tr>\n    <tr>\n      <td><code>to_growth_consentimiento</code></td>\n      <td>Recuerda esta misma elección para no volver a preguntarte</td>\n      <td>1 año</td>\n    </tr>\n    <tr>\n      <td><code>to_growth_profile</code></td>\n      <td>Guarda tu perfil de negocio en el navegador para que la app cargue al instante</td>\n      <td>Permanente</td>\n    </tr>\n    <tr>\n      <td><code>__cf_bm</code></td>\n      <td>Protección frente a bots (Cloudflare)</td>\n      <td>30 minutos</td>\n    </tr>\n  </table>\n\n  <h3>Análisis · solo con tu permiso</h3>\n  <table class=\"legal-tabla\">\n    <tr><th>Nombre</th><th>Para qué</th><th>Duración</th></tr>\n    <tr>\n      <td><code>_ga</code>, <code>_ga_*</code></td>\n      <td>Google Analytics: cuántas personas visitan cada sección y dónde abandonan. La IP se anonimiza.</td>\n      <td>Hasta 2 años</td>\n    </tr>\n  </table>\n\n  <h3>Estadística sin cookies · siempre</h3>\n  <p>\n    Para saber cuánta gente entra y qué partes de la herramienta se usan, usamos\n    Umami. No guarda nada en tu navegador (ni cookies ni nada parecido), no te\n    sigue por otras webs y solo nos da números agregados: visitas por página,\n    país, tipo de dispositivo y acciones como «búsqueda hecha» o «empresa\n    guardada». No lleva tu nombre ni tu correo. Por eso no necesita tu permiso.\n  </p>\n\n  <h3>Publicidad · solo con tu permiso</h3>\n  <table class=\"legal-tabla\">\n    <tr><th>Nombre</th><th>Para qué</th><th>Duración</th></tr>\n    <tr>\n      <td><code>_gcl_*</code></td>\n      <td>Medir si un anuncio ha terminado en registro, y no repetirte el mismo anuncio</td>\n      <td>Hasta 90 días</td>\n    </tr>\n  </table>\n\n  <h2>Cambiar de opinión</h2>\n  <p>\n    Puedes revisar o revocar tu elección cuando quieras, sin dar explicaciones:\n  </p>\n  <p>\n    <button class=\"btn btn-primary abrirPreferenciasCookies\">\n      Abrir mis preferencias de cookies\n    </button>\n  </p>\n  <p>\n    También puedes borrar las cookies desde los ajustes de tu navegador. Ten en\n    cuenta que si eliminas las necesarias tendrás que volver a iniciar sesión.\n  </p>\n\n  <h2>Cookies de terceros</h2>\n  <p>\n    Los servicios que usamos pueden instalar sus propias cookies. Sus políticas:\n  </p>\n  <ul>\n    <li><a href=\"https://policies.google.com/technologies/cookies\" target=\"_blank\" rel=\"noopener noreferrer\">Google</a></li>\n    <li><a href=\"https://stripe.com/cookies-policy/legal\" target=\"_blank\" rel=\"noopener noreferrer\">Stripe</a></li>\n    <li><a href=\"https://www.cloudflare.com/cookie-policy/\" target=\"_blank\" rel=\"noopener noreferrer\">Cloudflare</a></li>\n    <li><a href=\"https://supabase.com/privacy\" target=\"_blank\" rel=\"noopener noreferrer\">Supabase</a></li>\n  </ul>\n\n  <footer class=\"legal-pie\">\n    <a href=\"/\">Inicio</a> ·\n    <a href=\"/legal/aviso-legal\">Aviso legal</a> ·\n    <a href=\"/legal/privacidad\">Privacidad</a> ·\n    <a href=\"#\" class=\"abrirPreferenciasCookies\">Preferencias de cookies</a>\n    <p>© 2026 To Growth. Todos los derechos reservados.</p>\n  </footer>\n\n</div>\n\n<script src=\"../js/cookies.js\"></script>\n</body>\n</html>\n"
+  },
+  {
+    "method": "GET",
+    "url": "https://to-growth.com/legal/privacidad",
+    "request_headers": {},
+    "status": 200,
+    "headers": {
+      "Date": "Mon, 02 Nov 2026 09:14:37 GMT",
+      "Content-Type": "text/html",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "CF-Cache-Status": "HIT",
+      "Cache-Control": "public, max-age=0, must-revalidate",
+      "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "content-security-policy": "default-src 'self'; script-src 'self' https://cloud.umami.is https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self'; connect-src 'self' https://cloud.umami.is https://gateway.umami.is https://qrxjznkxsexdylqcvehj.supabase.co wss://qrxjznkxsexdylqcvehj.supabase.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://stats.g.doubleclick.net https://cloudflareinsights.com; frame-src https://www.youtube-nocookie.com https://calendar.google.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+      "cross-origin-opener-policy": "same-origin",
+      "permissions-policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()",
+      "referrer-policy": "strict-origin-when-cross-origin",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=btMo3cQ520PcktwRQ9WL08oUYO2cI6wxvl3TBYUsPYZIKmf63jYJzFiRoCKxN0B65aW00ea31tT4eej4XvDerp%2BoIqWMAg7jaGPoaa%2BkhTaGzRNH4HOTiUjiy%2FALbu9y\"}]}",
+      "ETag": "W/\"74b4fcbfc4d3f595bfa91e14a9802073\"",
+      "Content-Encoding": "gzip",
+      "Server": "cloudflare",
+      "CF-RAY": "a54207ad99cd191e-MAD",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    },
+    "body": "<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Política de Privacidad | To Growth</title>\n<meta name=\"description\" content=\"Cómo trata To Growth los datos personales: qué recogemos, para qué, durante cuánto tiempo y cómo ejercer tus derechos.\">\n<link rel=\"canonical\" href=\"https://to-growth.com/legal/privacidad\">\n<meta name=\"robots\" content=\"index, follow\">\n<link rel=\"stylesheet\" href=\"../styles.css\">\n<link rel=\"stylesheet\" href=\"legal.css\">\n<link rel=\"icon\" type=\"image/png\" href=\"/favicon.png\">\n<link rel=\"icon\" href=\"/favicon.ico\" sizes=\"48x48\">\n<link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\">\n<meta property=\"og:image\" content=\"https://to-growth.com/og-image.jpg\">\n<meta name=\"twitter:card\" content=\"summary_large_image\">\n</head>\n<body class=\"dark-theme legal-doc\">\n\n<div class=\"legal-wrap\">\n\n  <a class=\"legal-volver\" href=\"/\">&larr; Volver a To Growth</a>\n\n  <h1>Política de Privacidad</h1>\n  <p class=\"legal-fecha\">Última actualización: 28 de octubre de 2026</p>\n\n  <h2>1. Quién es el responsable de tus datos</h2>\n  <table class=\"legal-tabla\">\n    <tr><th>Responsable</th><td>Mateo Martínez</td></tr>\n    <tr><th>Domicilio</th><td>Burgos, España</td></tr>\n    <tr><th>Correo de contacto</th><td>mateo@to-growth.com</td></tr>\n    <tr><th>Sitio web</th><td>https://to-growth.com</td></tr>\n  </table>\n\n  <h2>2. Qué datos tratamos y con qué finalidad</h2>\n\n  <h3>2.1 Datos de tu cuenta</h3>\n  <p>\n    Cuando creas una cuenta recogemos tu <strong>correo electrónico</strong> y una\n    <strong>contraseña cifrada</strong>. La contraseña la gestiona Supabase y\n    nunca la vemos en claro.\n  </p>\n  <ul>\n    <li><strong>Finalidad:</strong> darte acceso a la plataforma y poder contactarte por cuestiones del servicio.</li>\n    <li><strong>Base legal:</strong> ejecución del contrato (art. 6.1.b RGPD).</li>\n    <li><strong>Conservación:</strong> mientras mantengas la cuenta y, tras darla de baja, el tiempo necesario para atender responsabilidades legales.</li>\n  </ul>\n\n  <h3>2.2 Tu perfil de negocio</h3>\n  <p>\n    Si completas el onboarding guardamos los datos de tu actividad: sector, oferta,\n    nicho objetivo, tono comercial y objeciones habituales.\n  </p>\n  <ul>\n    <li><strong>Finalidad:</strong> personalizar los resultados de búsqueda y los guiones de llamada.</li>\n    <li><strong>Base legal:</strong> ejecución del contrato.</li>\n    <li><strong>Conservación:</strong> hasta que lo borres o cierres la cuenta.</li>\n  </ul>\n\n  <h3>2.3 Datos de pago</h3>\n  <p>\n    Los pagos los procesa <strong>Stripe</strong>. <strong>Nunca vemos ni almacenamos\n    tu número de tarjeta</strong>: el formulario de pago es de Stripe y los datos van\n    directos a ellos. Nosotros solo guardamos un identificador de cliente para\n    saber que tu plan está activo.\n  </p>\n\n  <h3>2.4 Datos de empresas y profesionales del buscador</h3>\n  <div class=\"legal-destacado\">\n    <p>\n      Esta sección describe el tratamiento de datos de <strong>terceros</strong> —\n      personas que no son usuarias de To Growth pero cuyos datos profesionales\n      aparecen en el buscador.\n    </p>\n    <p>\n      <strong>Base legal:</strong> interés legítimo en la comunicación comercial\n      entre empresas (art. 6.1.f RGPD, considerando 47), limitado a\n      <strong>datos profesionales de contacto</strong> y nunca a datos personales\n      del ámbito privado.\n    </p>\n    <p>\n      <strong>Origen:</strong> proveedores de datos B2B con los que mantenemos un\n      acuerdo, y fuentes de acceso público. El buscador gratuito solo enseña lo\n      que el propio negocio publica en su ficha de Google Maps: nombre, dirección,\n      teléfono del negocio, web y valoración. No buscamos ni mostramos móviles\n      personales ni direcciones particulares.\n    </p>\n    <p>\n      <strong>Derecho de oposición:</strong> cualquier persona puede solicitar la\n      supresión de sus datos escribiendo a <a href=\"mailto:mateo@to-growth.com\">mateo@to-growth.com</a>.\n      Se atenderá sin necesidad de justificar el motivo y en un plazo máximo de\n      un mes.\n    </p>\n  </div>\n\n  <h3 id=\"quitar-mi-empresa\">2.5 Quitar mi empresa de To Growth</h3>\n  <p>\n    Si tu negocio sale en el buscador y prefieres que no salga, no hace falta que\n    expliques por qué. Escribe a <a href=\"mailto:mateo@to-growth.com?subject=Quitar%20mi%20empresa%20de%20To%20Growth\">mateo@to-growth.com</a>\n    con el asunto «Quitar mi empresa» e indica:\n  </p>\n  <ul>\n    <li>el nombre del negocio tal y como aparece en Google Maps,</li>\n    <li>la dirección o la ciudad,</li>\n    <li>y, si lo tienes, el enlace a su ficha de Google Maps.</li>\n  </ul>\n  <p>\n    Lo bloqueamos para que no vuelva a salir en ninguna búsqueda y te\n    respondemos para confirmarlo. Lo atiende una persona, no un sistema\n    automático, y el plazo máximo es de un mes.\n  </p>\n\n  <h2>3. Quién más accede a tus datos</h2>\n  <p>Trabajamos con proveedores que actúan como encargados del tratamiento:</p>\n  <table class=\"legal-tabla\">\n    <tr><th>Proveedor</th><th>Para qué</th><th>Dónde</th></tr>\n    <tr><td>Supabase</td><td>Base de datos y autenticación</td><td>UE / EE. UU.</td></tr>\n    <tr><td>Cloudflare</td><td>Alojamiento y seguridad</td><td>Red global</td></tr>\n    <tr><td>Stripe</td><td>Procesamiento de pagos</td><td>UE / EE. UU.</td></tr>\n    <tr><td>Google</td><td>Analítica web (solo si la aceptas) y datos públicos de empresas para el buscador (Google Maps)</td><td>UE / EE. UU.</td></tr>\n    <tr><td>Umami</td><td>Estadística de visitas y de uso de la herramienta, sin cookies y sin datos que te identifiquen</td><td>UE</td></tr>\n    <tr><td>Brevo</td><td>Envío de correos de la plataforma (bienvenida, avisos)</td><td>UE</td></tr>\n    <tr><td>OpenAI</td><td>Generación de guiones con inteligencia artificial (ver apartado 4)</td><td>EE. UU.</td></tr>\n  </table>\n  <p>\n    Las transferencias fuera del Espacio Económico Europeo se amparan en las\n    Cláusulas Contractuales Tipo de la Comisión Europea.\n  </p>\n  <p>\n    <strong>No vendemos ni cedemos tus datos personales a terceros</strong> para\n    sus propios fines.\n  </p>\n\n  <h2>4. Guiones generados con inteligencia artificial</h2>\n  <p>\n    Cuando generas un guion de llamada, enviamos a <strong>OpenAI</strong> los datos\n    de la empresa a la que vas a llamar y los de tu perfil de negocio (tu oferta,\n    tu tono y tu caso de éxito). No enviamos tu correo, tu contraseña ni ningún\n    dato de pago.\n  </p>\n  <ul>\n    <li><strong>Finalidad:</strong> redactar un guion adaptado a esa llamada concreta.</li>\n    <li><strong>Base legal:</strong> ejecución del contrato.</li>\n    <li><strong>Encargado:</strong> OpenAI, que según sus condiciones para clientes de API\n        no utiliza estos datos para entrenar sus modelos.</li>\n  </ul>\n  <p>\n    La clave de acceso es nuestra y vive cifrada en el servidor. Tú no necesitas\n    cuenta de OpenAI ni introducir ninguna clave.\n  </p>\n\n  <h2>5. Tus derechos</h2>\n  <p>Puedes ejercer en cualquier momento los derechos de:</p>\n  <ul>\n    <li><strong>Acceso:</strong> saber qué datos tuyos tenemos.</li>\n    <li><strong>Rectificación:</strong> corregir los que sean inexactos.</li>\n    <li><strong>Supresión:</strong> pedir que los borremos.</li>\n    <li><strong>Oposición:</strong> oponerte a un tratamiento concreto.</li>\n    <li><strong>Limitación:</strong> pedir que los conservemos pero no los usemos.</li>\n    <li><strong>Portabilidad:</strong> recibirlos en un formato reutilizable.</li>\n  </ul>\n  <p>\n    Escribe a <a href=\"mailto:mateo@to-growth.com\">mateo@to-growth.com</a> indicando\n    qué derecho quieres ejercer. Responderemos en un plazo máximo de un mes.\n  </p>\n  <p>\n    Si consideras que no hemos atendido correctamente tu solicitud, puedes\n    reclamar ante la <a href=\"https://www.aepd.es\" target=\"_blank\" rel=\"noopener noreferrer\">Agencia Española de Protección de Datos</a>.\n  </p>\n\n  <h2>6. Seguridad</h2>\n  <p>\n    Aplicamos medidas técnicas para proteger tus datos: cifrado en tránsito\n    (HTTPS obligatorio), seguridad a nivel de fila en la base de datos para que\n    ningún usuario pueda acceder a los datos de otro, y las claves de las\n    integraciones almacenadas cifradas y fuera del navegador.\n  </p>\n  <p>\n    Ningún sistema es infalible. Si se produjera una brecha que afectase a tus\n    datos, te lo comunicaríamos y lo notificaríamos a la autoridad de control en\n    el plazo legal de 72 horas.\n  </p>\n\n  <h2>7. Cambios en esta política</h2>\n  <p>\n    Si modificamos esta política te avisaremos por correo o mediante un aviso\n    visible en la plataforma antes de que los cambios entren en vigor.\n  </p>\n\n  <footer class=\"legal-pie\">\n    <a href=\"/\">Inicio</a> ·\n    <a href=\"/legal/aviso-legal\">Aviso legal</a> ·\n    <a href=\"/legal/cookies\">Cookies</a> ·\n    <a href=\"#\" class=\"abrirPreferenciasCookies\">Preferencias de cookies</a>\n    <p>© 2026 To Growth. Todos los derechos reservados.</p>\n  </footer>\n\n</div>\n\n<script src=\"../js/cookies.js\"></script>\n</body>\n</html>\n"
+  }
+]

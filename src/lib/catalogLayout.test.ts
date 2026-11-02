@@ -18,11 +18,11 @@ const extras = Array.from({ length: 10 }, (_, index) => source('more', 'movie', 
 const sources = [other, cinemetaMovie, cinemetaSeries, searchOnly, ...extras];
 
 describe('home catalog layout', () => {
-  it('puts Cinemeta first, skips catalogs that need extras and shows ten rows by default', () => {
+  it('puts Cinemeta first, skips catalogs that need extras and shows all rows by default', () => {
     const rows = homeRows(sources, emptyLayout);
     expect(rows.slice(0, 3).map((row) => row.title)).toEqual(['Películas populares', 'Series populares', 'other top']);
     expect(rows.map((row) => row.source)).not.toContain(searchOnly);
-    expect(rows.filter((row) => row.visible)).toHaveLength(10);
+    expect(rows.filter((row) => row.visible)).toHaveLength(sources.length - 1);
     expect(rows.slice(0, 3).map((row) => row.browse)).toEqual(['movie', 'series', 'movie']);
     expect(homeRows([source('tv', 'tv', 'live')], emptyLayout)[0].browse).toBeUndefined();
   });
@@ -34,9 +34,25 @@ describe('home catalog layout', () => {
     layout = renameRow(layout, cinemetaSeries.key, '  Mis series  ');
     rows = homeRows([...sources, source('new', 'series', 'x')], layout);
     expect(rows.slice(0, 3).map((row) => row.title)).toEqual(['Películas populares', 'other top', 'Mis series']);
-    expect(rows[12].visible).toBe(true);
+    expect(rows[12].visible).toBe(false);
     expect(rows.at(-1)?.source.addon.manifest.id).toBe('new');
+    expect(rows.at(-1)?.visible).toBe(true);
     expect(renameRow(layout, cinemetaSeries.key, ' ').names).toEqual({});
+  });
+
+  it('appends new addon catalogs visibly beyond ten rows while preserving explicit visibility', () => {
+    const layout = {
+      order: homeRows(sources, emptyLayout).map((row) => row.source.key).reverse(),
+      hidden: { [other.key]: true, [extras[9].key]: false },
+      names: {},
+    };
+    const added = [source('new', 'movie', 'films'), source('new', 'series', 'shows')];
+    const rows = homeRows([...sources, ...added], layout);
+    expect(rows.slice(0, -2).map((row) => row.source.key)).toEqual(layout.order);
+    expect(rows.slice(-2).map((row) => row.source)).toEqual(added);
+    expect(rows.slice(-2).every((row) => row.visible)).toBe(true);
+    expect(rows.find((row) => row.source.key === other.key)?.visible).toBe(false);
+    expect(rows.find((row) => row.source.key === extras[9].key)?.visible).toBe(true);
   });
 
   it('keeps a layout per profile', () => {

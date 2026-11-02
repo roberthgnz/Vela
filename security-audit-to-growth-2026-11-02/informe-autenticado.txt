@@ -1,0 +1,33 @@
+AUDITORÍA EN NAVEGADOR — CUENTA GRATUITA — 2 NOVIEMBRE 2026
+
+Alcance: sesión iniciada por el usuario en el navegador de producción de to-growth.com. Cuenta comprobada con plan_type=free, role=user y correo verificado. Pruebas de lectura y rechazo de credenciales manipuladas; no se editaron roles, planes, registros ni datos comerciales. No se crearon pagos en esta fase. Contraseña y tokens excluidos de la evidencia.
+
+HALLAZGO — BAJO / EXPOSICIÓN DE TEXTO CON BLOQUEO SOLO EN LA INTERFAZ
+El visor de lecciones Academy.openLessonViewer exige Plan.esFundador(). Sin embargo, /js/academia-datos.js?v=6 devuelve 200 al solicitarlo desde el navegador con credentials:omit, sin Authorization. El archivo contiene los datos completos empleados por el visor: summary y keyTakeaways, además de títulos y metadatos.
+La cuenta gratuita ya dispone en memoria de 28 módulos y 141 lecciones, todas con resumen. Plan.esFundador() es false. El control de interfaz deriva de checkIsVIP() y un indicador local; no constituye autorización de entrega del texto.
+Impacto confirmado: el texto que muestra el visor de pago puede obtenerse sin comprar ni iniciar sesión. No se ha demostrado acceso a vídeos: las 141 lecciones tienen el campo video vacío. Si los resúmenes se consideran contenido promocional público, esta observación es informativa; debe aclararse esa intención de producto.
+Corrección: mantener el catálogo y las muestras públicas, pero entregar cualquier texto/vídeo reservado desde endpoints que comprueben el plan en el servidor. Para vídeos, usar un proveedor con autorización de reproducción; no depender de ocultar enlaces en JavaScript.
+Verificación: la petición sin sesión o con plan gratuito no debe recibir material reservado; la cuenta Fundador debe poder obtenerlo. No se ha realizado prueba con una cuenta de pago.
+
+CONTROLES VERIFICADOS
+- GET /api/sync/leads con token válido: 200, lista vacía propia, Cache-Control:no-store.
+- GET /api/afiliados/resumen: 200. Solo se guardaron nombres de campos en la evidencia, sin códigos de afiliación ni contenido de comisiones.
+- GET /api/integraciones/apollo con plan free: 402, exige Plan Fundador. La comprobación existe en el servidor para esta ruta.
+- POST /api/acceso-admin con token válido de usuario normal y JSON vacío: 404; GET /admin/:404. No se obtuvo acceso administrativo.
+- Token propio con payload modificado a role=service_role, manteniendo la firma original: 401 en GET /api/sync/leads y GET /api/integraciones/apollo. No se observó aceptación de ese JWT manipulado.
+- Lectura de profiles mediante Supabase, usando HEAD con conteo y sin recuperar filas: filtro propio devuelve 1 fila visible; filtro excluyendo el id propio devuelve 0. Es compatible con aislamiento de lectura, pero no demuestra aislamiento completo: no hay una segunda cuenta controlada ni se conocen los registros existentes.
+- La sesión usa JWT de una hora y persistencia del SDK de Supabase en localStorage. Este patrón no es, por sí solo, una vulnerabilidad ni demuestra XSS. No se exportó el token.
+- Antes de iniciar sesión y sin decisión de consentimiento, se observaron recursos de Umami y Cloudflare Insights; no se observaron recursos de Google en esa captura inicial. Tras la intervención del usuario había cookies _ga. No se infiere un incumplimiento de consentimiento de ese cambio.
+- Se volvió a confirmar ausencia de HSTS en las respuestas API y admin probadas, observación ya recogida en el informe externo.
+
+LÍMITES
+No se han intentado actualizaciones de role o plan_type, ni escrituras de datos ajenos, ni consumo de búsquedas/IA. No se han probado las políticas RLS de escritura, eliminación de comentarios, almacenamiento ni aislamiento entre dos cuentas. No se han probado webhooks de Stripe, antifraude, cuotas o revocación de sesión. La cuenta no tenía leads para validar la retención de datos al cerrar sesión. No se modificó el indicador VIP local.
+Esta revisión no permite confirmar ni descartar backdoors: requeriría código de servidor, dependencias y registros. No se observó un bypass administrativo en las rutas probadas.
+
+PRIORIDADES
+1. Corregir TLS 1.0/1.1 detectados en la revisión externa.
+2. Decidir qué texto de academia es público y proteger en servidor el reservado.
+3. Unificar HSTS en respuestas dinámicas.
+4. Completar aislamiento entre dos cuentas controladas y permisos de escritura en un conjunto de datos de prueba, aunque se use producción.
+
+Evidencia: authenticated-evidence.json. No contiene contraseñas ni tokens de acceso/refresco.

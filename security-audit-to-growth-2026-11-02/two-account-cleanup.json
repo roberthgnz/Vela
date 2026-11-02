@@ -1,0 +1,24 @@
+[
+  {
+    "status": "fulfilled",
+    "value": {
+      "account": "A",
+      "localLeadCount": 0,
+      "localTemporaryMarkers": 0,
+      "serverLeadCount": 0,
+      "serverTemporaryMarkers": 0,
+      "status": 200
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "account": "B",
+      "localLeadCount": 0,
+      "localTemporaryMarkers": 0,
+      "serverLeadCount": 0,
+      "serverTemporaryMarkers": 0,
+      "status": 200
+    }
+  }
+]

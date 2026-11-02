@@ -1,0 +1,120 @@
+[
+  {
+    "requested": "TLSv1_2",
+    "negotiated": "TLSv1.2",
+    "cipher": [
+      "ECDHE-ECDSA-AES128-GCM-SHA256",
+      "TLSv1.2",
+      128
+    ],
+    "cert": {
+      "subject": [
+        [
+          [
+            "commonName",
+            "to-growth.com"
+          ]
+        ]
+      ],
+      "issuer": [
+        [
+          [
+            "countryName",
+            "US"
+          ]
+        ],
+        [
+          [
+            "organizationName",
+            "Google Trust Services"
+          ]
+        ],
+        [
+          [
+            "commonName",
+            "WE1"
+          ]
+        ]
+      ],
+      "version": 3,
+      "serialNumber": "B7E68EAAC92E770E0E53D17A094CFE24",
+      "notBefore": "Oct  3 10:15:20 2026 GMT",
+      "notAfter": "Jan  1 11:15:01 2027 GMT",
+      "subjectAltName": [
+        [
+          "DNS",
+          "to-growth.com"
+        ],
+        [
+          "DNS",
+          "*.to-growth.com"
+        ]
+      ],
+      "caIssuers": [
+        "http://i.pki.goog/we1.crt"
+      ],
+      "crlDistributionPoints": [
+        "http://c.pki.goog/we1/jeT6HIXpRMI.crl"
+      ]
+    }
+  },
+  {
+    "requested": "TLSv1_3",
+    "negotiated": "TLSv1.3",
+    "cipher": [
+      "TLS_AES_256_GCM_SHA384",
+      "TLSv1.3",
+      256
+    ],
+    "cert": {
+      "subject": [
+        [
+          [
+            "commonName",
+            "to-growth.com"
+          ]
+        ]
+      ],
+      "issuer": [
+        [
+          [
+            "countryName",
+            "US"
+          ]
+        ],
+        [
+          [
+            "organizationName",
+            "Google Trust Services"
+          ]
+        ],
+        [
+          [
+            "commonName",
+            "WE1"
+          ]
+        ]
+      ],
+      "version": 3,
+      "serialNumber": "B7E68EAAC92E770E0E53D17A094CFE24",
+      "notBefore": "Oct  3 10:15:20 2026 GMT",
+      "notAfter": "Jan  1 11:15:01 2027 GMT",
+      "subjectAltName": [
+        [
+          "DNS",
+          "to-growth.com"
+        ],
+        [
+          "DNS",
+          "*.to-growth.com"
+        ]
+      ],
+      "caIssuers": [
+        "http://i.pki.goog/we1.crt"
+      ],
+      "crlDistributionPoints": [
+        "http://c.pki.goog/we1/jeT6HIXpRMI.crl"
+      ]
+    }
+  }
+]

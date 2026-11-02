@@ -1,0 +1,22 @@
+[
+  {
+    "account": "A",
+    "result": {
+      "csvObserverRemoved": true,
+      "localLeadCount": 0,
+      "privilegesRestored": true,
+      "serverLeadCount": 0,
+      "serverLeadsRestored": true
+    }
+  },
+  {
+    "account": "B",
+    "result": {
+      "csvObserverRemoved": true,
+      "localLeadCount": 0,
+      "privilegesRestored": true,
+      "serverLeadCount": 0,
+      "serverLeadsRestored": true
+    }
+  }
+]

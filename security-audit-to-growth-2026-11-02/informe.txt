@@ -1,0 +1,64 @@
+AUDITORÍA EXTERNA SIN AUTENTICACIÓN — TO-GROWTH.COM
+Fecha: 2 de noviembre de 2026. Observación aproximada: 09:11–09:18 UTC.
+Destino: https://to-growth.com/
+
+RESULTADO
+Se confirmó un riesgo medio: el frontal público acepta TLS 1.0 y TLS 1.1.
+Se observó una mejora de endurecimiento de riesgo bajo: HSTS no está presente en las respuestas de API y administración probadas.
+No se demostró acceso sin autorización a datos privados ni funciones de IA/búsqueda. Esto no acredita la seguridad de toda la aplicación.
+
+ALCANCE Y MÉTODO
+Peticiones HTTP de bajo volumen, sin cuenta, sin cookies de sesión ni tokens de usuario. Lectura de la portada, 30 scripts públicos propios, páginas legales y rutas descubiertas en esos recursos. Comprobación de 22 peticiones adicionales recogidas en request-checks.json y additional-checks.json. Negociaciones TLS con validación del certificado y hostname.
+Los POST de prueba emplearon un objeto JSON vacío. No se enviaron formularios de alta, correos, mensajes ni datos personales. No se hicieron ataques de carga, fuerza bruta o explotación.
+Excepción de efecto lateral: POST /api/stripe/checkout creó UNA sesión real de checkout de Stripe. No se abrió el enlace ni se efectuó un pago. El enlace se ha redactado en la evidencia guardada. No se repitió esta prueba.
+No se ejecutó un navegador: las conclusiones sobre JavaScript proceden de lectura estática; no constituyen una captura HAR ni verifican el tráfico efectivo después de ejecutar scripts.
+
+HALLAZGO 1 — MEDIO — PROTOCOLOS TLS ANTIGUOS ACEPTADOS
+Confirmado mediante conexiones independientes con versión mínima y máxima fijadas:
+- TLS 1.0: negociación TLSv1; HEAD / devuelve HTTP/1.1 200 OK.
+- TLS 1.1: negociación TLSv1.1; HEAD / devuelve HTTP/1.1 200 OK.
+- Cifrado observado en ambos: ECDHE-RSA-AES128-SHA.
+- También se aceptaron TLS 1.2 y TLS 1.3; certificado válido para el hostname durante las pruebas.
+Impacto: el sitio permite que clientes antiguos utilicen protocolos obsoletos y cifrado CBC/SHA-1. No se ha demostrado descifrado, interceptación ni degradación de una conexión de navegador moderno. HSTS obliga a HTTPS, pero no determina su versión TLS.
+Corrección: configurar Minimum TLS Version = 1.2 para la zona/hostname en Cloudflare y conservar TLS 1.3. Revisar compatibilidad de clientes antes de aplicar el cambio.
+Verificación: TLS 1.0 y TLS 1.1 deben fallar en el handshake; TLS 1.2 y 1.3 deben seguir funcionando.
+Evidencia: tls-legacy.json y tls.json.
+Referencia: https://developers.cloudflare.com/ssl/edge-certificates/additional-options/minimum-tls/
+
+HALLAZGO 2 — BAJO — HSTS INCONSISTENTE SEGÚN LA RUTA
+La portada y los scripts probados incluyen Strict-Transport-Security: max-age=31536000; includeSubDomains.
+Las respuestas probadas de /api/* y /admin/ no incluyen esta cabecera.
+Impacto limitado: un cliente que acceda directamente por HTTPS a esas rutas, sin haber recibido HSTS anteriormente y sin una política precargada aplicable, no aprenderá HSTS de esas respuestas. Quien ya recibió la política desde la portada conserva su protección para el host. No se comprobó el estado de precarga HSTS.
+Corrección: añadir HSTS de forma uniforme a todas las respuestas HTTPS, incluidos errores y funciones dinámicas. Mantener Cache-Control: no-store en las API.
+Evidencia: home-headers.json, scripts-headers.json, request-checks.json y additional-checks.json.
+No se considera que la ausencia de CSP en una respuesta JSON sea por sí misma una vulnerabilidad.
+
+OBSERVACIONES QUE REQUIEREN VALIDACIÓN
+A. Datos locales tras cerrar sesión (riesgo contextual bajo; revisión estática).
+El manejador de logout en auth.js borra perfil, indicador VIP y usuario local. No se observa borrado de to_growth_saved_leads, historial del asistente ni secuencias guardadas. Sync.detener() detiene temporizadores; no borra esos datos. Existe una comprobación de dueño para leads al cambiar de cuenta, lo que mitiga parte del riesgo, pero los datos permanecen en el dispositivo.
+Consecuencia posible: exposición local en equipos compartidos y permanencia de información comercial. No se ha demostrado acceso remoto ni filtración entre dos cuentas.
+Acción: inventariar datos de usuario en localStorage, separarlos por usuario y limpiarlos al salir; validar logout, cambio de cuenta y fallos de sincronización con cuentas de prueba.
+Evidencia: auth.js, sync.js, prospector.js, chatbot.js.
+
+B. Checkout de invitados (informativo; no es un bypass demostrado).
+POST /api/stripe/checkout con {} y sin Authorization devuelve 200 y un enlace de Stripe. checkout.js admite expresamente la ausencia de token. Es coherente con la compra como invitado.
+No se verificaron controles de frecuencia, antifraude, precio, atribución de afiliados ni firma/idempotencia del webhook. No debe afirmarse que faltan esos controles.
+Acción: comprobar esos controles en servidor, especialmente límites de creación de sesiones y concesión del plan solo tras confirmación válida de Stripe.
+Además, checkout.js muestra el aviso de pago recibido y registra un evento purchase cuando el fragmento contiene checkout=success e invitado=1. Es una señal visual/analítica controlable por el visitante; no se demostró activación del plan. Evitar tratar ese fragmento como prueba de compra.
+Evidencia: checkout.js y request-checks.json (enlace de pago redactado).
+
+CONTROLES QUE FUNCIONARON EN LAS PRUEBAS
+- HTTP y www redirigen con 301 al HTTPS del dominio principal.
+- La portada incluye CSP: sin unsafe-eval ni unsafe-inline para scripts; object-src none, frame-ancestors none y form-action self. También X-Frame-Options: DENY, nosniff, Referrer-Policy y Permissions-Policy restrictiva. style-src sí permite unsafe-inline.
+- 401 sin sesión en búsquedas Apollo/Maps, generación de guiones, asistente, integración Apollo, resumen de afiliados, lectura de leads y latido.
+- /admin/ y POST /api/acceso-admin no entregan panel ni sesión al visitante anónimo: 404.
+- Un Bearer inválido en lectura de leads obtiene 401.
+- La ruta de leads no devuelve Access-Control-Allow-Origin ante el origen externo de prueba; su preflight devuelve 405. Esta observación no cubre todas las rutas ni escenarios autenticados.
+- Las respuestas de API probadas llevan no-store y nosniff. No se observaron trazas internas en esos errores.
+- La respuesta HTTP de la portada no fija cookies mediante Set-Cookie. No se verificaron las cookies creadas por JavaScript o después del login.
+- La clave Supabase del cliente tiene rol anon: su publicación es normal y no demuestra exposición de una clave administrativa. No se comprobaron las políticas RLS.
+- cookies.js condiciona la carga de Google Analytics al consentimiento; Umami se carga siempre, comportamiento que la política pública declara. No se ha realizado una auditoría jurídica ni una verificación dinámica de consentimiento/revocación.
+
+LÍMITES Y SIGUIENTES COMPROBACIONES
+Sin credenciales ni acceso al servidor no se han validado aislamiento entre usuarios, RLS, edición de roles/planes, seguridad de cookies autenticadas, recuperación de cuenta, CSRF autenticado, webhooks de Stripe o límites de uso. Tampoco se ha inspeccionado el origen detrás de Cloudflare. No se asigna una nota global de seguridad a partir de esta muestra.
+Prioridad: bloquear TLS 1.0/1.1; unificar HSTS; después verificar datos locales y controles de pago con cuentas y entorno de pruebas.

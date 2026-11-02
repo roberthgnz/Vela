@@ -451,6 +451,32 @@ describe("Player", () => {
     }
   });
 
+  it("replaces an early codec error with a dismissible hint once the video starts", async () => {
+    vi.mocked(probeFile).mockResolvedValueOnce({
+      format: { name: "matroska,webm" },
+      streams: [
+        { track: "video", codec: "h264" },
+        { track: "audio", codec: "dts" },
+      ],
+      reads: 1,
+    });
+    const { video, onStarted } = setup(movie(), { onEmbedded: vi.fn() });
+    expect((await screen.findByRole("alert")).textContent).toContain("audio DTS");
+
+    fireEvent.playing(video);
+    expect(onStarted).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText(/no decodifica parte de este archivo/)).toBeTruthy();
+    expect(document.querySelector(".player")).toHaveAttribute("data-status", "playing");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+    expect(screen.queryByText(/no decodifica parte de este archivo/)).toBeNull();
+    fireEvent.pause(video);
+    fireEvent.playing(video);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/no decodifica parte de este archivo/)).toBeNull();
+  });
+
   it("offers mpv without stopping a file that already plays in silence, when there is no libmpv", async () => {
     let finish: (
       value: Awaited<ReturnType<typeof probeFile>>,

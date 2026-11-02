@@ -1,0 +1,25 @@
+{
+  "anonymousResource": {
+    "authorizationHeaderSent": false,
+    "characters": 88657,
+    "containsSampleSummary": true,
+    "credentials": "omit",
+    "status": 200,
+    "url": "/js/academia-datos.js?v=6"
+  },
+  "contentInventory": {
+    "keyTakeawayItems": 423,
+    "lessons": 141,
+    "modules": 28,
+    "nonemptyVideos": 0,
+    "summaries": 141,
+    "summaryCharacters": 32808
+  },
+  "scope": "User confirmed summaries/key takeaways are exclusively paid content",
+  "uiGate": {
+    "checksFounder": true,
+    "currentAccountIsFounder": false,
+    "usesKeyTakeaways": true,
+    "usesSummary": true
+  }
+}

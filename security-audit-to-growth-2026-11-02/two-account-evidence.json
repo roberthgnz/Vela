@@ -1,0 +1,137 @@
+{
+  "date": "2026-11-02",
+  "scope": "Two authorized free accounts, browser production; A/B pseudonyms",
+  "profilesAndBaseline": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "account": "A",
+        "leads": [
+          {
+            "error": null,
+            "leadCount": 0,
+            "sha256": "de4332a0803a8bc5fd19e51bed6ecc3eebd8c323d16d46926a68c6941f0e4430",
+            "status": 200,
+            "test": "own_leads"
+          },
+          {
+            "error": null,
+            "leadCount": 0,
+            "sha256": "de4332a0803a8bc5fd19e51bed6ecc3eebd8c323d16d46926a68c6941f0e4430",
+            "status": 200,
+            "test": "leads_with_other_user_id"
+          }
+        ],
+        "profiles": [
+          {
+            "error": null,
+            "status": 200,
+            "test": "own_profile",
+            "visibleRows": 1
+          },
+          {
+            "error": null,
+            "status": 200,
+            "test": "other_profile",
+            "visibleRows": 0
+          },
+          {
+            "error": null,
+            "status": 200,
+            "test": "all_visible_profiles",
+            "visibleRows": 1
+          }
+        ]
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "account": "B",
+        "leads": [
+          {
+            "error": null,
+            "leadCount": 0,
+            "sha256": "de4332a0803a8bc5fd19e51bed6ecc3eebd8c323d16d46926a68c6941f0e4430",
+            "status": 200,
+            "test": "own_leads"
+          },
+          {
+            "error": null,
+            "leadCount": 0,
+            "sha256": "de4332a0803a8bc5fd19e51bed6ecc3eebd8c323d16d46926a68c6941f0e4430",
+            "status": 200,
+            "test": "leads_with_other_user_id"
+          }
+        ],
+        "profiles": [
+          {
+            "error": null,
+            "status": 200,
+            "test": "own_profile",
+            "visibleRows": 1
+          },
+          {
+            "error": null,
+            "status": 200,
+            "test": "other_profile",
+            "visibleRows": 0
+          },
+          {
+            "error": null,
+            "status": 200,
+            "test": "all_visible_profiles",
+            "visibleRows": 1
+          }
+        ]
+      }
+    }
+  ],
+  "persistedLeadTests": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "account": "A",
+        "results": [
+          {
+            "count": 1,
+            "markerA": true,
+            "markerB": false,
+            "status": 200,
+            "test": "own"
+          },
+          {
+            "count": 1,
+            "markerA": true,
+            "markerB": false,
+            "status": 200,
+            "test": "other_user_parameter"
+          }
+        ]
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "account": "B",
+        "results": [
+          {
+            "count": 1,
+            "markerA": false,
+            "markerB": true,
+            "status": 200,
+            "test": "own"
+          },
+          {
+            "count": 1,
+            "markerA": false,
+            "markerB": true,
+            "status": 200,
+            "test": "other_user_parameter"
+          }
+        ]
+      }
+    }
+  ],
+  "method": "One temporary manually entered lead per account; no emails or searches; leads removed via UI. GET with foreign user_id is only an extra-parameter test, not a documented object access route."
+}

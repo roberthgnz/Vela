@@ -1,0 +1,70 @@
+PROFUNDIZACIÓN DE HALLAZGOS CONFIRMADOS — 2 NOVIEMBRE 2026
+
+1. EXPORTACIÓN CSV CON CONTENIDO INTERPRETABLE COMO FÓRMULA
+
+Hecho probado
+Una ficha manual llamada =1+1 se guardó en la aplicación y el botón Exportar CSV produjo una celda "=1+1". Se observó el Blob real de la aplicación, sin modificar su contenido. Al analizar de nuevo ese CSV con un parser estándar, el valor de la primera celda de datos sigue siendo exactamente =1+1.
+
+Causa y alcance
+En /js/crm.js, CRM.exportLeadsToCsv usa un serializador que convierte valores a texto, duplica las comillas y rodea el resultado de comillas dobles. Esto conserva la estructura CSV, pero no convierte una fórmula en texto para la hoja de cálculo.
+El mismo serializador se aplica a todas las columnas. Por inspección del código, el defecto no está limitado a Empresa: también afecta a los campos textuales Decisor, Cargo, Teléfono, Email, Web, Ubicación, Sector y Señales, entre otros valores exportados. La prueba dinámica realizada fue sobre Empresa; los demás campos no se han probado individualmente en una hoja de cálculo.
+
+Entrada desde proveedores
+En /js/prospector.js, el resultado Apollo copia l.name/l.organization_name/l.company_name al nombre de la ficha; el resultado Maps copia e.name. La función de exportación consume después t.name. Este recorrido por código permite que un nombre recibido del proveedor alcance el exportador sin neutralización específica de fórmulas.
+Lo demostrado no incluye conseguir que Google Maps o Apollo acepten y devuelvan un nombre malicioso de un tercero. Ese es el requisito externo pendiente para convertir el caso manual en una cadena de ataque remota contra otra persona.
+
+Impacto defendible
+El CSV contiene datos que un programa de hoja de cálculo puede interpretar como fórmulas. La incidencia en un usuario depende de cómo lo abra, su aplicación y versión, sus advertencias y las funciones disponibles. No se ha demostrado exfiltración, ejecución de comandos ni control del equipo. No hay Excel/LibreOffice disponible en este entorno para completar esa verificación nativa.
+Valoración: defecto confirmado del exportador; gravedad práctica condicionada por el control del dato externo y el comportamiento del cliente de hoja de cálculo. No se asigna severidad alta ni puntuación CVSS sin esos datos.
+
+Corrección concreta
+Corregir en el límite de exportación, no alterando destructivamente los nombres almacenados ni confiando en el escape HTML de la interfaz.
+Una opción robusta para uso humano es exportar XLSX con los campos externos definidos explícitamente como texto y las magnitudes numéricas validadas por separado.
+Si se conserva CSV, documentar los clientes compatibles y neutralizar prefijos de fórmula en TODOS los campos textuales, además de conservar el escape de separadores/comillas. No presentar el apóstrofo como solución universal: la interpretación y el guardado/reapertura dependen del cliente. La guía OWASP describe ese límite y estrategias específicas para Excel.
+
+Criterios de aceptación
+- Un registro externo con =1+1 debe aparecer como texto literal en el cliente de hoja de cálculo soportado.
+- Verificar prefijos +, -, @, controles y variantes relevantes para los idiomas soportados, además de comillas, separadores y saltos de línea dentro del campo.
+- Verificar apertura, guardado y reapertura. No basta con comprobar el texto bruto del CSV o que una librería pueda analizarlo.
+- Mantener teléfonos internacionales, nombres con comillas, acentos y valores numéricos legítimos sin romper el uso normal.
+Referencia: https://community.owasp.org/attacks/CSV_Injection
+Evidencia local: adversarial-evidence.json, apartado csvExporter; código público de crm.js y prospector.js.
+
+2. TLS 1.0 Y TLS 1.1 ACEPTADOS POR EL FRONTAL PÚBLICO
+
+Hecho probado
+Las conexiones fijadas a TLS 1.0 y TLS 1.1 negociaron respectivamente TLSv1 y TLSv1.1. Se validó el certificado/hostname y el servidor respondió HTTP/1.1 200 OK a HEAD /. Cifrado observado: ECDHE-RSA-AES128-SHA. También se comprobaron conexiones TLS 1.2 y TLS 1.3 válidas.
+La etiqueta TLSv1.0 dentro de la tupla de descripción del cipher no es la versión negociada: la versión efectiva se guardó por separado. No debe confundirse con una degradación de TLS 1.1 a 1.0.
+
+Impacto defendible
+El frontal permite protocolos obsoletos que RFC 8996 depreca. Esto amplía la superficie criptográfica para clientes que todavía los utilicen.
+No se ha demostrado que un atacante pueda forzar a un navegador moderno a negociar esos protocolos, romper el cifrado, interceptar una sesión ni extraer credenciales. Afirmar cualquiera de esos impactos a partir del handshake sería incorrecto. HSTS exige HTTPS, pero no establece la versión mínima de TLS.
+La prueba corresponde al tramo cliente-frontal público; no revela cómo se cifra la conexión desde Cloudflare al origen.
+
+Corrección concreta
+En Cloudflare, configurar Minimum TLS Version=1.2 y conservar TLS 1.3. Revisar previamente si existen clientes legítimos antiguos. La existencia de soporte TLS 1.3 no desactiva automáticamente TLS 1.0/1.1.
+
+Criterios de aceptación
+- Repetir con un cliente que realmente pueda emitir TLS 1.0 y TLS 1.1 y comprobar rechazo en el handshake por el servidor.
+- Un error local de librería por protocolo no soportado NO demuestra que el servidor haya sido corregido.
+- Comprobar que TLS 1.2 y TLS 1.3 siguen funcionando y sirviendo la aplicación.
+Referencias: https://www.rfc-editor.org/rfc/rfc8996.html
+https://developers.cloudflare.com/ssl/edge-certificates/additional-options/minimum-tls/
+Evidencia local: tls-legacy.json y tls.json. En esta ronda se revisó la evidencia ya guardada; no se repitió el sondeo TLS.
+
+3. OBSERVACIONES CONFIRMADAS CON MENOR O DISTINTO ALCANCE
+
+Texto de academia público — ACTUALIZACIÓN: FALLO DE AUTORIZACIÓN CONFIRMADO
+El usuario ha confirmado que los resúmenes y puntos clave son exclusivos de pago. Por tanto, la entrega pública de ese contenido sí vulnera la restricción de producto.
+La verificación adicional encontró 141 resúmenes y 423 puntos clave en 28 módulos. Solo los resúmenes suman 32.808 caracteres. Los enlaces de vídeo permanecen vacíos.
+Una petición a /js/academia-datos.js?v=6 con credentials:omit y sin Authorization devuelve HTTP 200 y contiene el mismo resumen de muestra cargado por la aplicación. La cuenta actual tiene Plan.esFundador()=false. El código de Academy.openLessonViewer comprueba el plan en la interfaz, pero utiliza summary/keyTakeaways de los datos ya entregados.
+Impacto confirmado: descarga anónima y masiva del texto reservado, sin comprar, alterar el rol ni forzar peticiones. No se ha demostrado exposición de vídeos ni datos personales.
+Severidad propuesta: media para confidencialidad de contenido comercial. El perjuicio económico concreto no está cuantificado. Este hallazgo tiene una cadena de acceso no autorizado completa, a diferencia del tramo externo pendiente en CSV.
+Corrección: retirar summary/keyTakeaways del JavaScript público y de los artefactos públicos; entregar el material desde servidor privado tras validar sesión y plan/rol en servidor. Mantener públicos únicamente los metadatos promocionales que el producto autorice. La respuesta protegida debe evitar caché pública compartida; por ejemplo, Cache-Control:private,no-store. Purgar las copias CDN de los assets afectados, incluidas variantes de URL/versiones aún servidas. Retirar el archivo actual no recupera copias ya descargadas.
+Verificación de la corrección: recurso público sin contenido reservado; petición anónima al nuevo recurso protegido rechazada; cuenta gratuita rechazada; cuenta Fundador válida recibe su lección; cambiar el indicador VIP local no permite obtenerla. Inspeccionar también bundles, mapas de fuente y versiones antiguas que sigan expuestas.
+Evidencia adicional: paid-academy-confirmed-evidence.json.
+
+HSTS ausente en ciertas respuestas dinámicas
+La diferencia de cabeceras está probada. Una política recibida antes desde la portada protege también las rutas del mismo host. La ausencia en /api no significa que el navegador pierda HSTS al entrar en /api. Es una mejora de consistencia/endurecimiento, sin explotación demostrada en esta revisión.
+
+Esta profundización no ha realizado nuevos cambios en producción ni ha creado fichas adicionales. La ficha aritmética de la ronda anterior ya estaba eliminada y las listas verificadas como restauradas.

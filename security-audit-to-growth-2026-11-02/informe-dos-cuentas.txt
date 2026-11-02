@@ -1,0 +1,28 @@
+AISLAMIENTO ENTRE DOS CUENTAS — TO-GROWTH.COM — 2 NOVIEMBRE 2026
+
+Alcance: dos cuentas proporcionadas por el usuario, con sesiones separadas en los perfiles incognito/default del navegador. Ambas se comprobaron como plan free y role user. Las identidades se denominan A y B en la evidencia.
+
+PERFILES: COMPROBACIÓN SATISFACTORIA DE LECTURA
+Se comprobó desde cada cuenta la visibilidad del perfil propio y del identificador conocido de la otra cuenta. Se utilizaron consultas HEAD de Supabase con conteo, sin recuperar datos personales ajenos.
+Cuenta A: propio=1 fila; perfil de B=0; consulta sin filtro=1.
+Cuenta B: propio=1 fila; perfil de A=0; consulta sin filtro=1.
+Ahora se conoce que ambos perfiles existen, porque cada uno es visible para su propietario. La ausencia del perfil ajeno constituye evidencia de aislamiento de lectura para este par de cuentas y esta tabla.
+
+LEADS: COMPROBACIÓN CON DATOS DISTINTOS
+Las listas iniciales estaban vacías. Para evitar una comprobación inconcluyente, se crearon temporalmente desde la interfaz dos fichas manuales claramente identificadas como AUDITORIA-TEMPORAL-A/B-20261102-NO-CONTACTAR, sin email ni web y con un número ficticio de ceros. No se hicieron búsquedas, llamadas, envíos ni generaciones de IA.
+Se confirmó con GET /api/sync/leads que cada ficha estaba guardada en el servidor, antes de probar el cruce de identidades.
+Con la sesión A: la respuesta contiene una ficha, marcador A presente y marcador B ausente.
+Con la sesión B: la respuesta contiene una ficha, marcador B presente y marcador A ausente.
+Se repitió la lectura añadiendo ?user_id=<identificador de la otra cuenta>. En ambos sentidos la respuesta mantuvo exclusivamente la ficha del propietario de la sesión.
+Esto descarta una fuga por esa manipulación concreta del parámetro. No demuestra qué hace internamente el servidor: puede ignorar user_id o imponer la identidad del token. El parámetro no aparece documentado en el cliente original.
+
+LIMPIEZA
+Las dos fichas temporales se quitaron mediante la interfaz. La comprobación final del servidor se recoge en two-account-cleanup.json. La lista inicial de cada cuenta era vacía; el objetivo de limpieza es recuperar ese estado tanto localmente como en la API.
+
+CONCLUSIÓN Y LÍMITES
+No se observó acceso cruzado de lectura de perfiles ni leads en estas pruebas. El resultado se limita a las rutas y al par de cuentas comprobados.
+No se intentaron escrituras o borrados de registros de otro usuario, cambios de role/plan_type ni modificaciones de pagos. La prueba de escritura efectuada fue exclusivamente crear y quitar las fichas propias desde el flujo normal.
+Quedan sin comprobar autorización de escritura a nivel de fila/columna, comentarios de comunidad/academia, almacenamiento, webhooks y combinaciones de cuenta Fundador/administrador. No se ha revisado código de servidor ni puede descartarse la existencia de backdoors.
+Los hallazgos anteriores de TLS antiguo y texto de academia público no cambian como consecuencia de esta prueba.
+
+Evidencias: two-account-evidence.json y two-account-cleanup.json. No contienen contraseñas ni tokens.
