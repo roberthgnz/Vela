@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vela-party",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "PartyRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PartyRoom"] }],
+  "observability": { "enabled": true }
+}
