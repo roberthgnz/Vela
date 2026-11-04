@@ -20,6 +20,7 @@ import {
   RotateCcw,
   RotateCw,
   SkipForward,
+  Popcorn,
   Volume1,
   Volume2,
   VolumeX,
@@ -79,6 +80,9 @@ import { useOverlay } from "./player/useOverlay";
 import { useSubtitles } from "./player/useSubtitles";
 import { useSlowWait, useTorrentSwarm } from "./player/useWaiting";
 import { useWatchProgress } from "./player/useWatchProgress";
+import { useWatchPartySync } from "./player/useWatchPartySync";
+import { useWatchParty } from "../lib/watchParty/client";
+import { WatchPartyPanel } from "./WatchPartyPanel";
 
 export type { Playing } from "./player/shared";
 
@@ -210,10 +214,10 @@ export function Player({
   const [externalBusy, setExternalBusy] = useState(false);
   /** The open popover (audio and subtitles, or speed), aligned with the button that opened it. */
   const [popover, setPopover] = useState<{
-    kind: "tracks" | "speed";
+    kind: "tracks" | "speed" | "party";
     right: number;
   } | null>(null);
-  const openPopover = (kind: "tracks" | "speed", button: HTMLElement) =>
+  const openPopover = (kind: "tracks" | "speed" | "party", button: HTMLElement) =>
     setPopover((current) => {
       if (current?.kind === kind) return null;
       const box = surface.current?.getBoundingClientRect();
@@ -247,6 +251,15 @@ export function Player({
   const { idle, setIdle, flash, showFlash, pulse, showPulse, wake } =
     useOverlay(video);
   const progress = useWatchProgress(playing, next, video);
+  const partyRoom = useWatchParty();
+  const partySync = useWatchPartySync({
+    video,
+    playing,
+    status,
+    begun,
+    setRate,
+    onBlocked: () => setNotice(t("player.pressPlay")),
+  });
   const media = useMediaSource({
     playing,
     video,
@@ -699,7 +712,7 @@ export function Player({
       >
         <video
           ref={mount}
-          autoPlay
+          autoPlay={!partySync.following}
           playsInline
           preload="auto"
           aria-label={t("player.videoLabel", { name: playing.meta.name })}
@@ -710,14 +723,16 @@ export function Player({
             setDuration(
               Number.isFinite(element.duration) ? element.duration : 0,
             );
-            const resumeTo = resumeAt.current;
+            // In a watch party the room says where to start.
+            const partyStart = partySync.startPosition();
+            const resumeTo = partyStart ?? resumeAt.current;
             if (
               resumeTo > 0 &&
               (!Number.isFinite(element.duration) ||
                 resumeTo < element.duration - 10)
             ) {
               element.currentTime = resumeTo;
-              if (resumeTo === playing.resume && !converting) {
+              if (partyStart === undefined && resumeTo === playing.resume && !converting) {
                 setResumed(true);
                 setTimeout(() => setResumed(false), 6000);
               }
@@ -1118,6 +1133,16 @@ export function Player({
             onLook={(value) => preferencesStore.setPlayer(value)}
           />
         )}
+        {popover?.kind === "party" && (
+          <div
+            className="player-popover party-popover"
+            role="dialog"
+            aria-label={t("party.title")}
+            style={{ right: popover.right }}
+          >
+            <WatchPartyPanel onCopied={showFlash} />
+          </div>
+        )}
         {popover?.kind === "speed" && (
           <SpeedPanel
             right={popover.right}
@@ -1282,6 +1307,25 @@ export function Player({
               {clock(time)} <span>/ {clock(duration)}</span>
             </span>
             <span className="player-spacer" />
+            <button
+              className={`player-icon party-button ${partyRoom.phase !== "idle" ? "active" : ""} ${popover?.kind === "party" ? "pressed" : ""}`}
+              aria-label={t("party.title")}
+              aria-haspopup="dialog"
+              aria-expanded={popover?.kind === "party"}
+              title={
+                partySync.active
+                  ? t("party.inSync")
+                  : partyRoom.phase !== "idle"
+                    ? t("party.notInSync")
+                    : t("party.title")
+              }
+              onClick={(event) => openPopover("party", event.currentTarget)}
+            >
+              <Popcorn size={19} />
+              {partyRoom.unread > 0 && popover?.kind !== "party" && (
+                <span className="party-badge">{partyRoom.unread}</span>
+              )}
+            </button>
             <button
               className={`player-icon ${subtitleKey || audioTracks.length > 1 ? "active" : ""} ${popover?.kind === "tracks" ? "pressed" : ""}`}
               aria-label={t("player.audioAndSubtitles")}

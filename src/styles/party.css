@@ -1,0 +1,206 @@
+/* Watch party: the panel (sidebar dialog and player popover), its sidebar entry and the player button. */
+.party-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+.party-lead {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 12.5px;
+}
+.party-field {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.party-or {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.party-join,
+.party-say {
+  display: flex;
+  gap: 6px;
+}
+.party-join .input,
+.party-say .input {
+  flex: 1;
+  min-width: 0;
+}
+.party-join .input {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.party-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+}
+.party-relay {
+  color: var(--muted);
+  font-size: 12px;
+}
+.party-relay summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.party-relay .input {
+  width: 100%;
+  margin-top: 6px;
+}
+.party-relay p {
+  margin: 6px 0 0;
+}
+.party-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.party-code div {
+  display: grid;
+}
+.party-code span {
+  color: var(--fg-2);
+  font-size: 11.5px;
+}
+.party-code strong {
+  color: var(--accent);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+.party-peers {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.party-peers li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 12.5px;
+}
+.party-peers svg {
+  color: var(--warning);
+}
+.party-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.party-peer-status {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.party-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.party-peers li[data-status="ready"] .party-dot {
+  background: var(--ok);
+}
+.party-peers li[data-status="loading"] .party-dot,
+.party-peers li[data-status="buffering"] .party-dot {
+  background: var(--warning);
+}
+.party-chat {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 60px;
+  max-height: 180px;
+  margin: 0;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius);
+  background: rgb(0 0 0 / 22%);
+  font-size: 12.5px;
+  list-style: none;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.party-chat:empty::before {
+  content: "…";
+  color: var(--faint);
+}
+.party-chat strong {
+  color: var(--fg-2);
+  font-weight: 600;
+}
+.party-chat li.own strong {
+  color: var(--accent);
+}
+.party-leave {
+  align-self: flex-start;
+}
+
+/* In the player. */
+.party-popover {
+  width: min(320px, calc(100% - 24px));
+  padding: 12px;
+}
+.party-popover > .party-panel {
+  flex: 1;
+}
+.party-popover .party-chat {
+  max-height: 140px;
+}
+.party-button {
+  position: relative;
+}
+.party-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* In the sidebar. */
+.party-dialog {
+  width: min(400px, calc(100vw - 32px));
+}
+.party-nav-count {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+.party-nav.active-party svg {
+  color: var(--accent);
+}
+.sidebar-collapsed .party-nav-count {
+  display: none;
+}
