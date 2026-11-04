@@ -20,8 +20,8 @@ commands.allow = ["service_installed", "service_start", "hardware_decoding_get",
 
 [[permission]]
 identifier = "allow-storage"
-description = "Allow the main window to read and write Vela's own database in the app data folder, make a copy of it and show the folder with its backups in Explorer."
-commands.allow = ["storage_load", "storage_write", "storage_info", "storage_backup", "storage_reveal"]
+description = "Allow the main window to read and write Vela's own database in the app data folder, create and preview its local backups, restore a validated backup with a safety copy, and show the backups folder in Explorer."
+commands.allow = ["storage_load", "storage_write", "storage_info", "storage_backup", "storage_backup_preview", "storage_restore", "storage_reveal"]
 
 [[permission]]
 identifier = "allow-logging"

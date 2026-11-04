@@ -26,6 +26,8 @@ export type StorageStatus = {
   error?: string;
   /** Whether this start copied the data from localStorage. */
   migrated: boolean;
+  /** Old stores must not write over restored data before the page reloads. */
+  restoring?: boolean;
 };
 
 const PREFIX = "vela.";
@@ -41,6 +43,8 @@ export type DesktopStorage = KeyValueStorage & {
   init(entries: Change[], legacy?: KeyValueStorage & { length: number; key(index: number): string | null }): Promise<void>;
   /** Resolves when nothing is left to write (or the write failed and will be retried). */
   flush(): Promise<void>;
+  /** Drains existing writes and holds later ones until reload, or resumes them if replacement fails. */
+  restore<T>(replace: () => Promise<T>): Promise<T>;
   getStatus(): StorageStatus;
   subscribe(listener: () => void): () => void;
 };
@@ -48,13 +52,14 @@ export type DesktopStorage = KeyValueStorage & {
 export function createDesktopStorage(writer: Writer, backend: Backend = "desktop", afterMigration?: () => Promise<unknown>): DesktopStorage {
   const data = new Map<string, string>();
   const pending = new Map<string, string | null>();
+  const held = new Map<string, string | null>();
   const listeners = new Set<() => void>();
   let status: StorageStatus = { backend, pending: 0, migrated: false };
   let timer: ReturnType<typeof setTimeout> | undefined;
   let writing: Promise<void> | undefined;
 
   function setStatus(next: Partial<StorageStatus>) {
-    status = { ...status, ...next, pending: pending.size };
+    status = { ...status, ...next, pending: pending.size + held.size };
     for (const listener of [...listeners]) listener();
   }
 
@@ -70,23 +75,35 @@ export function createDesktopStorage(writer: Writer, backend: Backend = "desktop
       const message = error instanceof Error ? error.message : String(error);
       if (status.error !== message) log.error(`storage write failed (${batch.length} changes kept for retry)`, message);
       setStatus({ error: message });
-      timer = setTimeout(schedule, RETRY_DELAY);
+      if (!status.restoring) timer = setTimeout(schedule, RETRY_DELAY);
     }
   }
 
-  function schedule() {
+  function schedule(force = false) {
     timer = undefined;
-    if (writing || !pending.size) return;
+    if (writing || !pending.size || (status.restoring && !force)) return;
     writing = write().finally(() => {
       writing = undefined;
-      if (pending.size && !timer) timer = setTimeout(schedule, BATCH_DELAY);
+      if (pending.size && !timer && !status.restoring) timer = setTimeout(schedule, BATCH_DELAY);
     });
   }
 
   function queue(key: string, value: string | null) {
-    pending.set(key, value);
-    if (!timer && !writing) timer = setTimeout(schedule, BATCH_DELAY);
+    (status.restoring ? held : pending).set(key, value);
+    if (!status.restoring && !timer && !writing) timer = setTimeout(schedule, BATCH_DELAY);
     setStatus({});
+  }
+
+  async function flushPending() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    if (writing) await writing;
+    if (pending.size) {
+      schedule(true);
+      if (writing) await writing;
+    }
   }
 
   return {
@@ -129,16 +146,29 @@ export function createDesktopStorage(writer: Writer, backend: Backend = "desktop
       if (!status.error) await afterMigration?.().catch(() => {});
     },
     async flush() {
-      if (timer) {
-        clearTimeout(timer);
-        timer = undefined;
-      }
       // One attempt even after an earlier failure (closing, reloading); a new failure keeps the
       // changes and re-arms the retry timer instead of looping here.
-      if (writing) await writing;
-      if (pending.size) {
-        schedule();
+      if (status.restoring) {
         if (writing) await writing;
+        return;
+      }
+      await flushPending();
+    },
+    async restore(replace) {
+      if (status.restoring) throw new Error("Ya hay una restauración en curso.");
+      setStatus({ restoring: true });
+      try {
+        await flushPending();
+        if (pending.size || status.error) throw new Error(status.error || "No se pudieron guardar los cambios pendientes.");
+        // Later writes (including closing the window) stay in memory. Only a fresh page may
+        // write again after replacement: its stores will have loaded the restored database.
+        return await replace();
+      } catch (error) {
+        for (const [key, value] of held) pending.set(key, value);
+        held.clear();
+        setStatus({ restoring: false });
+        if (pending.size && !timer) timer = setTimeout(schedule, BATCH_DELAY);
+        throw error;
       }
     },
     getStatus: () => status,
@@ -288,8 +318,24 @@ export async function storageInfo(): Promise<StorageInfo | null> {
 }
 
 export async function backupStorage(): Promise<string> {
+  if (getStorageStatus().restoring) throw new Error("Espera a que termine la restauración antes de crear una copia.");
   await flushStorage();
+  const status = getStorageStatus();
+  if (status.error || status.pending || status.restoring)
+    throw new Error(status.error || "No se pudieron guardar los cambios pendientes antes de crear la copia.");
   return invoke<string>("storage_backup");
+}
+
+export type BackupPreview = { name: string; keys: number; profiles: number; libraryItems: number };
+
+export function previewStorageBackup(name: string): Promise<BackupPreview> {
+  return invoke<BackupPreview>("storage_backup_preview", { name });
+}
+
+/** Success must be followed by a page reload; stale stores remain unable to write meanwhile. */
+export async function restoreStorage(name: string): Promise<string> {
+  if (!desktop || active !== desktop) throw new Error("La base de datos de Vela no está disponible.");
+  return desktop.restore(() => invoke<string>("storage_restore", { name }));
 }
 
 export function revealStorage(): Promise<void> {

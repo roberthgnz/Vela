@@ -375,7 +375,29 @@ Los PR #2–#9 se fusionaron en orden en `next`. La versión 1.3.0 reúne estos 
 
 ## Orden de trabajo pendiente
 
+La [matriz del primer sprint](validation.md) convierte estos puntos en casos con
+criterios de aceptación y registra la evidencia nueva. Ajustes › Biblioteca ya
+permite revisar y restaurar copias locales con respaldo previo y reemplazo
+transaccional. Las escrituras del estado anterior se retienen hasta recargar,
+y el caché de cuenta no se restaura: hay que volver a vincular Stremio para
+reanudar la sincronización. En un perfil infantil protegido se debe entrar
+primero en el perfil principal con su PIN. La restauración desde la ventana
+sigue pendiente de comprobación nativa; las pruebas Rust y de componentes no la
+sustituyen. La restauración manual descrita en almacenamiento sigue siendo una
+alternativa con la aplicación cerrada.
+
+El segundo bloque completa la importación de exportaciones JSON de biblioteca:
+combina por timestamps dentro del perfil elegido, conserva títulos locales y
+crea una copia previa en escritorio. La exportación también está disponible si
+solo hay historial. Las copias manuales se rechazan si quedan cambios sin guardar.
+El refresco inicial de manifiestos y las comprobaciones manuales comparten el
+diagnóstico visible en Addons: estado/fecha de sesión, reintento y protección
+frente a respuestas de instalaciones antiguas. Esto no valida las fuentes del
+addon ni la reproducción. Las pruebas y los recorridos nativos pendientes están
+registrados en la matriz.
+
 1. Rendimiento en enjambres públicos con piezas grandes, peers lentos, NAT y saltos: el benchmark de 4 MiB es local. Dune no se ha probado porque el usuario ya no tiene su magnet.
+   - El primer sprint añadió una prueba pública con Sintel (piezas de 128 KiB): primer byte en 2 s y archivo completo. El salto posterior leyó datos ya descargados. Los detalles están en la matriz; siguen pendientes las piezas grandes en Internet y los saltos a piezas ausentes.
 2. Temporada completa de un enjambre público: el motor de Vela se ha validado con tres MP4 sintéticos por TCP y comprobación íntegra de bytes. Falta repetir reproducción y siguiente episodio en la interfaz con ese enjambre y con Stremio Service.
 3. Fuentes adjuntas de MKV para JASSUB: implementar un lector propio de Attachments/SeekHead y probar fuentes/ASS reales. La ruta `/hlsv2/{id}/source/attachment/{n}` sigue siendo del servicio; no hay extracción propia ni una prueba que garantice tipografía exacta. Por ahora, usar mpv para esos archivos.
 4. RAR y archivos por volúmenes: no soportados; no se ha integrado `rar-stream` ni un descompresor. Cualquier soporte futuro necesita límites de disco, cancelación, tratamiento de contraseñas y validación de rutas de extracción.

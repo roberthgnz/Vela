@@ -447,6 +447,8 @@ fn main() {
             storage::storage_write,
             storage::storage_info,
             storage::storage_backup,
+            storage::storage_backup_preview,
+            storage::storage_restore,
             storage::storage_reveal,
             logging::log_write,
             logging::log_tail,

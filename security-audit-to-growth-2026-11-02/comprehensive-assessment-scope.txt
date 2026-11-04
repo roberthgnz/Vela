@@ -1,0 +1,40 @@
+COMPREHENSIVE APPLICATION SECURITY ASSESSMENT — CONTROL DE ALCANCE
+Fecha: 2026-11-02
+
+OBJETIVO ASUMIDO
+To Growth, según la continuidad de la conversación. No se asume autorización para auditar otro proyecto por compartir el workspace.
+
+INSPECCIÓN LOCAL
+Workspace: C:/Users/reliu/Documents/Vela.
+package.json identifica vela: cliente de escritorio Windows compatible con addons Stremio. README y estructura src-tauri/src identifican Rust/Tauri, React/TypeScript y Vite. Existen CI de GitHub, Cargo.lock y pnpm-lock.yaml.
+La búsqueda de to-growth, el identificador del proyecto Supabase, SUPABASE_URL y stripe en el código local, excluyendo dependencias, build, Git y evidencias previas, no devuelve coincidencias.
+Conclusión: el repositorio local no es el código de To Growth. No se han modificado archivos de implementación ni realizado pruebas activas en esta ronda.
+
+ARQUITECTURA DE TO GROWTH OBSERVADA EXTERNAMENTE
+- Cliente HTML/JavaScript público servido por Cloudflare.
+- Autenticación mediante Supabase; JWT de usuario usados como Bearer en API propia y llamadas directas al servicio Supabase.
+- Perfiles con role y plan_type; los valores user/free y los indicadores de founder/admin aparecen en los flujos inspeccionados.
+- Datos propios de leads mediante /api/sync/leads; datos sociales mediante tablas y RPC Supabase identificadas en JavaScript.
+- Funciones sensibles: administración, búsqueda de empresas, generación de IA, integración Apollo, contenido de academia, checkout y afiliados.
+- Dependencias externas observadas: Supabase, Stripe, Maps/Apollo, analítica. El proveedor exacto de ejecución y configuración interna no se infiere de las cabeceras del frontal.
+
+LÍMITES DE CONFIANZA Y AMENAZAS A VALIDAR CON FUENTE
+1. Navegador -> API propia: autenticación, autorización por función y propiedad, asignación masiva, validación de entrada y límites de uso.
+2. Navegador -> Supabase: RLS para SELECT/INSERT/UPDATE/DELETE, grants por columna, funciones RPC y permisos de almacenamiento.
+3. Proveedor de pago -> webhook: firma, identidad, precio/moneda/producto esperados, estado final, idempotencia y atomicidad de la concesión del plan.
+4. Proveedor de empresas/IA -> cliente/exportación: escape según contexto, URLs permitidas, fórmulas CSV, límites y tratamiento de contenido no confiable.
+5. Código/CI/CD -> despliegue: secretos, privilegios de ejecución, revisión de dependencias, artefactos públicos y coherencia de configuración.
+
+INVARIANTES PROPUESTOS
+- Un usuario solo puede modificar recursos de su propiedad salvo permisos administrativos explícitos.
+- Ninguna entrada del cliente concede role ni plan de pago.
+- Un plan se concede una única vez y solo a partir de pago verificado y asociado a la identidad correcta.
+- La cuota se reserva/consume de forma atómica antes de llamadas de coste externo.
+- Ningún artefacto público contiene material marcado como exclusivo de pago.
+- Los datos externos no se interpretan como HTML ejecutable ni fórmulas de hoja de cálculo por defecto.
+
+EVIDENCIA PREVIA
+Existen pruebas externas con dos cuentas controladas y hallazgos guardados en esta carpeta. Sus estados corresponden a las fechas de observación; no sustituyen revisión de código ni certifican el despliegue actual. No se asigna CVSS v4.0 sin fijar precondiciones e impactos suficientes. La inyección de atributos en renderizador separado no se describe como XSS explotado entre cuentas.
+
+REQUISITO PARA CONTINUAR LA REVISIÓN DE REPOSITORIO
+Ruta local o URL del repositorio de To Growth, o confirmación expresa de cambio de objetivo a Vela. No se buscará indiscriminadamente en carpetas ajenas al workspace para localizar repositorios o credenciales.

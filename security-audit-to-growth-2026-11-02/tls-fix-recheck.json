@@ -1,0 +1,22 @@
+[
+  {
+    "requested": "TLSv1",
+    "negotiated": "TLSv1",
+    "response": "HTTP/1.1 200 OK"
+  },
+  {
+    "requested": "TLSv1_1",
+    "negotiated": "TLSv1.1",
+    "response": "HTTP/1.1 200 OK"
+  },
+  {
+    "requested": "TLSv1_2",
+    "negotiated": "TLSv1.2",
+    "response": "HTTP/1.1 200 OK"
+  },
+  {
+    "requested": "TLSv1_3",
+    "negotiated": "TLSv1.3",
+    "response": "HTTP/1.1 200 OK"
+  }
+]

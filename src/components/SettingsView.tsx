@@ -7,7 +7,6 @@ import {
   ExternalLink,
   Captions,
   ClipboardCopy,
-  DatabaseBackup,
   FolderOpen,
   Globe,
   House,
@@ -38,7 +37,7 @@ import {
   type TorrentProfile,
 } from "../lib/streamingServer";
 import { logFolder, logTail, revealLog, saveReport } from "../lib/log";
-import { backupStorage, getStorageStatus, revealStorage, storageInfo, useStorageStatus } from "../lib/storage";
+import { getStorageStatus, storageInfo } from "../lib/storage";
 import { formatBytes } from "../lib/downloads";
 import { openExternal } from "../lib/transport";
 import { errorMessage, motion } from "../lib/utils";
@@ -54,6 +53,8 @@ import { native } from "./WindowControls";
 import { ProfileSettings } from "./Profiles";
 import { CatalogSettings } from "./CatalogSettings";
 import { TmdbCatalogsRow } from "./TmdbCatalogsRow";
+import { StorageSettings } from "./StorageSettings";
+import { LibraryImport } from "./LibraryImport";
 import { parseKeywords, sourceKeywords, useSourceKeywords } from "../lib/sourceKeywords";
 import { compareText, formatDateTime, languageSetting, plural, setLanguage, t, type LanguageSetting } from "../lib/i18n";
 
@@ -170,63 +171,6 @@ function DiagnosticsRows({ notify }: { notify: (message: string) => void }) {
   );
 }
 
-function when(at: number): string {
-  return formatDateTime(at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-/** The database that holds the library, profiles and preferences, and its daily copies. */
-function StorageSettings({ notify }: { notify: (message: string) => void }) {
-  const status = useStorageStatus();
-  const queryClient = useQueryClient();
-  const info = useQuery({ queryKey: ["storage-info"], queryFn: storageInfo, staleTime: 10_000 });
-  const backup = useMutation({
-    mutationFn: backupStorage,
-    onSuccess: () => {
-      notify(t("settings.storage.backupCreated"));
-      void queryClient.invalidateQueries({ queryKey: ["storage-info"] });
-    },
-    onError: (error) => notify(errorMessage(error)),
-  });
-  const data = info.data;
-  const newest = data?.backups[0];
-  return (
-    <div className="settings-card">
-      <Row
-        label={t("settings.storage.database")}
-        description={
-          status.backend !== "desktop"
-            ? t("settings.storage.unavailable", { error: status.error ? ` (${status.error})` : "" })
-            : data
-              ? t("settings.storage.summary", { folder: data.folder, size: formatBytes(data.size), keys: data.keys, migrated: status.migrated ? t("settings.storage.migrated") : "" })
-              : t("settings.storage.default")
-        }
-      >
-        {status.backend === "desktop" && (
-          <button className="button secondary" onClick={() => void revealStorage().catch((error) => notify(errorMessage(error)))}>
-            <FolderOpen size={14} /> {t("settings.openFolder")}
-          </button>
-        )}
-      </Row>
-      {status.backend === "desktop" && (
-        <Row
-          label={t("settings.storage.backups")}
-          description={
-            data
-              ? data.backups.length
-                ? plural(data.backups.length, "settings.storage.backupCount.one", "settings.storage.backupCount.other", { last: newest ? when(newest.created) : "" })
-                : t("settings.storage.backupsNone")
-              : t("settings.storage.backupsDefault")
-          }
-        >
-          <button className="button secondary" onClick={() => backup.mutate()} disabled={backup.isPending}>
-            {backup.isPending ? <Spinner /> : <DatabaseBackup size={14} />} {t("settings.storage.backupNow")}
-          </button>
-        </Row>
-      )}
-    </div>
-  );
-}
-
 function validServiceUrl(value: string): string {
   const url = new URL(value.trim());
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash)
@@ -323,6 +267,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
     };
   }, []);
   const count = Object.values(prefs.library).filter((entry) => entry.saved).length;
+  const entries = Object.keys(prefs.library).length;
   const withProgress = Object.values(prefs.library).filter((entry) => entry.progress || entry.videos).length;
   return (
     <div className="page settings-page">
@@ -603,12 +548,13 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
                 description={t("settings.library.localHint", { count, progress: withProgress })}
               />
               <Row label={t("settings.library.export")} description={t("settings.library.exportHint")}>
-                <button className="button secondary" onClick={exportLibrary} disabled={!count}>
+                <button className="button secondary" onClick={exportLibrary} disabled={!entries}>
                   <Download size={14} /> {t("settings.library.exportButton")}
                 </button>
               </Row>
+              <LibraryImport notify={notify} />
               <Row label={t("settings.library.clear")} description={t("settings.library.clearHint")}>
-                <button className="button danger-outline" onClick={() => setClearing(true)} disabled={!count}>
+                <button className="button danger-outline" onClick={() => setClearing(true)} disabled={!entries}>
                   <Trash2 size={14} /> {t("settings.library.clearButton")}
                 </button>
               </Row>
@@ -664,7 +610,7 @@ export function SettingsView({ notify }: { notify: (message: string) => void }) 
       {clearing && (
         <Dialog title={t("settings.library.clear")} onClose={() => setClearing(false)} className="compact-dialog" hideClose>
           <h2>{t("settings.library.clearQuestion")}</h2>
-          <p>{t("settings.library.clearWarning", { count })}</p>
+          <p>{t("settings.library.clearWarning", { count: entries })}</p>
           <div className="form-actions">
             <button className="button secondary" data-autofocus onClick={() => setClearing(false)}>
               {t("common.cancel")}

@@ -1,0 +1,38 @@
+{
+  "rendererTest": {
+    "csp": "default-src 'self'; script-src 'self' https://cloud.umami.is https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self'; connect-src 'self' https://cloud.umami.is https://gateway.umami.is https://qrxjznkxsexdylqcvehj.supabase.co wss://qrxjznkxsexdylqcvehj.supabase.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://stats.g.doubleclick.net https://cloudflareinsights.com; frame-src https://www.youtube-nocookie.com https://calendar.google.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+    "rendererSource": "ba\",\"aquí te ganas la llamada\",y(r(w)+(p?\" Lo que hago distinto: \"+r(p)+\".\":\"\")+\" Y te llamo porque creo que a \"+r(e.name)+\" le puede pasar algo parecido.\")+f(d?\"Ese resultado concreto es lo que te hace creíble. Dilo con naturalidad, sin inflarlo.\":\"Rellena «un resultado concreto» en tu perfil: es la frase que más peso tiene de toda la llamada.\"))+h(\"4 · Dos preguntas\",\"que hable el otro\",y(\"¿Ahora mismo cómo os están llegando los clientes nuevos?\")+y(\"¿Y estáis contentos con ese ritmo, o os gustaría que fuera más predecible?\")+f(\"Quien habla se convence solo. Escucha y apunta lo que diga: lo vas a usar en el cierre.\"))+h(\"5 · Objeciones\",\"las que se encuentra cualquiera que venda servicios\",P)+h(\"6 · Cierre\",\"no preguntes si, pregunta cuándo\",y(\"Mira, en vez de contártelo ahora a medias, \"+r(t.toLowerCase())+\" y lo vemos con calma. ¿Te va mejor el <strong>martes a las 10</strong> o el <strong>jueves a las 16</strong>?\")+f(\"Dos opciones concretas. Si dice que ninguna, propón otra fecha tú, no le preguntes cuándo le viene bien: eso lo deja en el aire.\"))+'<div class=\"guion-bloque guion-enriquecer\"><div class=\"guion-cab\"><strong>Datos de contacto</strong><span>corrígelos si los consigues en la llamada</span></div><div class=\"guion-campos\"><input type=\"text\" id=\"editLeadContact\" class=\"form-control\" placeholder=\"Nombre del responsable\" value=\"'+r(e.contactPerson||\"\")+'\"><input type=\"text\" id=\"editLeadPhone\" class=\"form-control\" placeholder=\"Teléfono directo\" value=\"'+r(e.phone&&!e.phoneLocked?e.phone:\"\")+'\"><input type=\"email\" id=\"editLeadEmail\" class=\"form-control\" placeholder=\"Email del responsable\" value=\"'+r(e.email||\"\")+'\"><button type=\"button\" class=\"btn btn-outline btn-sm\" id=\"saveManualLeadDataBtn\"><i class=\"ri-save-3-line\"></i> Guardar</button></div></div></div>'}",
+    "results": [
+      {
+        "detached": true,
+        "field": "contactPerson",
+        "injectedAttribute": "confirmed",
+        "inputId": "editLeadContact",
+        "parsedValue": "AUDIT"
+      },
+      {
+        "detached": true,
+        "field": "phone",
+        "injectedAttribute": "confirmed",
+        "inputId": "editLeadPhone",
+        "parsedValue": "AUDIT"
+      },
+      {
+        "detached": true,
+        "field": "email",
+        "injectedAttribute": "confirmed",
+        "inputId": "editLeadEmail",
+        "parsedValue": "AUDIT"
+      }
+    ],
+    "test": "actual renderer parsed in detached template; no persistence or external requests from test data"
+  },
+  "attributeImpact": {
+    "extraElementsCreated": 1,
+    "fix": "Construct inputs via DOM and assign input.value instead of interpolating untrusted values into innerHTML",
+    "inputValue": "ORIGINAL",
+    "marker": "attribute-breakout",
+    "readOnly": true,
+    "scope": "Detached renderer only; no storage or session modification"
+  }
+}

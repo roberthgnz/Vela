@@ -54,6 +54,19 @@ const listeners = new Set<() => void>();
 let applying = false;
 let knownKeys = new Set(Object.keys(preferencesStore.getSnapshot().library));
 let knownProfile = preferencesStore.getProfile();
+// Responses belong to the session and profile that started them, including after switching back.
+let sessionRevision = 0;
+let profileRevision = 0;
+let credentialWrite: Promise<void> = Promise.resolve();
+
+/** Serialize OS credential changes so an old deletion cannot finish after a newer sign-in. */
+function changeSecret(revision: number, change: () => Promise<void>): Promise<void> {
+  const next = credentialWrite.catch(() => {}).then(async () => {
+    if (revision === sessionRevision) await change();
+  });
+  credentialWrite = next;
+  return next;
+}
 
 /** Only the profile that signed in synchronizes; other profiles stay local. */
 function ownsAccount(): boolean {
@@ -81,6 +94,8 @@ preferencesStore.subscribe(() => {
   if (preferencesStore.getProfile() !== knownProfile) {
     knownProfile = preferencesStore.getProfile();
     knownKeys = keys;
+    profileRevision++;
+    if (state.syncing) set({ syncing: false });
     return;
   }
   if (!applying && state.status === "signed-in" && ownsAccount()) {
@@ -104,12 +119,14 @@ async function authKey(): Promise<string> {
   return key;
 }
 
-async function expire(error: unknown) {
+async function expire(error: unknown, revision: number) {
+  if (revision !== sessionRevision) return true;
   if (error instanceof StremioApiError && error.code === 1) {
-    await deleteSecret(secretName).catch(() => {});
+    const expired = ++sessionRevision;
     persisted = { sync: persisted.sync };
     save();
-    set({ status: "signed-out", user: undefined, syncing: false, error: error.message });
+    set({ status: "signed-out", user: undefined, syncing: false, lastSync: undefined, error: error.message });
+    await changeSecret(expired, () => deleteSecret(secretName)).catch(() => {});
     return true;
   }
   return false;
@@ -125,66 +142,110 @@ export const account = {
   },
 
   async init() {
+    const revision = sessionRevision;
     if (!persisted.user) {
       set({ status: "signed-out" });
       return;
     }
     try {
       await authKey();
+      if (revision !== sessionRevision) return;
       set({ status: "signed-in" });
       void account.sync();
     } catch {
+      if (revision !== sessionRevision) return;
       set({ status: "signed-out", user: undefined });
     }
   },
 
   async signInWithKey(key: string, known?: StremioUser) {
+    const revision = ++sessionRevision;
+    const profile = preferencesStore.getProfile();
+    const profileAtStart = profileRevision;
+    const current = () => revision === sessionRevision && profileAtStart === profileRevision;
+    if (state.syncing) set({ syncing: false });
     const user = known ?? (await getUser(key));
-    await setSecret(secretName, key);
+    if (!current()) return;
+    await changeSecret(revision, () => setSecret(secretName, key));
+    // Once the credential write starts, finish linking its original profile even if the user
+    // navigates to another one meanwhile. Otherwise the cache could name the old account while
+    // the OS already holds the new account's key. A newer sign-in/sign-out still supersedes it.
+    if (revision !== sessionRevision) return;
     // A new account, or the same one linked to another profile, starts a new synchronization history.
-    if (persisted.user?.id !== user._id || (persisted.profile ?? MAIN_PROFILE) !== preferencesStore.getProfile())
+    if (persisted.user?.id !== user._id || (persisted.profile ?? MAIN_PROFILE) !== profile) {
       persisted.sync = { synced: {}, removed: {} };
+      persisted.lastSync = undefined;
+    }
     persisted.user = userOf(user);
-    persisted.profile = preferencesStore.getProfile();
+    persisted.profile = profile;
     save();
-    set({ status: "signed-in", user: persisted.user, error: undefined });
+    set({ status: "signed-in", user: persisted.user, syncing: false, lastSync: persisted.lastSync, error: undefined });
     await account.sync();
   },
 
   async signInWithPassword(email: string, password: string) {
+    const revision = ++sessionRevision;
+    const profileAtStart = profileRevision;
+    if (state.syncing) set({ syncing: false });
     const result = await login(email.trim(), password);
+    if (revision !== sessionRevision || profileAtStart !== profileRevision) return;
     await account.signInWithKey(result.authKey, result.user);
   },
 
   async signOut() {
-    const key = await getSecret(secretName).catch(() => null);
-    if (key) await logout(key).catch(() => {});
-    await deleteSecret(secretName);
+    const revision = ++sessionRevision;
     persisted = { sync: { synced: {}, removed: {} } };
     save();
-    set({ status: "signed-out", user: undefined, lastSync: undefined, error: undefined });
+    set({ status: "signed-out", user: undefined, syncing: false, lastSync: undefined, error: undefined });
+    const key = await getSecret(secretName).catch(() => null);
+    if (revision !== sessionRevision) return;
+    await changeSecret(revision, () => deleteSecret(secretName));
+    if (key && revision === sessionRevision) await logout(key).catch(() => {});
   },
 
   /** Pulls the account library, merges it with the local one and uploads local changes. */
   async sync(): Promise<SyncSummary | undefined> {
     if (state.status !== "signed-in" || state.syncing || !ownsAccount()) return undefined;
+    const revision = sessionRevision;
+    const profileAtStart = profileRevision;
+    const current = () => revision === sessionRevision && profileAtStart === profileRevision;
     set({ syncing: true, error: undefined });
     try {
       const key = await authKey();
+      if (!current()) return undefined;
       const remote = await getLibrary(key);
-      const plan = await planSync(preferencesStore.getSnapshot().library, remote, persisted.sync);
+      if (!current()) return undefined;
+      const library = preferencesStore.getSnapshot().library;
+      const removedAtStart = { ...persisted.sync.removed };
+      const plan = await planSync(library, remote, { synced: { ...persisted.sync.synced }, removed: removedAtStart });
+      if (!current()) return undefined;
       if (plan.push.length) await putLibrary(key, plan.push);
+      if (!current()) return undefined;
+      // An upload can take seconds. Keep edits/removals made since planning instead of replacing
+      // them with its earlier snapshot, and leave them unacknowledged for the next sync.
+      const latest = preferencesStore.getSnapshot().library;
+      const unchanged = (type: string, id: string) => latest[mediaKey(type, id)] === library[mediaKey(type, id)];
+      const pull = plan.pull.filter((entry) => unchanged(entry.meta.type, entry.meta.id));
+      const local = plan.local.filter((entry) => unchanged(entry.meta.type, entry.meta.id));
+      const drop = plan.drop.filter((entry) => unchanged(entry.type, entry.id));
+      const beforeById = new Map(Object.values(library).map((entry) => [entry.meta.id, entry]));
+      const latestById = new Map(Object.values(latest).map((entry) => [entry.meta.id, entry]));
+      const synced = Object.fromEntries(Object.entries(plan.synced).filter(([id]) => beforeById.get(id) === latestById.get(id)));
       applying = true;
       try {
-        preferencesStore.mergeLibrary([...plan.local, ...plan.pull], plan.drop);
+        preferencesStore.mergeLibrary([...local, ...pull], drop);
       } finally {
         applying = false;
         knownKeys = new Set(Object.keys(preferencesStore.getSnapshot().library));
       }
       const removed = plan.push.filter((item) => item.removed && !item.temp).length;
-      persisted.sync = { synced: { ...persisted.sync.synced, ...plan.synced }, removed: {} };
+      const pendingRemovals = { ...persisted.sync.removed };
+      for (const [id, tombstone] of Object.entries(removedAtStart)) {
+        if (pendingRemovals[id] === tombstone && Object.hasOwn(synced, id)) delete pendingRemovals[id];
+      }
+      persisted.sync = { synced: { ...persisted.sync.synced, ...synced }, removed: pendingRemovals };
       const summary: SyncSummary = {
-        pulled: plan.pull.length + plan.drop.length,
+        pulled: pull.length + drop.length,
         pushed: plan.push.length - removed,
         removed,
         at: Date.now(),
@@ -194,17 +255,24 @@ export const account = {
       set({ syncing: false, lastSync: summary });
       return summary;
     } catch (error) {
-      if (!(await expire(error)))
+      if (!current()) return undefined;
+      const expired = await expire(error, revision);
+      if (!expired && current())
         set({ syncing: false, error: error instanceof Error ? error.message : t("lib.account.syncFailed") });
       return undefined;
     }
   },
 
   async addons() {
+    const revision = sessionRevision;
     try {
-      return (await getAddonCollection(await authKey())).addons;
+      const key = await authKey();
+      if (revision !== sessionRevision) throw new Error(t("lib.account.noSession"));
+      const result = await getAddonCollection(key);
+      if (revision !== sessionRevision) throw new Error(t("lib.account.noSession"));
+      return result.addons;
     } catch (error) {
-      await expire(error);
+      await expire(error, revision);
       throw error;
     }
   },

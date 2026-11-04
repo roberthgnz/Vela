@@ -87,6 +87,41 @@
 .addon-controls .switch {
   margin-right: 6px;
 }
+.addon-health {
+  grid-column: 2 / -1;
+  grid-row: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 14px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.addon-health-text {
+  display: flex;
+  flex: 1 1 240px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.addon-health-date {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.addon-health.unavailable .addon-health-text > :first-child,
+.addon-health.changed .addon-health-text > :first-child {
+  color: var(--danger, #f38b8b);
+}
+.addon-health-note {
+  margin-top: 6px;
+}
+@media (max-width: 720px) {
+  .addon-health {
+    grid-column: 1 / -1;
+    grid-row: 5;
+  }
+}
 .footnote {
   max-width: 72ch;
   margin-top: 14px;

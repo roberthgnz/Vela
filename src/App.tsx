@@ -25,7 +25,8 @@ import { account, useAccount } from "./lib/account";
 import type { Episode, InstalledAddon, MediaItem, ResolvedStream } from "./lib/contracts";
 import { episodeCode, nextEpisode, pickNextStream } from "./lib/episodes";
 import { externalPlayerName, onExternalClosed, playExternally } from "./lib/externalPlayback";
-import { defaultAddons, getStreams, loadManifest } from "./lib/protocol";
+import { defaultAddons, getStreams } from "./lib/protocol";
+import { addonHealth } from "./lib/addonHealth";
 import { metaAddon, RouteStateProvider, useNavigation, type Route, type Section } from "./lib/navigation";
 import { containerProblems, resolvePlayback } from "./lib/playback";
 import { stopMediaProxy } from "./lib/mediaProxy";
@@ -398,9 +399,7 @@ export default function App() {
     const bundled = new Set(defaultAddons().map((addon) => addon.manifestUrl));
     for (const addon of preferencesStore.getSnapshot().addons) {
       if (!/^https?:/.test(addon.manifestUrl) || bundled.has(addon.manifestUrl)) continue;
-      void loadManifest(addon.manifestUrl)
-        .then((fresh) => preferencesStore.refreshAddon(fresh))
-        .catch(() => {});
+      void addonHealth.check(addon);
     }
     return () => clearTimeout(timer);
   }, []);

@@ -1,0 +1,51 @@
+AUDITORÍA EXTERNA: SESIÓN Y AUTORIZACIÓN DE BUSCADOR PRO
+Observación: 2026-11-02, aproximadamente 14:49–14:51 UTC.
+Cuenta controlada, role=user y plan_type=free. Auditoría sin repositorio ni configuración del servidor. No se conservaron tokens, credenciales ni registros de empresas devueltos; únicamente conteos, nombres de campos y estados HTTP.
+
+HALLAZGO: ACCESO PARCIAL DESDE PLAN FREE AL ENDPOINT DEL BUSCADOR PRO
+Clasificación propuesta: MEDIUM por incoherencia de autorización comercial, con alcance limitado a los datos efectivamente entregados. La intención de ofrecer una vista previa por API debe confirmarse antes de dar por establecido que toda respuesta free es indebida.
+
+Flujo y precondición
+El usuario inicia sesión con una cuenta gratuita. En /js/prospector.js?v=14, cambiarFuente(s,a) comprueba Plan.esFundador() y rechaza s=pro cuando devuelve false; el mensaje dice que el Buscador Pro es del Plan Fundador.
+La misma función de búsqueda llama a POST /api/apollo/search. Una llamada directa con el JWT válido de la cuenta gratuita evita el bloqueo de selección de la interfaz.
+
+Pruebas dinámicas
+1. POST /api/apollo/search con {}: HTTP 200. Se repitió una vez para resumir estructura y contenido sin guardar registros. La respuesta declara plan=free, clavePropia=false y contiene 100 organizations. Hay 97 registros con web y 84 con phoneLocked. La presencia de phone no prueba que el valor sea un teléfono real/desbloqueado. No se guardaron ni imprimieron los valores.
+2. Petición acotada con mode=organizations, niche=clinicas dentales, location=Madrid, España, page=1, per_page=1: HTTP 200, plan=free, un registro con nombre y dominio no vacíos. Ningún valor telefónico no enmascarado se observó en esa muestra de un registro.
+3. GET /api/integraciones/apollo con la misma cuenta: HTTP 402, exige Plan Fundador.
+4. Sin sesión, POST /api/apollo/search rechaza la petición; consultar la evidencia para el estado exacto. No es un fallo de autenticación anónima.
+
+Impacto demostrado
+La cuenta gratuita recibe una respuesta utilizable de la búsqueda que el cliente identifica como reservada a Fundador. El bloqueo en la selección de fuente no protege ese acceso por API.
+No se han probado extracción masiva, cambios de página sostenidos, saltos de cuota, teléfonos desbloqueados, acceso a la clave de Apollo ni facturación real del proveedor. No se deduce coste por llamada ni falta de rate limiting. Se hicieron tres peticiones autenticadas de búsqueda en esta ronda y se detuvo la exploración de resultados.
+
+Corrección y regresión
+Definir expresamente si free tiene permitido algún modo de vista previa. Si no, validar plan en el servidor antes de llamar al proveedor y devolver 403/402 al plan gratuito. Si sí, limitar por servidor campos, volumen y cuota; alinear la interfaz y el contrato comercial. No aceptar plan/role declarados en el cuerpo o indicadores locales.
+Regresión: sin sesión rechazado; free rechazado o vista previa explícitamente acotada; founder autorizado; modificar localStorage no amplía datos ni cuota. Probar estos casos con sustitutos locales del proveedor para evitar costes.
+
+OBSERVACIÓN: JWT REUTILIZABLE DESPUÉS DE CERRAR SESIÓN
+Clasificación: INFORMATIONAL como comportamiento de arquitectura documentado; riesgo contextual si se exige revocación inmediata, no account takeover demostrado.
+
+Prueba controlada
+Se conservaron access_token y refresh_token únicamente en variables locales dentro de una ejecución del navegador. No se devolvieron en los resultados ni se guardaron en archivos.
+Se llamó a supabase.auth.signOut({scope:local}) para cerrar solo la sesión de auditoría, conservando otras sesiones del usuario. No se accionó el botón de salida completo de la aplicación; se probó la revocación del proveedor de autenticación.
+El SDK confirmó cierre sin error y ausencia de sesión local.
+Después del cierre, el JWT anterior todavía obtuvo:
+- GET /api/sync/leads: 200.
+- GET /api/afiliados/resumen: 200.
+- GET /api/integraciones/apollo: 402 por plan; el token se trató como autenticado, sin conceder el plan de pago.
+El refresh_token anterior obtuvo HTTP 400, refresh_token_not_found y ningún token nuevo.
+Al iniciar esta prueba al JWT le quedaban 3.452 segundos de vigencia. No se esperó a su expiración ni se afirma que la aceptación duró todo ese intervalo; se confirmó aceptación inmediata y el tiempo restante declarado.
+
+Impacto y límites
+Si alguien ya dispone de una copia del JWT, el cierre de esa sesión no impide inmediatamente las lecturas probadas. No se demostró robo del JWT ni revocación fallida de refresh tokens. La documentación de Supabase declara que los access tokens siguen vigentes hasta expirar.
+Si la aplicación necesita cierre inmediato por incidente o para operaciones sensibles, validar actividad de sesión en servidor además de firma/expiración o aplicar un mecanismo de revocación. Acortar la vida del JWT reduce la ventana, pero no equivale a revocación inmediata. No se modificó configuración alguna.
+Referencia oficial consultada: https://supabase.com/docs/guides/auth/signout
+
+OTROS CONTROLES
+POST /api/acceso-admin con usuario normal: 404. GET /admin/ y /admin/index.html:404. Estas rutas no entregaron panel en las pruebas; no se considera comprobación exhaustiva del área administrativa.
+
+ESTADO Y SIGUIENTE ALCANCE
+La sesión de prueba quedó cerrada por la prueba de revocación. No se alteraron datos de perfil, planes, leads ni afiliación. Las búsquedas pueden consumir cuota de esta cuenta o del proveedor; no se comprobó su contabilidad.
+Sin código no se han validado idempotencia/firma de webhooks, transacciones, SQL completo, CI/CD, historial Git ni permisos cloud internos. Esos apartados siguen no verificables externamente, no aprobados.
+Evidencia: session-and-pro-evidence.json.

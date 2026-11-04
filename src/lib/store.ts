@@ -228,6 +228,48 @@ function entry(value: unknown): LibraryEntry | undefined {
   return result;
 }
 
+/** Import is all-or-nothing: unlike recovering damaged preferences, do not silently drop
+ * malformed history fields. The normal reader below remains tolerant of older installations. */
+export function parseLibraryImportEntry(value: unknown): LibraryEntry | undefined {
+  const parsed = entry(value);
+  if (!parsed || !record(value) || !record(value.meta)) return undefined;
+  if (value.saved !== undefined && typeof value.saved !== 'boolean') return undefined;
+  for (const key of ['changedAt', 'watchedAt', 'remoteWatchedAt'] as const)
+    if (value[key] !== undefined && !finite(value[key])) return undefined;
+  if (value.remoteWatched !== undefined && !nonempty(value.remoteWatched)) return undefined;
+  if (parsed.addonUrl && !canonicalManifestUrl(parsed.addonUrl)) return undefined;
+  const validPosition = (item: unknown): item is Record<string, unknown> => record(item)
+    && finite(item.seconds) && finite(item.duration) && finite(item.updatedAt)
+    && (item.duration === 0 || item.seconds <= item.duration);
+  if (value.progress !== undefined && (!validPosition(value.progress)
+    || !nonempty(value.progress.videoId) || !safeKey(value.progress.videoId))) return undefined;
+  if (value.videos !== undefined) {
+    if (!record(value.videos)) return undefined;
+    for (const [id, video] of Object.entries(value.videos))
+      if (!nonempty(id) || !safeKey(id) || !validPosition(video)
+        || (video.watched !== undefined && typeof video.watched !== 'boolean')) return undefined;
+  }
+  for (const key of ['poster', 'background', 'logo', 'description', 'releaseInfo', 'released', 'runtime', 'imdbRating'] as const)
+    if (value.meta[key] !== undefined && typeof value.meta[key] !== 'string') return undefined;
+  for (const key of ['genres', 'cast', 'director'] as const)
+    if (value.meta[key] !== undefined && (!Array.isArray(value.meta[key])
+      || !value.meta[key].every((item) => typeof item === 'string'))) return undefined;
+  if (value.meta.videos !== undefined) {
+    if (!Array.isArray(value.meta.videos)) return undefined;
+    const ids = new Set<string>();
+    for (const item of value.meta.videos) {
+      const video = episode(item);
+      if (!video || !record(item) || ids.has(video.id)) return undefined;
+      ids.add(video.id);
+      for (const key of ['season', 'episode'] as const)
+        if (item[key] !== undefined && (!finite(item[key]) || !Number.isInteger(item[key]))) return undefined;
+      for (const key of ['title', 'released', 'thumbnail', 'overview'] as const)
+        if (item[key] !== undefined && typeof item[key] !== 'string') return undefined;
+    }
+  }
+  return parsed;
+}
+
 export const defaultPlayer: PlayerPreferences = {
   subtitleLanguage: 'spa',
   subtitleSecondary: 'eng',

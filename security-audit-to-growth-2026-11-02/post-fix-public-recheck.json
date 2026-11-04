@@ -1,0 +1,75 @@
+{
+  "publicResources": {
+    "checks": [
+      {
+        "apiPaths": [],
+        "chars": 88657,
+        "path": "/js/academia-datos.js?v=6",
+        "status": 200,
+        "summaryFields": 141,
+        "takeawayFields": 141
+      },
+      {
+        "apiPaths": [],
+        "chars": 11146,
+        "csvExportSource": "exportLeadsToCsv(){const e=typeof Prospector<\"u\"&&Prospector.savedLeads?Prospector.savedLeads:[];if(e.length===0){typeof App<\"u\"&&App.showToast&&App.showToast(\"No hay empresas guardadas.\",\"warning\");return}typeof Cookies<\"u\"&&Cookies.evento&&Cookies.evento(\"exportar_csv\",{empresas:e.length});const a=t=>`\"${String(t??\"\").replace(/\"/g,'\"\"')}\"`,s=[\"Empresa\",\"Decisor\",\"Cargo\",\"Teléfono\",\"Email\",\"Web\",\"Ubicación\",\"Sector\",\"Valoración\",\"Reseñas\",\"Señales\",\"Etapa\",\"Importe venta\",\"Fecha venta\"],n=e.map(t=>[t.name,t.contactPerson,t.contactRole,t.phoneLocked?\"\":t.phone,t.email,t.website,t.address||t.location,t.industry||t.category,t.rating,t.reviews,(t.oportunidades||[]).map(i=>i.texto).join(\" / \"),this.ETAPA_LEGIBLE[t.status]||\"Contactos guardados\",t.saleAmount||0,t.saleDate?new Date(t.saleDate).toLocaleDateString(\"es-ES\"):\"\"].map(a)),d=\"\\uFEFF\"+[s.map(a).join(\";\"),...n.map(t=>t.join(\";\"))].join(`\n`),l=new Blob([d],{type:\"text/csv;charset=utf-8\"}),c=URL.createObjectURL(l),o=document.createElement(\"a\");o.href=c,o.download=`organizador_to_growth_${new Date().toISOString().slice(0,10)}.csv`,document.body.appendChild(o),o.click(),document.body.removeChild(o),setTimeout(()=>URL.revokeObjectURL(c),2e3)}};document.addEventListener(\"DOMContentLoaded\",()=>{CRM.init()}),window.CRM=CRM;\n",
+        "path": "js/crm.js?v=4",
+        "status": 200,
+        "summaryFields": 0,
+        "takeawayFields": 0
+      },
+      {
+        "apiPaths": [],
+        "chars": 88657,
+        "path": "js/academia-datos.js?v=6",
+        "status": 200,
+        "summaryFields": 141,
+        "takeawayFields": 141
+      },
+      {
+        "apiPaths": [],
+        "chars": 38001,
+        "path": "js/academy.js?v=6",
+        "status": 200,
+        "summaryFields": 0,
+        "takeawayFields": 0
+      }
+    ],
+    "scripts": [
+      "js/crm.js?v=4",
+      "js/academia-datos.js?v=6",
+      "js/academy.js?v=6"
+    ]
+  },
+  "cacheChecks": [
+    {
+      "age": null,
+      "cfCacheStatus": "HIT",
+      "etag": "W/\"a58b9da1fd483907631c2444a60026af\"",
+      "path": "/js/academia-datos.js?v=6",
+      "sha256": "a0eff54efe19de20d9ca3143f02560113efdf6a9ab218440b508d004e9c9a979",
+      "status": 200,
+      "summaryFields": 141
+    },
+    {
+      "age": null,
+      "cfCacheStatus": "HIT",
+      "etag": "W/\"a58b9da1fd483907631c2444a60026af\"",
+      "path": "/js/academia-datos.js?audit_recheck=1793629887538",
+      "sha256": "a0eff54efe19de20d9ca3143f02560113efdf6a9ab218440b508d004e9c9a979",
+      "status": 200,
+      "summaryFields": 141
+    },
+    {
+      "age": null,
+      "cfCacheStatus": "HIT",
+      "etag": "W/\"9b84b097bb2b7993a3f332baf4d0f176\"",
+      "path": "/js/crm.js?v=4",
+      "sha256": "8a72235584b7d79bb3d9fe656eab09ea8fb76b8dd944a3e5b37259c449f1a917",
+      "status": 200,
+      "summaryFields": 0
+    }
+  ],
+  "tlsEvidenceFile": "tls-fix-recheck.json",
+  "result": "Observed production still exposes paid summaries, unchanged unsafe CSV serializer, and TLS 1.0/1.1 accepted. Cache HIT observed; origin deployment state unknown."
+}

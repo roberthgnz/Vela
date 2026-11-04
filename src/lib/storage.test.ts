@@ -167,6 +167,77 @@ describe('desktop storage', () => {
     await vi.advanceTimersByTimeAsync(60);
     expect(listener).toHaveBeenCalledTimes(2);
   });
+
+  it('drains an in-flight write before restoring and holds stale writes until reload', async () => {
+    let finish!: () => void;
+    const writer = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const storage = createDesktopStorage(writer);
+    await storage.init([]);
+    storage.setItem('vela.progress', 'before');
+    await vi.advanceTimersByTimeAsync(50);
+    const replace = vi.fn(async () => 'previous.db');
+    const restoring = storage.restore(replace);
+    storage.setItem('vela.progress', 'late');
+    expect(replace).not.toHaveBeenCalled();
+    finish();
+    expect(await restoring).toBe('previous.db');
+    expect(replace).toHaveBeenCalledTimes(1);
+    // Closing the page or late account callbacks cannot undo the restored database.
+    storage.removeItem('vela.progress');
+    await storage.flush();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(writer).toHaveBeenCalledTimes(1);
+    expect(storage.getStatus()).toMatchObject({ restoring: true, pending: 1 });
+  });
+
+  it('resumes newer held changes if replacement fails', async () => {
+    const writes: Change[][] = [];
+    const storage = createDesktopStorage(async (changes) => void writes.push(changes));
+    await storage.init([]);
+    storage.setItem('vela.progress', 'before');
+    await expect(storage.restore(async () => {
+      storage.setItem('vela.progress', 'late');
+      storage.setItem('vela.extra', 'keep');
+      throw new Error('invalid backup');
+    })).rejects.toThrow('invalid backup');
+    await storage.flush();
+    expect(writes).toEqual([
+      [{ key: 'vela.progress', value: 'before' }],
+      [{ key: 'vela.progress', value: 'late' }, { key: 'vela.extra', value: 'keep' }],
+    ]);
+    expect(storage.getStatus()).toMatchObject({ restoring: false, pending: 0 });
+  });
+
+  it('does not restore when pending data cannot be saved', async () => {
+    let fail = true;
+    const writes: Change[][] = [];
+    const storage = createDesktopStorage(async (changes) => {
+      if (fail) throw new Error('disk full');
+      writes.push(changes);
+    });
+    await storage.init([]);
+    storage.setItem('vela.progress', 'keep');
+    const replace = vi.fn();
+    await expect(storage.restore(replace)).rejects.toThrow('disk full');
+    expect(replace).not.toHaveBeenCalled();
+    expect(storage.getStatus()).toMatchObject({ restoring: false, pending: 1 });
+    fail = false;
+    await storage.flush();
+    expect(writes).toEqual([[{ key: 'vela.progress', value: 'keep' }]]);
+  });
+
+  it('rejects another restore while a replacement is running', async () => {
+    const storage = createDesktopStorage(async () => {});
+    await storage.init([]);
+    let finish!: () => void;
+    const first = storage.restore(() => new Promise<void>((resolve) => { finish = resolve; }));
+    await Promise.resolve();
+    const second = vi.fn();
+    await expect(storage.restore(second)).rejects.toThrow('restauración en curso');
+    expect(second).not.toHaveBeenCalled();
+    finish();
+    await first;
+  });
 });
 
 describe('storage status', () => {

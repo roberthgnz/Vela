@@ -9,11 +9,13 @@ import {
   MoreHorizontal,
   Plus,
   Puzzle,
+  RefreshCw,
   Search,
   Settings2,
   Trash2,
 } from "lucide-react";
 import { account, useAccount } from "../lib/account";
+import { addonHealth, useAddonHealth } from "../lib/addonHealth";
 import {
   COMMUNITY_SITE_URL,
   communityCapabilities,
@@ -31,7 +33,7 @@ import type { InstalledAddon } from "../lib/contracts";
 import { loadManifest, normalizeManifestUrl } from "../lib/protocol";
 import { preferencesStore, usePreferences } from "../lib/store";
 import { addonHost, errorMessage, safeImage } from "../lib/utils";
-import { plural, t } from "../lib/i18n";
+import { formatDateTime, plural, t } from "../lib/i18n";
 import {
   anchorFrom,
   Dialog,
@@ -71,6 +73,30 @@ function AddonIcon({ addon }: { addon: InstalledAddon }) {
 
 /** The last install request handled, across mounts of the view. */
 let handledInstall = 0;
+
+/** A manifest check does not ask a stream provider for content or validate its playback. */
+export function AddonHealthStatus({ addon }: { addon: InstalledAddon }) {
+  const health = useAddonHealth(addon);
+  const action = t(health.status === "unavailable" || health.status === "changed" ? "addons.health.retry" : "addons.health.check");
+  return (
+    <div className={`addon-health ${health.status}`}>
+      <div className="addon-health-text" role="status" aria-live="polite">
+        <span>{t(`addons.health.${health.status}`)}</span>
+        {health.checkedAt !== undefined && (
+          <span className="addon-health-date">
+            {t("addons.health.checkedAt", { date: formatDateTime(health.checkedAt, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) })}
+          </span>
+        )}
+      </div>
+      {health.status !== "local" && (
+        <button className="button subtle small" aria-label={`${action} · ${addon.manifest.name}`} disabled={health.status === "checking"} onClick={() => void addonHealth.check(addon)}>
+          {health.status === "checking" ? <Spinner size={13} /> : <RefreshCw size={13} />}
+          {action}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function AddonsView({
   notify,
@@ -211,6 +237,7 @@ export function AddonsView({
                       <MoreHorizontal size={16} />
                     </button>
                   </div>
+                  <AddonHealthStatus addon={addon} />
                 </article>
               );
             })}
@@ -236,6 +263,9 @@ export function AddonsView({
         <p className="footnote">
           {filter === "discover" ? t("addons.discover.footnote") : t("addons.footnote")}
         </p>
+        {filter !== "discover" && filter !== "account" && list.length > 0 && (
+          <p className="footnote addon-health-note">{t("addons.health.scope")}</p>
+        )}
       </div>
       {installOpen && (
         <InstallDialog

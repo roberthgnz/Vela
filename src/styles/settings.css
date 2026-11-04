@@ -76,6 +76,25 @@
   display: grid;
   gap: 8px;
 }
+.storage-backup-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.storage-backup-controls select {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+.storage-backup-name {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.library-import-pin {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
 .source-keywords {
   display: flex;
   flex-wrap: wrap;

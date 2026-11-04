@@ -1,0 +1,32 @@
+REVISIÓN RETOMADA: GENERADOR DE GUIONES — 2 NOVIEMBRE 2026
+
+HALLAZGO CONFIRMADO EN EL RENDERIZADOR
+ScriptGenerator.buildMeetingPitchHTML interpola contactPerson, phone y email dentro de atributos value delimitados por comillas dobles. Su función local de escape solo sustituye el carácter <. Una comilla doble del dato termina el atributo y permite introducir atributos adicionales.
+
+PRUEBA
+Se invocó el renderizador real, ya cargado por la web, con una ficha sintética en memoria. El resultado se analizó dentro de un elemento template separado del documento visible.
+En cada uno de los tres campos se utilizó un marcador inocuo equivalente a: AUDIT seguido de comillas que añaden data-audit-injected=confirmed. El navegador interpretó un nuevo atributo y el valor original quedó truncado a AUDIT.
+Una segunda prueba con contactPerson confirmó que se puede añadir readonly al input, alterando su comportamiento previsto, además de un marcador data-audit.
+No se persistieron los valores en servidor/localStorage, no se consumió generación de IA ni se ejecutó contenido del marcador.
+
+ALCANCE Y SEVERIDAD
+Defecto de codificación contextual confirmado; permite inyección de atributos en los inputs generados. Se propone prioridad baja en el estado demostrado.
+No se demostró XSS con ejecución de JavaScript, robo de sesión, acceso entre cuentas ni inserción remota de estos datos mediante un proveedor externo. Una prueba del renderizador con datos sintéticos no demuestra por sí sola una cadena de explotación externa.
+La CSP observada restringe script-src y no permite unsafe-inline: limita los manejadores de eventos inline. Este control reduce impacto, pero no corrige la interpolación insegura. No se comprobó un bypass de esa CSP.
+
+CAUSA
+Escape apto solo parcialmente para texto reutilizado dentro de atributos HTML. Una función que sustituye únicamente < no protege un atributo delimitado por comillas.
+
+CORRECCIÓN
+Preferida: crear los inputs con DOM y asignar sus datos mediante input.value. Usar textContent para textos y evitar que los valores de contacto formen parte de una cadena innerHTML.
+Si se mantiene una plantilla de HTML, aplicar una función de escape contextual coherente que cubra al menos &, <, > y las comillas usadas para delimitar atributos. No tratar esa función como validador de protocolos URL.
+Mantener la CSP restrictiva como capa adicional.
+
+PRUEBAS DE ACEPTACIÓN
+Introducir contacto/teléfono/email con comillas dobles, simples, &, < y >. El valor recuperado del input debe coincidir literalmente con el original y no deben aparecer atributos adicionales.
+El marcador readonly no debe cambiar la propiedad readOnly. Las pruebas deben cubrir el generador real y el flujo de edición/guardado, sin ejecutar payloads contra usuarios reales.
+
+OTRAS COMPROBACIONES REALIZADAS ANTES DE LA INTERRUPCIÓN
+Las rutas públicas /.git/HEAD, /.env, /.env.local, /package.json, /wrangler.toml, /_worker.js y /_routes.json devolvieron 404 con página HTML de error. No se obtuvo contenido de configuración en esa muestra. Esto no descarta archivos expuestos en otras rutas.
+
+Evidencia: attribute-injection-evidence.json. Esta ronda no modifica ni corrige el sitio.

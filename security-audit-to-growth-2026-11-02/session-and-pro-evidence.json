@@ -1,0 +1,193 @@
+{
+  "baseline": {
+    "authenticated": true,
+    "controlledAccount": true,
+    "profile": {
+      "plan": "free",
+      "role": "user"
+    },
+    "secondsUntilExpiry": 3554
+  },
+  "functionChecks": {
+    "checks": [
+      {
+        "cacheControl": "no-store",
+        "characters": 30648,
+        "contentType": "application/json; charset=utf-8",
+        "error": null,
+        "location": null,
+        "method": "POST",
+        "path": "/api/apollo/search",
+        "status": 200
+      },
+      {
+        "cacheControl": "no-store",
+        "characters": 62,
+        "contentType": "application/json; charset=utf-8",
+        "error": "Conectar tu cuenta de Apollo es del Plan Fundador.",
+        "location": null,
+        "method": "GET",
+        "path": "/api/integraciones/apollo",
+        "status": 402
+      },
+      {
+        "cacheControl": "no-store",
+        "characters": 26,
+        "contentType": "application/json; charset=utf-8",
+        "error": "No encontrado.",
+        "location": null,
+        "method": "POST",
+        "path": "/api/acceso-admin",
+        "status": 404
+      },
+      {
+        "cacheControl": "no-store",
+        "characters": 13,
+        "contentType": "text/plain;charset=UTF-8",
+        "error": null,
+        "location": null,
+        "method": "GET",
+        "path": "/admin/",
+        "status": 404
+      },
+      {
+        "cacheControl": "no-store",
+        "characters": 13,
+        "contentType": "text/plain;charset=UTF-8",
+        "error": null,
+        "location": null,
+        "method": "GET",
+        "path": "/admin/index.html",
+        "status": 404
+      }
+    ],
+    "plan": "free",
+    "role": "user",
+    "timestamp": "2026-11-02T14:49:16.530Z"
+  },
+  "freeProResponseSummary": {
+    "error": null,
+    "flags": {
+      "clavePropia": false,
+      "plan": "free"
+    },
+    "paginationKeys": [
+      "page",
+      "total_entries",
+      "total_pages"
+    ],
+    "phoneLocked": 84,
+    "recordArrayType": true,
+    "recordCount": 100,
+    "recordKeys": [
+      "id",
+      "name",
+      "domain",
+      "website",
+      "phone",
+      "phoneLocked",
+      "city",
+      "country",
+      "industry",
+      "employees",
+      "linkedin"
+    ],
+    "status": 200,
+    "topLevelKeys": [
+      "plan",
+      "clavePropia",
+      "organizations",
+      "pagination"
+    ],
+    "withEmail": 0,
+    "withPhone": 84,
+    "withWebsite": 97
+  },
+  "targetedProResponseSummary": {
+    "domainsPresent": 1,
+    "keys": [
+      "plan",
+      "clavePropia",
+      "organizations",
+      "pagination"
+    ],
+    "namesPresent": 1,
+    "phoneValuesPresentWithoutMask": 0,
+    "phonesMarkedLocked": 0,
+    "phonesMaskPattern": 0,
+    "profile": {
+      "plan": "free",
+      "role": "user"
+    },
+    "recordCount": 1,
+    "request": {
+      "location": "Madrid, España",
+      "mode": "organizations",
+      "niche": "clinicas dentales",
+      "page": 1,
+      "per_page": 1
+    },
+    "responsePlan": "free",
+    "serverError": null,
+    "status": 200,
+    "timestamp": "2026-11-02T14:50:06.520Z"
+  },
+  "revocation": {
+    "afterChecks": [
+      {
+        "bodyKeys": [
+          "leads"
+        ],
+        "cacheControl": "no-store",
+        "error": null,
+        "path": "/api/sync/leads",
+        "status": 200
+      },
+      {
+        "bodyKeys": [
+          "codigo",
+          "porcentaje",
+          "clics",
+          "registros",
+          "fundadores",
+          "pendiente",
+          "solicitado",
+          "pagado",
+          "comisiones"
+        ],
+        "cacheControl": "no-store",
+        "error": null,
+        "path": "/api/afiliados/resumen",
+        "status": 200
+      },
+      {
+        "bodyKeys": [],
+        "cacheControl": "no-store",
+        "error": "Conectar tu cuenta de Apollo es del Plan Fundador.",
+        "path": "/api/integraciones/apollo",
+        "status": 402
+      }
+    ],
+    "beforeStatus": 200,
+    "localSessionRemoved": true,
+    "refresh": {
+      "errorCode": "refresh_token_not_found",
+      "issuedNewAccessToken": false,
+      "status": 400
+    },
+    "scope": "local",
+    "secretsExported": false,
+    "signoutError": null,
+    "timestamp": "2026-11-02T14:50:27.027Z",
+    "tokenLifetimeRemainingSeconds": 3452
+  },
+  "gateAndAnonymous": {
+    "anonymousApollo": {
+      "error": "Inicia sesion para buscar empresas.",
+      "status": 401
+    },
+    "localAuthSessionAbsent": true,
+    "timestamp": "2026-11-02T14:51:59.268Z",
+    "uiGateSource": "cambiarFuente(s,a){const t=typeof Plan<\"u\"?Plan.esFundador():!1;if(s===\"pro\"&&!t){typeof Plan<\"u\"&&Plan.exigir(\"El Buscador Pro (empresas B2B que no salen en Google Maps) es del Plan Fundador.\");return}this.fuente=s,this.currentPage=1,this.nextPageToken=null,this.tokensPorPagina=[];const n=document.getElementById(\"fuenteNormalBtn\"),u=document.getElementById(\"fuenteProBtn\");n&&n.classList.toggle(\"activo\",s===\"normal\")"
+  }
+}

@@ -18,7 +18,7 @@ node dev/make-validation-media.mjs   # medios sintéticos (necesita FFmpeg)
 node dev/validation-addon.mjs        # addon en http://127.0.0.1:7010/manifest.json
 ```
 
-Los torrents, la conversión de formatos y los subtítulos incrustados necesitan el servidor de streaming que instala Stremio (`http://127.0.0.1:11470`).
+Los torrents funcionan con el motor propio de Vela. Los subtítulos incrustados sin servidor usan mpv integrado; la conversión de formatos requiere el servidor de streaming que instala Stremio (`http://127.0.0.1:11470`). La [matriz de validación](docs/validation.md) distingue las pruebas automáticas de los recorridos que deben repetirse en la ventana y con servicios reales.
 
 ## Informar de un error
 

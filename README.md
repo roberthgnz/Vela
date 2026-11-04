@@ -79,6 +79,16 @@ Las capturas usan los tráileres de Blender Foundation incluidos en Vela (CC BY 
 - Una sola instancia: abrir Vela de nuevo trae la ventana abierta al frente.
 - Registro de errores en `%APPDATA%\com.vela.desktop\logs\vela.log` (rotado a 2 MB, nada se envía) y «Copiar diagnóstico» en Ajustes › Acerca de, que reúne versiones, estado del almacenamiento y el final del registro para pegarlo en un issue. Si una vista falla, solo esa parte muestra el error y se puede reintentar.
 
+En Ajustes › Biblioteca puedes importar una exportación JSON de Vela. Antes de
+confirmar se muestran el perfil de destino y los títulos nuevos o actualizados;
+la combinación conserva los datos más recientes y los títulos que no estén en
+el archivo. En escritorio se crea una copia previa. También puedes exportar un
+perfil que solo tenga historial o elementos de «Seguir viendo».
+
+Cada addon instalado muestra su última comprobación de manifiesto durante la
+sesión y permite comprobarlo de nuevo. Esa comprobación valida su respuesta e
+identidad; la disponibilidad de fuentes y la reproducción se verifican aparte.
+
 ## Límites actuales
 
 Cinemeta proporciona metadatos, no películas reproducibles. Las fuentes dependen de los addons que instale el usuario. Stremio Service y MPV no se incluyen. Los torrents funcionan sin ellos con el motor de Vela. Para formatos que WebView2 no decodifica hay dos caminos: la conversión del servidor de Stremio o mpv integrado, que necesita una libmpv: la de Stremio o mpv si están, o la que Vela descarga a petición. Vela no distribuye libmpv: la descarga el equipo del usuario desde GitHub.
@@ -98,6 +108,13 @@ La temporada sintética de tres episodios se valida por TCP con el motor de Vela
 El instalador sigue sin firma y puede mostrar el aviso habitual de Windows.
 
 ## Desarrollo
+
+La [matriz de validación](docs/validation.md) recoge los recorridos críticos,
+los comandos para repetirlos y las comprobaciones que requieren cuenta real,
+red externa o la ventana Windows. Para recuperar datos, Ajustes › Biblioteca
+permite revisar y restaurar una copia local: conserva una copia del estado actual
+antes de reemplazarlo y recarga Vela. Después hay que volver a vincular la cuenta
+de Stremio. Las copias recuperan datos de la aplicación, no los archivos de vídeo.
 
 Requiere Node 22.12 o posterior, pnpm 11, Rust estable, las herramientas de compilación C++ de Microsoft y WebView2.
 
