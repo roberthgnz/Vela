@@ -13,7 +13,6 @@ import {
   Keyboard,
   Library,
   PanelLeft,
-  Popcorn,
   Plus,
   Puzzle,
   RefreshCw,
@@ -61,10 +60,6 @@ import { sourceHistory } from "./lib/sourceHistory";
 import { useStorageProblem } from "./lib/storage";
 import { updates } from "./lib/updates";
 import { t } from "./lib/i18n";
-import { log } from "./lib/log";
-import { party, useWatchParty } from "./lib/watchParty/client";
-import { mediaId, partyMediaId, pickPartyStream, type PartyMedia } from "./lib/watchParty/share";
-import { WatchPartyPanel } from "./components/WatchPartyPanel";
 
 const primary = [
   { id: "home", label: t("nav.home"), icon: Home, shortcut: "Ctrl 1" },
@@ -199,7 +194,7 @@ export default function App() {
     // mpv inside the window opens the original URL with its headers, like an external player.
     let embedded = false;
     try {
-      embedded = mode !== "external" && party.getSnapshot().phase === "idle" && (await prefersEmbedded());
+      embedded = mode !== "external" && (await prefersEmbedded());
       target = await resolvePlayback(meta, stream, prefs.serviceUrl, {
         episode,
         external: mode === "external" || embedded,
@@ -317,54 +312,6 @@ export default function App() {
       showSources();
     }
   };
-
-  /* ---------- Watch party ---------- */
-
-  const [partyOpen, setPartyOpen] = useState(false);
-  const partyRoom = useWatchParty();
-  /** A guest plays what the host shares: the same release among its own addons when it has it. */
-  const followParty = async (media: PartyMedia) => {
-    const token = ++preparation.current;
-    const snapshot = preferencesStore.getSnapshot();
-    const entry = snapshot.library[mediaKey(media.meta.type, media.meta.id)];
-    const meta = entry?.meta ? { ...entry.meta, videos: entry.meta.videos ?? media.meta.videos } : media.meta;
-    const episode = media.episode ?? meta.videos?.find((video) => video.id === media.videoId);
-    const addonUrl = metaAddon(snapshot.addons, meta, entry?.addonUrl ?? "").manifestUrl;
-    setPlaying(null);
-    setPreparing({ meta, episode });
-    const showSources = () => {
-      setPreparing(null);
-      go({ name: "detail", meta, addonUrl, videoId: media.videoId, season: episode?.season, sources: true });
-      notify(t("party.chooseSource"), "error");
-    };
-    try {
-      const streams = await getStreams(snapshot.addons, meta.type, media.videoId);
-      if (token !== preparation.current) return;
-      const stream = pickPartyStream(streams, media.stream, native);
-      if (!stream) return showSources();
-      await startPlayback(meta, addonUrl, media.videoId, stream, "internal", episode, token);
-    } catch (error) {
-      if (token !== preparation.current) return;
-      log.warn("party: could not play the shared title", errorMessage(error));
-      showSources();
-    }
-  };
-  const guestMedia = partyRoom.phase === "connected" && !partyRoom.host ? partyRoom.media : undefined;
-  const guestMediaKey = guestMedia ? partyMediaId(guestMedia) : "";
-  /** The shared title this guest last opened; closing the player does not open it again. */
-  const followed = useRef("");
-  if (partyRoom.phase === "idle") followed.current = "";
-  const playingKey = playing ? mediaId(playing.meta.type, playing.meta.id, playing.videoId) : "";
-  useEffect(() => {
-    if (!guestMedia || followed.current === guestMediaKey) return;
-    followed.current = guestMediaKey;
-    if (playingKey === guestMediaKey) return;
-    notify(t("party.hostPlaying", { name: guestMedia.meta.name }));
-    void followParty(guestMedia);
-    // Only a new shared title starts playback.
-  }, [guestMediaKey]);
-  /** A guest watching the room's video leaves the next episode to the host. */
-  const followingHost = Boolean(guestMedia) && playingKey === guestMediaKey;
 
   const cancelPreparing = () => {
     preparation.current++;
@@ -552,7 +499,6 @@ export default function App() {
     },
     { id: "settings", label: t("nav.settings"), icon: <Settings size={15} />, shortcut: "Ctrl ,", run: () => section("settings") },
     { id: "shortcuts", label: t("app.shortcuts"), icon: <Keyboard size={15} />, shortcut: "F1", run: () => setShortcutsOpen(true) },
-    { id: "party", label: t("party.title"), icon: <Popcorn size={15} />, run: () => setPartyOpen(true) },
   ];
   const detailAddon: InstalledAddon | undefined =
     route.name === "detail" ? metaAddon(prefs.addons, route.meta, route.addonUrl) : undefined;
@@ -610,22 +556,6 @@ export default function App() {
           {primary.map(navButton)}
         </nav>
         <div className="sidebar-spacer" />
-        <nav aria-label={t("party.title")} className="nav-group">
-          <button
-            className={`nav-item party-nav ${partyRoom.phase !== "idle" ? "active-party" : ""}`}
-            aria-label={t("party.title")}
-            title={sidebar === "collapsed" ? t("party.title") : undefined}
-            onClick={() => setPartyOpen(true)}
-          >
-            <Popcorn size={17} strokeWidth={1.75} />
-            <span>{t("party.title")}</span>
-            {partyRoom.phase !== "idle" && (
-              <span className="party-nav-count" aria-label={t("party.peopleCount", { count: partyRoom.peers.length })}>
-                {partyRoom.unread > 0 ? `${partyRoom.unread}` : partyRoom.peers.length}
-              </span>
-            )}
-          </button>
-        </nav>
         <nav aria-label={t("app.navSecondary")} className="nav-group">
           {secondary.map(navButton)}
         </nav>
@@ -778,12 +708,6 @@ export default function App() {
           <ShortcutTable seekShort={prefs.player.seekShort} seekLong={prefs.player.seekLong} />
         </Dialog>
       )}
-      {partyOpen && (
-        <Dialog title={t("party.title")} onClose={() => setPartyOpen(false)} className="compact-dialog party-dialog">
-          <h2>{t("party.title")}</h2>
-          <WatchPartyPanel onCopied={(message) => notify(message)} />
-        </Dialog>
-      )}
       {playing && (
         <ErrorBoundary name="player" resetKey={playing}>
           {playing.embedded ? (
@@ -804,7 +728,7 @@ export default function App() {
             <Player
               key={`${playing.videoId}|${playing.url}`}
               playing={playing}
-              onNext={followingHost ? undefined : (episode) => void playNext(playing, episode)}
+              onNext={(episode) => void playNext(playing, episode)}
               onStarted={() => sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "played")}
               onFailed={(message) =>
                 sourceHistory.mark(playing.meta.type, playing.meta.id, playing.videoId, playing.stream, "failed", message)
