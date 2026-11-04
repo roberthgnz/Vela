@@ -23,7 +23,6 @@
 @import "./styles/responsive.css"; /* Narrow windows */
 @import "./styles/account.css"; /* Stremio account */
 @import "./styles/player-overlays.css"; /* Player: ASS canvas, cover, popovers, track and speed panels */
-@import "./styles/party.css"; /* Watch party: panel, player button, sidebar entry */
 @import "./styles/flags.css"; /* Country flag font */
 @import "./styles/watched.css"; /* Watched marks */
 @import "./styles/subtitle-preview.css"; /* Subtitle preview in Settings */
