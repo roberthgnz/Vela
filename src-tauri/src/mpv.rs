@@ -175,15 +175,31 @@ pub fn valid_session(session: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
 }
 
+/// The named pipe (Windows) or Unix socket MPV listens on. Sockets go to the user's runtime
+/// folder when there is one, else to `/tmp`: the per-user temporary folder of macOS is too long
+/// for a socket path (104 bytes at most).
 pub fn pipe_name(session: &str) -> String {
     if cfg!(windows) {
         format!(r"\\.\pipe\vela-mpv-{session}")
     } else {
-        std::env::temp_dir()
+        std::env::var_os("XDG_RUNTIME_DIR")
+            .map(std::path::PathBuf::from)
+            .filter(|dir| dir.is_absolute() && dir.is_dir())
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
             .join(format!("vela-mpv-{session}.sock"))
             .to_string_lossy()
             .into_owned()
     }
+}
+
+#[cfg(windows)]
+async fn connect(pipe: &str) -> std::io::Result<tokio::net::windows::named_pipe::NamedPipeClient> {
+    tokio::net::windows::named_pipe::ClientOptions::new().open(pipe)
+}
+
+#[cfg(unix)]
+async fn connect(pipe: &str) -> std::io::Result<tokio::net::UnixStream> {
+    tokio::net::UnixStream::connect(pipe).await
 }
 
 pub fn ipc_arguments(session: &str, start: Option<f64>) -> Vec<String> {
@@ -214,7 +230,6 @@ pub fn subtitle_arguments(urls: &[String], show: bool) -> Vec<String> {
 /// subtitles that arrive through `subtitles` once the file is loaded (MPV adds them to the file
 /// that is playing). Returns the last state once MPV closes the pipe, or `None` if it never
 /// answered.
-#[cfg(windows)]
 pub async fn follow(
     pipe: &str,
     session: &str,
@@ -222,10 +237,9 @@ pub async fn follow(
     mut progress: impl FnMut(Value),
     mut subtitles: UnboundedReceiver<Vec<LateSubtitle>>,
 ) -> Option<Playback> {
-    use tokio::net::windows::named_pipe::ClientOptions;
     let started = tokio::time::Instant::now();
     let client = loop {
-        match ClientOptions::new().open(pipe) {
+        match connect(pipe).await {
             Ok(client) => break client,
             Err(_) if started.elapsed() < CONNECT_TIMEOUT && alive() => {
                 tokio::time::sleep(Duration::from_millis(150)).await;
@@ -289,6 +303,48 @@ pub async fn follow(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The MPV end of the pipe (Windows) or socket (macOS, Linux), for one connection.
+    #[cfg(windows)]
+    struct FakeMpv(tokio::net::windows::named_pipe::NamedPipeServer);
+
+    #[cfg(windows)]
+    impl FakeMpv {
+        fn listen(pipe: &str) -> Self {
+            use tokio::net::windows::named_pipe::ServerOptions;
+            Self(
+                ServerOptions::new()
+                    .first_pipe_instance(true)
+                    .create(pipe)
+                    .unwrap(),
+            )
+        }
+
+        async fn accept(self) -> tokio::net::windows::named_pipe::NamedPipeServer {
+            self.0.connect().await.unwrap();
+            self.0
+        }
+    }
+
+    #[cfg(unix)]
+    struct FakeMpv(tokio::net::UnixListener, String);
+
+    #[cfg(unix)]
+    impl FakeMpv {
+        fn listen(pipe: &str) -> Self {
+            let _ = std::fs::remove_file(pipe);
+            Self(
+                tokio::net::UnixListener::bind(pipe).unwrap(),
+                pipe.to_owned(),
+            )
+        }
+
+        async fn accept(self) -> tokio::net::UnixStream {
+            let (stream, _) = self.0.accept().await.unwrap();
+            let _ = std::fs::remove_file(&self.1);
+            stream
+        }
+    }
 
     #[test]
     fn tracks_position_duration_pause_and_end() {
@@ -358,20 +414,14 @@ mod tests {
         assert!(subtitle_arguments(&[], false).is_empty());
     }
 
-    /// Plays the role of MPV on a real named pipe: answers the observe commands with
+    /// Plays the role of MPV on a real named pipe or socket: answers the observe commands with
     /// property changes, then closes as MPV does when the user quits.
-    #[cfg(windows)]
     #[tokio::test]
     async fn follows_a_named_pipe_until_the_player_closes() {
-        use tokio::net::windows::named_pipe::ServerOptions;
         let pipe = pipe_name("test-follow");
-        let server = ServerOptions::new()
-            .first_pipe_instance(true)
-            .create(&pipe)
-            .unwrap();
+        let server = FakeMpv::listen(&pipe);
         let fake = tokio::spawn(async move {
-            server.connect().await.unwrap();
-            let (reader, mut writer) = tokio::io::split(server);
+            let (reader, mut writer) = tokio::io::split(server.accept().await);
             let mut lines = BufReader::new(reader).lines();
             let mut commands = Vec::new();
             for _ in 0..4 {
@@ -410,7 +460,6 @@ mod tests {
         assert_eq!(updates.last().unwrap()["paused"], true);
     }
 
-    #[cfg(windows)]
     #[tokio::test]
     async fn gives_up_when_the_player_exits_without_ipc() {
         let (_sender, receiver) = unbounded_channel();
@@ -468,15 +517,10 @@ mod tests {
     }
 
     /// Subtitles sent while MPV opens wait for the file; later ones go at once.
-    #[cfg(windows)]
     #[tokio::test]
     async fn adds_late_subtitles_once_the_file_is_loaded() {
-        use tokio::net::windows::named_pipe::ServerOptions;
         let pipe = pipe_name("test-late");
-        let server = ServerOptions::new()
-            .first_pipe_instance(true)
-            .create(&pipe)
-            .unwrap();
+        let server = FakeMpv::listen(&pipe);
         let receiver = late_subtitles("test-late");
         assert!(send_subtitles(
             "test-late",
@@ -484,8 +528,7 @@ mod tests {
             true
         ));
         let fake = tokio::spawn(async move {
-            server.connect().await.unwrap();
-            let (reader, mut writer) = tokio::io::split(server);
+            let (reader, mut writer) = tokio::io::split(server.accept().await);
             let mut lines = BufReader::new(reader).lines();
             for _ in 0..4 {
                 lines.next_line().await.unwrap().unwrap();

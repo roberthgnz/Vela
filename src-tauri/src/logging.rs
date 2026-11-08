@@ -200,7 +200,7 @@ pub fn log_folder(app: AppHandle) -> Result<String, String> {
         .unwrap_or_default())
 }
 
-/// Writes the diagnostic report next to the log files and selects it in Explorer, for users
+/// Writes the diagnostic report next to the log files and selects it in the file manager, for users
 /// whose clipboard is not available. Returns the file's path.
 #[tauri::command]
 pub async fn log_save_report(app: AppHandle, report: String) -> Result<String, String> {
@@ -221,15 +221,11 @@ pub async fn log_save_report(app: AppHandle, report: String) -> Result<String, S
         .await
         .map_err(|_| "No se pudo guardar el diagnóstico.".to_owned())?;
     let shown = path.to_string_lossy().into_owned();
-    if cfg!(windows) {
-        let _ = tokio::process::Command::new("explorer")
-            .arg(format!("/select,{shown}"))
-            .spawn();
-    }
+    let _ = crate::desktop::reveal(&path, true);
     Ok(shown)
 }
 
-/// Shows the folder with the log files in Explorer.
+/// Shows the folder with the log files in the file manager.
 #[tauri::command]
 pub async fn log_reveal(app: AppHandle) -> Result<(), String> {
     let folder = log(&app)?.path().parent().map(Path::to_path_buf);
@@ -237,16 +233,7 @@ pub async fn log_reveal(app: AppHandle) -> Result<(), String> {
         return Err("El registro no está disponible.".to_owned());
     };
     tokio::fs::create_dir_all(&folder).await.ok();
-    let program = if cfg!(windows) {
-        "explorer"
-    } else {
-        "xdg-open"
-    };
-    tokio::process::Command::new(program)
-        .arg(folder.to_string_lossy().into_owned())
-        .spawn()
-        .map(|_| ())
-        .map_err(|_| "No se pudo abrir el Explorador.".to_owned())
+    crate::desktop::reveal(&folder, false)
 }
 
 #[cfg(test)]

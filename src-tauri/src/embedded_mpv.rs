@@ -696,9 +696,13 @@ impl EmbeddedMpv {
     }
 }
 
-/// The libmpv Vela would use, if any.
+/// The libmpv Vela would use, if any (none outside Windows).
 #[tauri::command]
 pub fn mpv_embedded_library(app: AppHandle, player_path: Option<String>) -> Option<String> {
+    // The native video window exists only on Windows; elsewhere the page keeps its own player.
+    if !cfg!(windows) {
+        return None;
+    }
     find(player_path.as_deref(), crate::libmpv::installed(&app))
         .map(|path| path.to_string_lossy().into_owned())
 }

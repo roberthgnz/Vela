@@ -78,6 +78,22 @@ async fn open_external(url: String) -> Result<(), String> {
 fn player_executable(configured: &str) -> Result<PathBuf, String> {
     if !configured.trim().is_empty() {
         let path = Path::new(configured);
+        // On macOS a chosen `mpv.app` or `VLC.app` stands for the program inside the bundle.
+        #[cfg(target_os = "macos")]
+        let bundled;
+        #[cfg(target_os = "macos")]
+        let path = match path.file_stem().and_then(|stem| stem.to_str()) {
+            Some(stem)
+                if path.is_dir()
+                    && path
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("app")) =>
+            {
+                bundled = path.join("Contents/MacOS").join(stem);
+                bundled.as_path()
+            }
+            _ => path,
+        };
         if !path.is_absolute() || !path.is_file() {
             return Err(
                 "Elige la ruta completa del ejecutable de un reproductor instalado.".to_owned(),
@@ -112,6 +128,25 @@ fn player_executable(configured: &str) -> Result<PathBuf, String> {
     if let Some(programs) = std::env::var_os("ProgramFiles(x86)") {
         candidates.push(PathBuf::from(programs).join("VideoLAN/VLC/vlc.exe"));
     }
+    // Apps opened from Finder or a desktop launcher get a short PATH, without Homebrew's folders.
+    let fixed: &[&str] = if cfg!(target_os = "macos") {
+        &[
+            "/opt/homebrew/bin/mpv",
+            "/usr/local/bin/mpv",
+            "/Applications/mpv.app/Contents/MacOS/mpv",
+            "/Applications/VLC.app/Contents/MacOS/VLC",
+        ]
+    } else if cfg!(windows) {
+        &[]
+    } else {
+        &[
+            "/usr/bin/mpv",
+            "/usr/local/bin/mpv",
+            "/usr/bin/vlc",
+            "/snap/bin/vlc",
+        ]
+    };
+    candidates.extend(fixed.iter().map(PathBuf::from));
     candidates
         .into_iter()
         .find(|path| path.is_file())
@@ -266,13 +301,10 @@ async fn launch_external_player(
                     return vlc::follow(*port, password, session, !show_subtitles, alive, report)
                         .await;
                 }
-                #[cfg(windows)]
                 if ipc && let Some(late) = late {
                     return mpv::follow(&mpv::pipe_name(session), session, alive, report, late)
                         .await;
                 }
-                #[cfg(not(windows))]
-                drop(late);
                 None
             };
             let (code, state) = tokio::join!(watcher, follower);
@@ -483,6 +515,11 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("could not start Vela")
         .run(|app, event| {
+            // macOS: clicking the Dock icon brings back a window hidden to the tray.
+            #[cfg(target_os = "macos")]
+            if let RunEvent::Reopen { .. } = event {
+                desktop::show_main(app);
+            }
             if let RunEvent::Exit = event {
                 app.state::<service::Service>().stop();
                 app.state::<embedded_mpv::EmbeddedMpv>().stop_blocking();

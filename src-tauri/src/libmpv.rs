@@ -370,16 +370,26 @@ impl Installer {
     }
 }
 
+/// The pinned build is a Windows DLL: elsewhere there is nothing to offer.
+fn supported() -> Result<(), String> {
+    if cfg!(windows) {
+        Ok(())
+    } else {
+        Err("La descarga de libmpv solo está disponible en Windows.".to_owned())
+    }
+}
+
 #[tauri::command]
-pub fn mpv_install_info(app: AppHandle) -> Info {
+pub fn mpv_install_info(app: AppHandle) -> Result<Info, String> {
+    supported()?;
     let build = build();
-    Info {
+    Ok(Info {
         version: build.version.clone(),
         size: build.size,
         license: build.license.clone(),
         source: build.source.clone(),
         path: installed(&app).map(|path| path.to_string_lossy().into_owned()),
-    }
+    })
 }
 
 /// Downloads the pinned libmpv, reporting `mpv-install` events, and returns where it is.
@@ -388,6 +398,7 @@ pub async fn mpv_install(
     app: AppHandle,
     installer: State<'_, Installer>,
 ) -> Result<String, String> {
+    supported()?;
     let (cancel, _running) = installer.begin()?;
     let build = build();
     let root = root(&app)?;

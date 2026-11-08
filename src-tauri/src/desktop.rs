@@ -1,4 +1,4 @@
-//! Windows integration: the tray icon (and closing to it), and links that open Vela.
+//! Desktop integration: the tray icon (and closing to it), and links that open Vela.
 //!
 //! Links: `vela://host/path/manifest.json` is always registered for the current user and opens
 //! the add-on install dialog with `https://host/path/manifest.json` filled in; nothing is
@@ -29,6 +29,46 @@ pub fn link_in<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
         let lower = arg.to_ascii_lowercase();
         (lower.starts_with("vela://") || lower.starts_with("stremio://")) && arg.len() <= 4096
     })
+}
+
+/// Shows `path` in the system file manager: selected inside its folder when `select` is set
+/// (Explorer and Finder; other file managers open the folder that holds it), or opened when it
+/// is a folder.
+pub fn reveal(path: &std::path::Path, select: bool) -> Result<(), String> {
+    let shown = path.to_string_lossy();
+    let shown = shown.trim_start_matches(r"\\?\");
+    let mut command = if cfg!(windows) {
+        let mut command = std::process::Command::new("explorer");
+        command.arg(if select {
+            format!("/select,{shown}")
+        } else {
+            shown.to_owned()
+        });
+        command
+    } else if cfg!(target_os = "macos") {
+        let mut command = std::process::Command::new("open");
+        if select {
+            command.arg("-R");
+        }
+        command.arg(shown);
+        command
+    } else {
+        let folder = if select {
+            path.parent().unwrap_or(path)
+        } else {
+            path
+        };
+        let mut command = std::process::Command::new("xdg-open");
+        command.arg(folder);
+        command
+    };
+    command
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map(drop)
+        .map_err(|_| "No se pudo abrir el explorador de archivos.".to_owned())
 }
 
 pub fn show_main(app: &AppHandle) {
