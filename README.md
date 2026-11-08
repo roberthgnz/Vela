@@ -5,7 +5,7 @@
 <h1 align="center">Vela</h1>
 
 <p align="center">
-  Cliente de escritorio para Windows compatible con los addons de Stremio.<br>
+  Cliente de escritorio para Windows, macOS y Linux compatible con los addons de Stremio.<br>
   Hecho con Tauri 2, Rust, React y TypeScript. No es una aplicación oficial de Stremio.
 </p>
 
@@ -13,11 +13,11 @@
   <a href="https://github.com/roberthgnz/Vela/releases/latest"><img src="https://img.shields.io/github/v/release/roberthgnz/Vela?label=versi%C3%B3n&color=d6ef91&labelColor=17181c" alt="Última versión"></a>
   <a href="https://github.com/roberthgnz/Vela/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/roberthgnz/Vela/ci.yml?branch=main&label=CI&labelColor=17181c" alt="Estado de la CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/roberthgnz/Vela?label=licencia&color=d6ef91&labelColor=17181c" alt="Licencia MIT"></a>
-  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-d6ef91?labelColor=17181c" alt="Windows 10 y 11">
+  <img src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-d6ef91?labelColor=17181c" alt="Windows, macOS y Linux">
 </p>
 
 <p align="center">
-  <a href="https://github.com/roberthgnz/Vela/releases/latest"><b>Descargar para Windows</b></a>
+  <a href="https://github.com/roberthgnz/Vela/releases/latest"><b>Descargar</b></a>
   ·
   <a href="#funciones">Funciones</a>
   ·
@@ -105,7 +105,7 @@ El proxy propio no reescribe listas HLS ni aplica `proxyHeaders.response`; HLS c
 
 La temporada sintética de tres episodios se valida por TCP con el motor de Vela: selección, descarga íntegra y reutilización del torrent. El benchmark con piezas de 4 MiB usa un peer local, no demuestra rendimiento en Internet. Dune y una temporada de un enjambre público siguen sin verificar. Los procedimientos y el alcance están en [docs/stremio.md](docs/stremio.md).
 
-El instalador sigue sin firma y puede mostrar el aviso habitual de Windows.
+El instalador sigue sin firma y puede mostrar el aviso habitual de Windows. En macOS y Linux faltan mpv integrado, la descarga de libmpv, los enlaces `vela://`/`stremio://` y el arranque automático del servidor de Stremio, y el motor web (WebKit) decodifica otros formatos que WebView2: ver [docs/platforms.md](docs/platforms.md). La app de macOS no está notarizada.
 
 ## Desarrollo
 
@@ -116,7 +116,7 @@ permite revisar y restaurar una copia local: conserva una copia del estado actua
 antes de reemplazarlo y recarga Vela. Después hay que volver a vincular la cuenta
 de Stremio. Las copias recuperan datos de la aplicación, no los archivos de vídeo.
 
-Requiere Node 22.12 o posterior, pnpm 11, Rust estable, las herramientas de compilación C++ de Microsoft y WebView2.
+Requiere Node 22.12 o posterior, pnpm 11, Rust estable, las herramientas de compilación C++ de Microsoft y WebView2. Para macOS y Linux, los requisitos y `pnpm package:macos`/`pnpm package:linux` están en [docs/platforms.md](docs/platforms.md).
 
 ```powershell
 pnpm install --frozen-lockfile
@@ -136,18 +136,18 @@ El instalador se genera en `src-tauri/target/release/bundle/nsis/`. `pnpm packag
 
 ### Versiones en GitHub
 
-- **CI** ([ci.yml](.github/workflows/ci.yml)): en cada push a `main` y en cada pull request comprueba tipos, compila la interfaz y ejecuta las pruebas unitarias (Ubuntu), y `cargo fmt`, `clippy` y las pruebas Rust (Windows).
-- **Release** ([release.yml](.github/workflows/release.yml)): genera el instalador NSIS en Windows tras pasar las pruebas y lo publica en [Releases](https://github.com/roberthgnz/Vela/releases) con su suma SHA-256 y notas generadas a partir de los commits. Se lanza de dos formas:
+- **CI** ([ci.yml](.github/workflows/ci.yml)): en cada push a `main` y en cada pull request comprueba tipos, compila la interfaz y ejecuta las pruebas unitarias (Ubuntu), y `cargo fmt`, `clippy` y las pruebas Rust (Windows, macOS y Linux).
+- **Release** ([release.yml](.github/workflows/release.yml)): genera el instalador NSIS de Windows, el `.dmg` universal de macOS y la AppImage y el `.deb` de Linux tras pasar las pruebas en cada sistema, y los publica juntos en [Releases](https://github.com/roberthgnz/Vela/releases) con sus sumas SHA-256 y notas generadas a partir de los commits. Se lanza de dos formas:
   - subiendo una etiqueta igual a la versión: actualiza la versión en `package.json`, `src-tauri/Cargo.toml` y `src-tauri/tauri.conf.json`, haz commit y ejecuta `git tag v0.3.0` y `git push origin v0.3.0`;
   - o desde Actions › Release › Run workflow, que etiqueta el commit elegido como `v<versión>` (opcionalmente como borrador).
 
-El flujo falla si las tres versiones no coinciden o si la etiqueta no corresponde a la versión. Si la versión ya está publicada, sustituye los archivos adjuntos.
+El flujo falla si las tres versiones no coinciden o si la etiqueta no corresponde a la versión. Al subir de nuevo la etiqueta de una versión ya publicada sustituye los archivos adjuntos; lanzado a mano, solo sube archivos a una release que no existe o sigue en borrador.
 
 ### Actualización automática
 
 Desde la 0.3.2, Vela consulta al arrancar `https://github.com/roberthgnz/Vela/releases/latest/download/latest.json` (se puede desactivar en Ajustes › Acerca de, donde también está «Buscar ahora»). Si hay una versión nueva lo avisa; al aceptar, descarga el instalador, comprueba su firma con la clave pública de `tauri.conf.json`, lo instala en modo pasivo y vuelve a abrir Vela. Nada se instala sin confirmación.
 
-El workflow de release firma el instalador con el secreto `TAURI_SIGNING_PRIVATE_KEY` y publica el `.sig` y `latest.json` ([dev/updater-manifest.mjs](dev/updater-manifest.mjs)). La clave privada no está en el repositorio: si se pierde, las copias instaladas no aceptarán más actualizaciones y habrá que reinstalar a mano con una clave nueva. `VELA_UPDATE_ENDPOINT` cambia la dirección consultada para probar con un `latest.json` local; la firma se comprueba igual.
+El workflow de release firma el paquete de actualización de cada sistema con el secreto `TAURI_SIGNING_PRIVATE_KEY` y publica los `.sig` y un `latest.json` con todas las plataformas ([dev/updater-manifest.mjs](dev/updater-manifest.mjs)). La clave privada no está en el repositorio: si se pierde, las copias instaladas no aceptarán más actualizaciones y habrá que reinstalar a mano con una clave nueva. `VELA_UPDATE_ENDPOINT` cambia la dirección consultada para probar con un `latest.json` local; la firma se comprueba igual.
 
 La firma de actualizaciones no es la firma de código de Windows: el instalador no está firmado con un certificado y Windows puede mostrar su aviso al ejecutarlo a mano. La aplicación empaquetada incluye su interfaz y no requiere Node ni el servidor Vite en el equipo del usuario. WebView2 es un requisito de ejecución.
 
