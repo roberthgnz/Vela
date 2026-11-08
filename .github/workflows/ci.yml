@@ -31,8 +31,18 @@ jobs:
       - run: pnpm test
 
   desktop:
-    name: Desktop (Rust on Windows)
-    runs-on: windows-latest
+    name: Desktop (Rust on ${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-latest
+          - name: Linux
+            os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
@@ -40,6 +50,12 @@ jobs:
       CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v5
+      - name: Install Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev libxdo-dev libssl-dev libdbus-1-dev
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal --component clippy,rustfmt && rustup default stable
       - uses: Swatinem/rust-cache@v2

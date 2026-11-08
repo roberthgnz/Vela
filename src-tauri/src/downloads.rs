@@ -37,7 +37,7 @@ pub fn folder(app: &AppHandle) -> Result<PathBuf, String> {
     let base = app
         .path()
         .download_dir()
-        .map_err(|_| "No se encontró la carpeta de descargas de Windows.".to_owned())?;
+        .map_err(|_| "No se encontró la carpeta de descargas.".to_owned())?;
     Ok(base.join("Vela"))
 }
 
@@ -310,27 +310,17 @@ pub async fn download_remove(
     Ok(())
 }
 
-/// Opens Explorer with the file selected (or the folder, when there is no file yet).
+/// Opens the file manager with the file selected (or the folder, when there is no file yet).
 #[tauri::command]
 pub async fn download_reveal(app: AppHandle, path: Option<String>) -> Result<(), String> {
-    let target = match path {
-        Some(path) => format!(
-            "/select,{}",
-            inside(&app, &path)?
-                .to_string_lossy()
-                .trim_start_matches(r"\\?\")
-        ),
+    match path {
+        Some(path) => crate::desktop::reveal(&inside(&app, &path)?, true),
         None => {
             let dir = folder(&app)?;
             tokio::fs::create_dir_all(&dir).await.ok();
-            dir.to_string_lossy().into_owned()
+            crate::desktop::reveal(&dir, false)
         }
-    };
-    tokio::process::Command::new("explorer")
-        .arg(target)
-        .spawn()
-        .map(|_| ())
-        .map_err(|_| "No se pudo abrir el Explorador.".to_owned())
+    }
 }
 
 #[cfg(test)]

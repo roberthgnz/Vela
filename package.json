@@ -1,7 +1,7 @@
 {
   "name": "vela",
   "private": true,
-  "description": "Cliente de escritorio para Windows compatible con addons de Stremio",
+  "description": "Cliente de escritorio compatible con addons de Stremio",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -16,7 +16,9 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "desktop": "tauri dev",
-    "package": "node node_modules/@tauri-apps/cli/tauri.js build --bundles nsis -- --locked"
+    "package": "node node_modules/@tauri-apps/cli/tauri.js build --bundles nsis -- --locked",
+    "package:macos": "node node_modules/@tauri-apps/cli/tauri.js build --target universal-apple-darwin --bundles app,dmg -- --locked",
+    "package:linux": "node node_modules/@tauri-apps/cli/tauri.js build --bundles appimage,deb -- --locked"
   },
   "dependencies": {
     "@tanstack/react-query": "5.105.0",

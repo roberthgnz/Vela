@@ -583,22 +583,12 @@ pub async fn storage_restore(app: AppHandle, name: String) -> Result<String, Str
     .await
 }
 
-/// Shows the folder with the database and its backups in Explorer.
+/// Shows the folder with the database and its backups in the file manager.
 #[tauri::command]
 pub async fn storage_reveal(app: AppHandle) -> Result<(), String> {
     let dir = storage(&app)?.backups_dir();
     tokio::fs::create_dir_all(&dir).await.ok();
-    let target = dir.to_string_lossy().into_owned();
-    let program = if cfg!(windows) {
-        "explorer"
-    } else {
-        "xdg-open"
-    };
-    tokio::process::Command::new(program)
-        .arg(target)
-        .spawn()
-        .map(|_| ())
-        .map_err(|_| "No se pudo abrir el Explorador.".to_owned())
+    crate::desktop::reveal(&dir, false)
 }
 
 #[cfg(test)]

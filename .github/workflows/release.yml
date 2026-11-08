@@ -1,9 +1,10 @@
 name: Release
 
-# Builds the Windows installer and publishes it as a GitHub release.
+# Builds the installers for Windows, macOS and Linux and publishes them as one GitHub release.
 # - Push a tag `vX.Y.Z` that matches the version in package.json, or
 # - run the workflow by hand (Actions › Release › Run workflow): it tags the selected
-#   commit as `v<package.json version>`.
+#   commit as `v<package.json version>` when the release is published.
+# Every platform's update bundle is signed for the in-app updater, and `latest.json` lists them all.
 
 on:
   push:
@@ -19,35 +20,21 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  windows:
-    runs-on: windows-latest
-    permissions:
-      contents: write
-    defaults:
-      run:
-        # Stop at the first failing command (PowerShell would continue after a failing native tool).
-        shell: bash
-    env:
-      CARGO_TERM_COLOR: always
+  version:
+    name: Version and tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          # pnpm is installed in the next step; automatic caching would look for it first.
-          package-manager-cache: false
-
-      - name: Install pnpm
-        run: npm install --global "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
-
-      - name: Install Rust
-        run: rustup toolchain install stable --profile minimal && rustup default stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       - name: Resolve version and tag
         id: version
@@ -67,6 +54,61 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
+  build:
+    name: Build (${{ matrix.name }})
+    needs: version
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            script: package
+            rust_targets: ""
+          - name: macOS
+            os: macos-latest
+            script: package:macos
+            rust_targets: aarch64-apple-darwin x86_64-apple-darwin
+          - name: Linux
+            # The oldest supported runner: the AppImage runs on systems with this glibc or newer.
+            os: ubuntu-22.04
+            script: package:linux
+            rust_targets: ""
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # Stop at the first failing command (PowerShell would continue after a failing native tool).
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          # pnpm is installed in the next step; automatic caching would look for it first.
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+
+      - name: Install Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev libxdo-dev libssl-dev libdbus-1-dev patchelf file \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal && rustup default stable
+          for target in ${{ matrix.rust_targets }}; do rustup target add "$target"; done
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: release
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -78,27 +120,97 @@ jobs:
 
       - name: Build installer
         env:
-          # Signs the installer for the in-app updater (public key in tauri.conf.json).
+          # Signs the update bundle for the in-app updater (public key in tauri.conf.json).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-        run: pnpm package
+        run: pnpm "${{ matrix.script }}"
+
+      # Release file names carry the version and the architecture, like the Windows installer.
+      - name: Collect bundles
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          out=release-files
+          mkdir -p "$out"
+          bundle=src-tauri/target/release/bundle
+          case "$RUNNER_OS" in
+            Windows)
+              cp "$bundle/nsis/Vela_${VERSION}_x64-setup.exe"* "$out/"
+              ;;
+            macOS)
+              bundle=src-tauri/target/universal-apple-darwin/release/bundle
+              cp "$bundle/dmg/Vela_${VERSION}_universal.dmg" "$out/"
+              cp "$bundle/macos/Vela.app.tar.gz" "$out/Vela_${VERSION}_universal.app.tar.gz"
+              cp "$bundle/macos/Vela.app.tar.gz.sig" "$out/Vela_${VERSION}_universal.app.tar.gz.sig"
+              ;;
+            Linux)
+              cp "$bundle/appimage/Vela_${VERSION}_amd64.AppImage"* "$out/"
+              cp "$bundle/deb/Vela_${VERSION}_amd64.deb"* "$out/"
+              ;;
+          esac
+          # macOS has shasum but not always sha256sum; both print "<hash>  <file>".
+          if command -v sha256sum > /dev/null; then sum="sha256sum"; else sum="shasum -a 256"; fi
+          (cd "$out" && for file in *; do
+            case "$file" in *.sig) ;; *) $sum "$file" > "$file.sha256" ;; esac
+          done)
+          ls -l "$out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles-${{ runner.os }}
+          path: release-files/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bundles-*
+          path: release-files
+          merge-multiple: true
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
           DRAFT: ${{ inputs.draft && '--draft' || '' }}
         run: |
-          name="Vela_${VERSION}_x64-setup.exe"
-          installer="src-tauri/target/release/bundle/nsis/$name"
-          test -f "$installer" && test -f "$installer.sig"
-          (cd "$(dirname "$installer")" && sha256sum "$name") > "$name.sha256"
-          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$name"
-          if ! gh release view "$TAG" > /dev/null 2>&1; then
+          cd release-files
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
+          windows="Vela_${VERSION}_x64-setup.exe"
+          macos="Vela_${VERSION}_universal.app.tar.gz"
+          appimage="Vela_${VERSION}_amd64.AppImage"
+          deb="Vela_${VERSION}_amd64.deb"
+          for file in "$windows" "$macos" "$appimage" "$deb"; do test -f "$file"; done
+          for file in "$windows" "$macos" "$appimage"; do test -f "$file.sig"; done
+          # The .deb is listed for the updater only when the bundler signed it too.
+          deb_entry=()
+          if [ -f "$deb.sig" ]; then deb_entry=("linux-x86_64-deb" "$deb" "$base/$deb"); fi
+          if gh release view "$TAG" --json isDraft -q .isDraft > draft.txt 2> /dev/null; then
+            # A run by hand must not replace the files of a release that is already out.
+            if [ "$GITHUB_EVENT_NAME" != "push" ] && [ "$(cat draft.txt)" != "true" ]; then
+              echo "::error::Release $TAG is already published; bump the version to build a new one"
+              exit 1
+            fi
+          else
             gh release create "$TAG" --target "$GITHUB_SHA" --title "Vela $VERSION" --generate-notes $DRAFT
           fi
-          # Installed copies poll latest.json; it carries the release notes and the signature.
-          gh release view "$TAG" --json body -q .body > notes.md
-          node dev/updater-manifest.mjs "$VERSION" "$installer" "$url" notes.md > latest.json
-          gh release upload "$TAG" "$installer" "$installer.sig" "$name.sha256" latest.json --clobber
+          rm -f draft.txt
+          # Installed copies poll latest.json; it carries the release notes and the signatures.
+          gh release view "$TAG" --json body -q .body > ../notes.md
+          node ../dev/updater-manifest.mjs "$VERSION" ../notes.md \
+            "windows-x86_64-nsis,windows-x86_64" "$windows" "$base/$windows" \
+            "darwin-aarch64-app,darwin-aarch64,darwin-x86_64-app,darwin-x86_64" "$macos" "$base/$macos" \
+            "linux-x86_64-appimage,linux-x86_64" "$appimage" "$base/$appimage" \
+            "${deb_entry[@]}" > latest.json
+          cat latest.json
+          gh release upload "$TAG" ./* --clobber

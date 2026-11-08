@@ -1,4 +1,5 @@
-//! Session secrets kept in the operating system credential store (Windows Credential Manager).
+//! Session secrets kept in the operating system credential store: Windows Credential Manager,
+//! the macOS keychain, or the Secret Service (GNOME Keyring, KWallet) on Linux.
 //! Only a fixed set of names can be read or written from the interface.
 
 const SERVICE: &str = "com.vela.desktop";
@@ -12,13 +13,13 @@ fn checked(name: &str) -> Result<&str, String> {
         .ok_or_else(|| "Secreto desconocido.".to_owned())
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 fn entry(name: &str) -> Result<keyring::Entry, String> {
     keyring::Entry::new(SERVICE, checked(name)?)
-        .map_err(|_| "El Administrador de credenciales de Windows no está disponible.".to_owned())
+        .map_err(|_| "El almacén de credenciales del sistema no está disponible.".to_owned())
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 #[tauri::command]
 pub fn secret_get(name: String) -> Result<Option<String>, String> {
     match entry(&name)?.get_password() {
@@ -28,18 +29,18 @@ pub fn secret_get(name: String) -> Result<Option<String>, String> {
     }
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 #[tauri::command]
 pub fn secret_set(name: String, value: String) -> Result<(), String> {
     if value.is_empty() || value.len() > 4096 {
         return Err("Secreto no válido.".to_owned());
     }
     entry(&name)?.set_password(&value).map_err(|_| {
-        "No se pudo guardar la sesión en el Administrador de credenciales de Windows.".to_owned()
+        "No se pudo guardar la sesión en el almacén de credenciales del sistema.".to_owned()
     })
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 #[tauri::command]
 pub fn secret_delete(name: String) -> Result<(), String> {
     match entry(&name)?.delete_credential() {
@@ -48,21 +49,21 @@ pub fn secret_delete(name: String) -> Result<(), String> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 #[tauri::command]
 pub fn secret_get(name: String) -> Result<Option<String>, String> {
     checked(&name)?;
     Ok(None)
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 #[tauri::command]
 pub fn secret_set(name: String, _value: String) -> Result<(), String> {
     checked(&name)?;
-    Err("El almacenamiento seguro de la sesión solo está disponible en Windows.".to_owned())
+    Err("El almacenamiento seguro de la sesión no está disponible en este sistema.".to_owned())
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 #[tauri::command]
 pub fn secret_delete(name: String) -> Result<(), String> {
     checked(&name).map(|_| ())
