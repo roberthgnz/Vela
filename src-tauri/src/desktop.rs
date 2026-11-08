@@ -300,7 +300,9 @@ pub fn register_own_scheme() {
     }
 }
 
+#[cfg(windows)]
 const STREMIO_KEY: &str = r"Software\Classes\stremio";
+#[cfg(windows)]
 const SAVED_KEY: &str = r"Software\Vela\stremio-link";
 
 /// Whether `stremio://` links currently open this Vela.

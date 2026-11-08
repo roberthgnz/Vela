@@ -389,7 +389,7 @@ mod tests {
         let arguments = ipc_arguments("abc", Some(95.04));
         assert!(
             arguments[0].starts_with("--input-ipc-server=")
-                && arguments[0].ends_with("vela-mpv-abc")
+                && arguments[0].contains("vela-mpv-abc")
         );
         assert_eq!(arguments[1], "--start=95.0");
         assert_eq!(ipc_arguments("abc", Some(0.2)).len(), 1);

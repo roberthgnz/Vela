@@ -925,6 +925,8 @@ pub async fn mpv_embedded_close(
 mod tests {
     use super::*;
 
+    // The candidates are Windows install folders.
+    #[cfg(windows)]
     #[test]
     fn looks_next_to_the_configured_player_first() {
         let list = candidates(Some(r"C:\Tools\mpv\mpv.exe"), None);
