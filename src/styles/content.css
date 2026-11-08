@@ -7,7 +7,7 @@
   overflow-x: hidden;
   border-top: 1px solid var(--line);
   border-left: 1px solid var(--line);
-  border-top-left-radius: var(--radius-xl);
+  border-top-left-radius: 18px;
   background: var(--bg);
   user-select: text;
   scrollbar-gutter: stable;
@@ -37,8 +37,8 @@
 }
 .page-header h1 {
   margin-right: auto;
-  font: 600 20px/1.2 var(--font-display);
-  letter-spacing: -0.01em;
+  font: 700 24px/1.2 var(--font-display);
+  letter-spacing: -0.02em;
 }
 .count {
   margin-left: 6px;
@@ -61,35 +61,34 @@
 }
 .page-tabs {
   display: flex;
-  gap: 2px;
-  margin: 0 var(--gutter) 14px;
-  border-bottom: 1px solid var(--line);
+  gap: 4px;
+  margin: 0 var(--gutter) 16px;
 }
 .page-tabs button {
   position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 34px;
-  padding: 0 10px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   color: var(--muted);
   font-weight: 500;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 .page-tabs button:hover {
+  background: rgb(255 255 255 / 6%);
   color: var(--fg);
 }
 .page-tabs button.selected {
+  border-color: var(--glass-edge);
+  background: rgb(255 255 255 / 10%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
   color: var(--fg);
-}
-.page-tabs button.selected::after {
-  content: "";
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--accent);
 }
 .tab-count {
   color: var(--faint);
@@ -155,7 +154,7 @@
   gap: 10px;
   width: 100%;
   padding: 8px 10px;
-  border-radius: var(--radius);
+  border-radius: 12px;
   color: var(--fg);
   text-align: left;
 }

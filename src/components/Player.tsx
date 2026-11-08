@@ -9,6 +9,8 @@ import {
 import {
   ArrowLeft,
   Captions,
+  ChevronsLeft,
+  ChevronsRight,
   Gauge,
   LoaderCircle,
   Maximize,
@@ -27,7 +29,7 @@ import {
 import type { Episode, MediaItem } from "../lib/contracts";
 import { episodeCode, nextEpisode } from "../lib/episodes";
 import { externalPlayerName, playExternally } from "../lib/externalPlayback";
-import { formatNumber, t } from "../lib/i18n";
+import { formatNumber, locale, t } from "../lib/i18n";
 import { log } from "../lib/log";
 import { readMkvChapters, type Chapter } from "../lib/mkvChapters";
 import {
@@ -106,6 +108,34 @@ function CoverArt({ meta }: { meta: MediaItem }) {
         <strong className="player-cover-name">{meta.name}</strong>
       )}
     </>
+  );
+}
+
+/** Whether the clock after the seek bar shows the time left or when the video will end. */
+const timeModeKey = "vela.ui.player.timeMode";
+type TimeMode = "remaining" | "end";
+
+/**
+ * Covers the video after a while paused and untouched: what is being watched, its logo or name,
+ * the episode and its synopsis. Any movement or key brings the controls back.
+ */
+function PauseScreen({ playing }: { playing: Playing }) {
+  const [logoFailed, setLogoFailed] = useState(false);
+  const logo = logoFailed ? undefined : safeImage(playing.meta.logo);
+  const synopsis = playing.episode?.overview || playing.meta.description;
+  return (
+    <div className="player-away" aria-hidden="true">
+      <div className="player-away-text">
+        <span className="player-away-label">{t("player.youreWatching")}</span>
+        {logo ? (
+          <img src={logo} alt="" onError={() => setLogoFailed(true)} />
+        ) : (
+          <strong>{playing.meta.name}</strong>
+        )}
+        {playing.episode && <span className="player-away-episode">{episodeText(playing.episode)}</span>}
+        {synopsis && <p>{synopsis}</p>}
+      </div>
+    </div>
   );
 }
 
@@ -244,8 +274,21 @@ export function Player({
   );
   const episodeLine = episodeText(playing.episode);
 
-  const { idle, setIdle, flash, showFlash, pulse, showPulse, wake } =
+  const { idle, setIdle, still, flash, showFlash, hud, showHud, pulse, showPulse, wake } =
     useOverlay(video);
+  const [timeMode, setTimeMode] = useState<TimeMode>(() =>
+    storage.getItem(timeModeKey) === "end" ? "end" : "remaining",
+  );
+  const toggleTimeMode = () =>
+    setTimeMode((current) => {
+      const nextMode = current === "end" ? "remaining" : "end";
+      try {
+        storage.setItem(timeModeKey, nextMode);
+      } catch {
+        /* Optional, like the volume. */
+      }
+      return nextMode;
+    });
   const progress = useWatchProgress(playing, next, video);
   const media = useMediaSource({
     playing,
@@ -519,16 +562,18 @@ export function Player({
       0,
       Math.min(element.duration, element.currentTime + seconds),
     );
-    showFlash(`${seconds > 0 ? "+" : "−"}${Math.abs(seconds)} s`);
+    showHud({ kind: "seek", seconds });
     wake();
   };
   const changeVolume = (value: number) => {
     const nextVolume = Math.max(0, Math.min(1, Math.round(value * 100) / 100));
     setVolume(nextVolume);
     setMuted(nextVolume === 0);
-    showFlash(
-      t("player.volumeFlash", { percent: Math.round(nextVolume * 100) }),
-    );
+    showHud({ kind: "volume", value: nextVolume });
+  };
+  const toggleMute = () => {
+    showHud({ kind: "volume", value: muted ? volume : 0 });
+    setMuted((value) => !value);
   };
   const toggleFullscreen = () =>
     void setFullscreen(surface.current, !fullscreen).catch(() =>
@@ -623,14 +668,7 @@ export function Player({
         togglePlay: toggle,
         seekBy,
         volumeBy: (delta) => changeVolume((muted ? 0 : volume) + delta),
-        toggleMute: () => {
-          showFlash(
-            muted
-              ? t("player.volumeFlash", { percent: Math.round(volume * 100) })
-              : t("player.muted"),
-          );
-          setMuted((value) => !value);
-        },
+        toggleMute,
         toStart: () => {
           if (!element) return;
           element.currentTime = 0;
@@ -683,6 +721,25 @@ export function Player({
   } as CSSProperties;
   const busy = status === "loading" || status === "buffering";
   const canConvert = Boolean(playing.transcodeUrl && !converting);
+  // Paused for a while and untouched: the pause screen takes over (not over a panel, a card or
+  // an error, which are waiting for the user).
+  const away =
+    still && status === "paused" && begun && !popover && !error && !showNext && !notice;
+  const endsAt = new Intl.DateTimeFormat(locale(), {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(Date.now() + (Math.max(0, remaining) / rate) * 1000);
+  const hoverSegment = hover ? activeSegment(segments, hover.time) : undefined;
+  const nextThumbnail = next ? safeImage(next.thumbnail) : undefined;
+  const hudVolumeIcon =
+    hud?.kind === "volume"
+      ? hud.value === 0
+        ? VolumeX
+        : hud.value < 0.5
+          ? Volume1
+          : Volume2
+      : undefined;
+  const HudVolumeIcon = hudVolumeIcon ?? VolumeIcon;
   return (
     <Dialog
       title={t("player.playingTitle", { name: playing.meta.name })}
@@ -692,10 +749,22 @@ export function Player({
     >
       <div
         ref={surface}
-        className={`player ${idle && status === "playing" && !popover ? "idle" : ""}`}
+        className={`player ${(idle && status === "playing" && !popover) || away ? "idle" : ""}${away ? " away" : ""}`}
         data-status={status}
         onMouseMove={wake}
+        onMouseLeave={() => {
+          // The pointer left the window: nothing to wait for before hiding the controls.
+          if (status === "playing" && !popover) setIdle(true);
+        }}
         onKeyDownCapture={() => wake()}
+        onWheel={(event) => {
+          // The wheel over the picture sets the volume; inside a panel it scrolls the panel.
+          if ((event.target as HTMLElement).closest(".player-popover, .player-error, .player-next"))
+            return;
+          if (!event.deltaY) return;
+          changeVolume((muted ? 0 : volume) + (event.deltaY < 0 ? 0.05 : -0.05));
+          wake();
+        }}
       >
         <video
           ref={mount}
@@ -764,7 +833,8 @@ export function Player({
             setStatus((value) =>
               value === "loading" && element.readyState < 3 ? value : "paused",
             );
-            setIdle(false);
+            // Controls back, and the pause screen counts from now.
+            wake();
             progress.save(element);
           }}
           onCanPlay={(event) => {
@@ -835,21 +905,10 @@ export function Player({
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="player-title" data-tauri-drag-region>
-            <strong data-tauri-drag-region>{playing.meta.name}</strong>
-            <span data-tauri-drag-region>
-              {[
-                episodeLine,
-                playing.stream.addonName,
-                quality,
-                converting && t("player.convertedByService"),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-          </div>
+          <span className="player-spacer" data-tauri-drag-region />
           {!fullscreen && <WindowControls onError={setNotice} />}
         </div>
+        {away && <PauseScreen playing={playing} />}
         {busy && !error && (
           <div
             className={`player-loading${status === "loading" ? " cover" : ""}`}
@@ -915,6 +974,34 @@ export function Player({
         {flash && (
           <div className="player-flash" aria-live="polite">
             {flash}
+          </div>
+        )}
+        {hud?.kind === "volume" && (
+          <div className="player-hud" aria-live="polite">
+            <span className="sr-only">
+              {hud.value === 0
+                ? t("player.muted")
+                : t("player.volumeFlash", { percent: Math.round(hud.value * 100) })}
+            </span>
+            <HudVolumeIcon size={18} aria-hidden="true" />
+            <span className="player-hud-bar" aria-hidden="true">
+              <span style={{ width: `${hud.value * 100}%` }} />
+            </span>
+            <span className="player-hud-value" aria-hidden="true">
+              {Math.round(hud.value * 100)}
+            </span>
+          </div>
+        )}
+        {hud?.kind === "seek" && (
+          <div
+            className={`player-seek-hud ${hud.seconds < 0 ? "back" : "forward"}`}
+            aria-hidden="true"
+          >
+            {hud.seconds < 0 ? <ChevronsLeft size={26} /> : <ChevronsRight size={26} />}
+            <span key={hud.seconds}>
+              {hud.seconds > 0 ? "+" : "−"}
+              {Math.abs(hud.seconds)} s
+            </span>
           </div>
         )}
         {pulse && (
@@ -1000,9 +1087,15 @@ export function Player({
         )}
         {skip && (
           <button
-            className="button player-skip"
+            className="player-skip"
             onClick={skipSegment}
             aria-keyshortcuts="S"
+            style={
+              {
+                // How far into the intro or credits the video is: the button fills up as it goes.
+                "--progress": `${Math.min(100, Math.max(0, ((time - skip.start) / Math.max(1, skip.end - skip.start)) * 100))}%`,
+              } as CSSProperties
+            }
           >
             <SkipForward size={15} />{" "}
             {skip.kind === "intro"
@@ -1012,6 +1105,16 @@ export function Player({
         )}
         {showNext && next && (
           <section className="player-next" aria-label={t("player.nextEpisode")}>
+            <button
+              className="player-next-thumb"
+              tabIndex={-1}
+              aria-hidden="true"
+              onClick={() => playNext(next)}
+            >
+              {nextThumbnail && <img src={nextThumbnail} alt="" />}
+              <Play size={22} fill="currentColor" />
+            </button>
+            <div className="player-next-body">
             <span className="player-next-label">
               {countdown !== null
                 ? t("player.nextEpisodeIn", { seconds: countdown })
@@ -1023,9 +1126,16 @@ export function Player({
             </strong>
             <div>
               <button
-                className="button primary small"
+                className={`button primary small${countdown !== null ? " counting" : ""}`}
                 data-autofocus
                 onClick={() => playNext(next)}
+                style={
+                  countdown !== null
+                    ? ({
+                        "--progress": `${100 - (countdown / Math.max(1, settings.nextCountdown)) * 100}%`,
+                      } as CSSProperties)
+                    : undefined
+                }
               >
                 <SkipForward size={14} /> {t("player.watchNow")}
               </button>
@@ -1035,6 +1145,7 @@ export function Player({
               >
                 {countdown !== null ? t("common.cancel") : t("player.hide")}
               </button>
+            </div>
             </div>
           </section>
         )}
@@ -1139,6 +1250,23 @@ export function Player({
           />
         )}
         <div className="player-controls">
+          <div className="player-heading" data-tauri-drag-region>
+            <div className="player-title">
+              <strong>{playing.meta.name}</strong>
+              {episodeLine && <span>{episodeLine}</span>}
+            </div>
+            <div className="player-chips">
+              {quality && <span className="player-chip strong">{quality}</span>}
+              {playing.stream.addonName && (
+                <span className="player-chip">{playing.stream.addonName}</span>
+              )}
+              {converting && (
+                <span className="player-chip">{t("player.convertedByService")}</span>
+              )}
+            </div>
+          </div>
+          <div className="player-timeline">
+          <span className="player-time">{clock(time)}</span>
           <div
             className="seek"
             onMouseMove={(event) => {
@@ -1173,6 +1301,13 @@ export function Player({
                     }}
                   />
                 ))}
+              {hover && duration > 0 && (
+                <span
+                  className="seek-hover"
+                  aria-hidden="true"
+                  style={{ width: `${(hover.time / duration) * 100}%` }}
+                />
+              )}
               <span className="seek-fill" style={{ width: `${percent}%` }} />
             </div>
             <input
@@ -1195,93 +1330,113 @@ export function Player({
             />
             {hover && duration > 0 && (
               <span className="seek-tooltip" style={{ left: hover.x }}>
+                {hoverSegment && (
+                  <small>
+                    {hoverSegment.kind === "intro"
+                      ? t("player.segment.intro")
+                      : t("player.segment.credits")}
+                  </small>
+                )}
                 {clock(hover.time)}
               </span>
             )}
           </div>
+          <button
+            className="player-time remaining"
+            title={t("player.timeModeTitle")}
+            onClick={toggleTimeMode}
+          >
+            {timeMode === "end"
+              ? t("player.endsAt", { time: endsAt })
+              : `−${clock(Math.max(0, remaining))}`}
+          </button>
+          </div>
           <div className="player-row">
-            <button
-              className="player-icon"
-              aria-label={
-                status === "playing" || status === "buffering"
-                  ? t("player.pause")
-                  : t("player.play")
-              }
-              title={
-                status === "playing"
-                  ? t("player.pauseKey")
-                  : t("player.playKey")
-              }
-              onClick={toggle}
-            >
-              {status === "playing" || status === "buffering" ? (
-                <Pause size={20} fill="currentColor" />
-              ) : (
-                <Play size={20} fill="currentColor" />
-              )}
-            </button>
-            <button
-              className="player-icon"
-              aria-label={t("player.rewindLabel", {
-                seconds: settings.seekLong,
-              })}
-              title={t("player.rewindTitle", { seconds: settings.seekLong })}
-              onClick={() => seekBy(-settings.seekLong)}
-            >
-              <RotateCcw size={18} />
-            </button>
-            <button
-              className="player-icon"
-              aria-label={t("player.forwardLabel", {
-                seconds: settings.seekLong,
-              })}
-              title={t("player.forwardTitle", { seconds: settings.seekLong })}
-              onClick={() => seekBy(settings.seekLong)}
-            >
-              <RotateCw size={18} />
-            </button>
-            {next && onNext && (
-              <button
-                className="player-icon"
-                aria-label={t("player.nextEpisodeLabel", {
-                  code: episodeCode(next),
-                })}
-                title={t("player.nextEpisodeTitle", {
-                  code: episodeCode(next),
-                })}
-                onClick={() => playNext(next)}
-              >
-                <SkipForward size={18} />
-              </button>
-            )}
-            <div className="volume">
-              <button
-                className="player-icon"
-                aria-label={muted ? t("player.unmute") : t("player.mute")}
-                title={muted ? t("player.unmuteKey") : t("player.muteKey")}
-                onClick={() => setMuted(!muted)}
-              >
-                <VolumeIcon size={19} />
-              </button>
-              <input
-                type="range"
-                aria-label={t("player.volume")}
-                min="0"
-                max="1"
-                step="0.05"
-                value={muted ? 0 : volume}
-                style={
-                  {
-                    "--thumb": `${(muted ? 0 : volume) * 100}%`,
-                  } as CSSProperties
-                }
-                onChange={(event) => changeVolume(Number(event.target.value))}
-              />
+            <div className="player-cluster start">
+              <div className="volume">
+                <button
+                  className="player-icon"
+                  aria-label={muted ? t("player.unmute") : t("player.mute")}
+                  title={muted ? t("player.unmuteKey") : t("player.muteKey")}
+                  onClick={toggleMute}
+                >
+                  <VolumeIcon size={19} />
+                </button>
+                <input
+                  type="range"
+                  aria-label={t("player.volume")}
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={muted ? 0 : volume}
+                  style={
+                    {
+                      "--thumb": `${(muted ? 0 : volume) * 100}%`,
+                    } as CSSProperties
+                  }
+                  onChange={(event) => changeVolume(Number(event.target.value))}
+                />
+              </div>
             </div>
-            <span className="player-time">
-              {clock(time)} <span>/ {clock(duration)}</span>
-            </span>
-            <span className="player-spacer" />
+            <div className="player-cluster transport">
+              <button
+                className="player-icon"
+                aria-label={t("player.rewindLabel", {
+                  seconds: settings.seekLong,
+                })}
+                title={t("player.rewindTitle", { seconds: settings.seekLong })}
+                onClick={() => seekBy(-settings.seekLong)}
+              >
+                <RotateCcw size={19} />
+                <small className="player-icon-badge">{settings.seekLong}</small>
+              </button>
+              <button
+                className="player-icon play"
+                aria-label={
+                  status === "playing" || status === "buffering"
+                    ? t("player.pause")
+                    : t("player.play")
+                }
+                title={
+                  status === "playing"
+                    ? t("player.pauseKey")
+                    : t("player.playKey")
+                }
+                onClick={toggle}
+              >
+                {status === "playing" || status === "buffering" ? (
+                  <Pause size={22} fill="currentColor" />
+                ) : (
+                  <Play size={22} fill="currentColor" />
+                )}
+              </button>
+              <button
+                className="player-icon"
+                aria-label={t("player.forwardLabel", {
+                  seconds: settings.seekLong,
+                })}
+                title={t("player.forwardTitle", { seconds: settings.seekLong })}
+                onClick={() => seekBy(settings.seekLong)}
+              >
+                <RotateCw size={19} />
+                <small className="player-icon-badge">{settings.seekLong}</small>
+              </button>
+              {next && onNext && (
+                <button
+                  className="player-icon"
+                  aria-label={t("player.nextEpisodeLabel", {
+                    code: episodeCode(next),
+                  })}
+                  title={t("player.nextEpisodeTitle", {
+                    code: episodeCode(next),
+                  })}
+                  onClick={() => playNext(next)}
+                >
+                  <SkipForward size={19} />
+                </button>
+              )}
+            </div>
+            <div className="player-cluster end">
             <button
               className={`player-icon ${subtitleKey || audioTracks.length > 1 ? "active" : ""} ${popover?.kind === "tracks" ? "pressed" : ""}`}
               aria-label={t("player.audioAndSubtitles")}
@@ -1341,6 +1496,7 @@ export function Player({
             >
               {fullscreen ? <Minimize size={19} /> : <Maximize size={19} />}
             </button>
+            </div>
           </div>
         </div>
       </div>

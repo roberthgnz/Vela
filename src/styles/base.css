@@ -33,6 +33,12 @@
   --radius-xl: 12px;
   --shadow-pop: 0 16px 40px rgb(0 0 0 / 50%), 0 0 0 1px rgb(255 255 255 / 8%);
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  /* Glass: translucent, blurred surfaces with a faint light edge (player, title page). */
+  --glass: rgb(30 32 38 / 46%);
+  --glass-strong: rgb(26 28 33 / 74%);
+  --glass-edge: rgb(255 255 255 / 11%);
+  --glass-blur: blur(26px) saturate(170%);
+  --glass-shadow: 0 10px 34px rgb(0 0 0 / 34%), inset 0 1px 0 rgb(255 255 255 / 7%);
   font-family: var(--font);
   font-size: 13px;
   line-height: 1.45;

@@ -1,20 +1,22 @@
 /* Library table */
 .table {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgb(255 255 255 / 4.5%), rgb(255 255 255 / 1.5%));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
   overflow: hidden;
 }
 .table-row {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) 90px 90px 140px 120px 44px;
   align-items: center;
-  min-height: 48px;
-  padding: 0 8px 0 0;
-  border-top: 1px solid var(--line);
+  min-height: 52px;
+  padding: 0 10px 0 4px;
+  border-top: 1px solid rgb(255 255 255 / 6%);
+  transition: background 0.15s;
 }
 .table-row:hover:not(.table-head) {
-  background: rgb(255 255 255 / 2.5%);
+  background: rgb(255 255 255 / 4%);
 }
 .table-head {
   min-height: 34px;
@@ -43,7 +45,7 @@
   flex: none;
   width: 28px;
   aspect-ratio: 2 / 3;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
 }
 .thumb .artwork-fallback {
   padding: 0;
@@ -58,9 +60,9 @@
 }
 .inline-progress > span {
   width: 64px;
-  height: 3px;
+  height: 4px;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: 999px;
   background: rgb(255 255 255 / 12%);
 }
 .inline-progress > span span {

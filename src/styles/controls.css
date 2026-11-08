@@ -4,20 +4,25 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  height: 32px;
-  padding: 0 14px;
+  height: 34px;
+  padding: 0 16px;
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 999px;
   font-weight: 600;
   white-space: nowrap;
   transition:
-    background 0.12s,
-    border-color 0.12s,
-    color 0.12s;
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s var(--ease);
+}
+.button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .button.small {
-  height: 26px;
-  padding: 0 10px;
+  height: 28px;
+  padding: 0 12px;
   font-size: 12px;
   font-weight: 500;
 }
@@ -27,16 +32,18 @@
 }
 .button.primary:hover:not(:disabled) {
   background: var(--accent-hover);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 .button.primary:active:not(:disabled) {
   background: #c7e27c;
 }
 .button.secondary {
-  border-color: var(--line-strong);
-  background: rgb(255 255 255 / 5%);
+  border-color: var(--glass-edge);
+  background: rgb(255 255 255 / 6%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
 }
 .button.secondary:hover:not(:disabled) {
-  background: rgb(255 255 255 / 9%);
+  background: rgb(255 255 255 / 11%);
 }
 .button.secondary:active:not(:disabled) {
   background: rgb(255 255 255 / 4%);
@@ -73,10 +80,17 @@
 .icon-button {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   color: var(--fg-2);
+  transition:
+    background 0.15s,
+    color 0.15s,
+    transform 0.15s var(--ease);
+}
+.icon-button:active:not(:disabled) {
+  transform: scale(0.92);
 }
 .icon-button:hover:not(:disabled) {
   background: var(--hover);
@@ -86,10 +100,10 @@
   background: var(--pressed);
 }
 .icon-button.bordered {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line-strong);
-  background: rgb(255 255 255 / 5%);
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--glass-edge);
+  background: rgb(255 255 255 / 6%);
 }
 .icon-button.rate-button.on {
   border-color: rgb(214 239 145 / 45%);
@@ -114,11 +128,14 @@
 .input,
 .filter-field,
 .select select {
-  height: 32px;
-  border: 1px solid var(--line-strong);
-  border-bottom-color: rgb(255 255 255 / 18%);
-  border-radius: var(--radius);
-  background: rgb(255 255 255 / 4%);
+  height: 34px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 5%);
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 .input {
   width: 100%;
@@ -131,8 +148,9 @@
 }
 .input:focus,
 .filter-field:focus-within {
-  border-bottom: 2px solid var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
   background: rgb(0 0 0 / 22%);
+  box-shadow: 0 0 0 4px var(--accent-soft);
   outline: none;
 }
 .input::placeholder,
@@ -140,14 +158,15 @@
   color: var(--faint);
 }
 .input[aria-invalid="true"] {
-  border-bottom-color: var(--danger);
+  border-color: var(--danger);
 }
 .filter-field {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 200px;
-  padding: 0 8px;
+  width: 220px;
+  padding: 0 12px;
+  border-radius: 999px;
   color: var(--muted);
 }
 .filter-field input {
@@ -177,8 +196,12 @@
   background-repeat: no-repeat;
   text-overflow: ellipsis;
 }
+.select select {
+  border-radius: 999px;
+}
 .select.compact select {
-  height: 28px;
+  height: 30px;
+  border-radius: 999px;
   font-size: 12px;
 }
 .select option {
@@ -186,45 +209,50 @@
 }
 .segmented {
   display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgb(0 0 0 / 18%);
+  padding: 3px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 22%);
 }
 .segmented button {
   display: grid;
   place-items: center;
   min-width: 30px;
   height: 26px;
-  padding: 0 6px;
-  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  border-radius: 999px;
   color: var(--muted);
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 .segmented button:hover {
   color: var(--fg);
 }
 .segmented button[aria-checked="true"] {
-  background: var(--raised-2);
+  background: rgb(255 255 255 / 14%);
   color: var(--fg);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 30%);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%), inset 0 1px 0 rgb(255 255 255 / 8%);
 }
 .switch {
   position: relative;
   width: 40px;
-  height: 20px;
-  border: 1px solid rgb(255 255 255 / 45%);
-  border-radius: 10px;
-  transition: background 0.15s, border-color 0.15s;
+  height: 22px;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 6%);
+  transition: background 0.2s, border-color 0.2s;
 }
 .switch span {
   position: absolute;
   top: 3px;
-  left: 4px;
-  width: 12px;
-  height: 12px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--fg-2);
-  transition: transform 0.15s var(--ease), background 0.15s;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+  transition: transform 0.2s var(--ease), background 0.2s;
 }
 .switch:hover span {
   transform: scale(1.12);
@@ -235,10 +263,10 @@
 }
 .switch.checked span {
   background: var(--accent-ink);
-  transform: translateX(19px);
+  transform: translateX(18px);
 }
 .switch.checked:hover span {
-  transform: translateX(19px) scale(1.12);
+  transform: translateX(18px) scale(1.12);
 }
 .chip-row {
   display: flex;
@@ -252,24 +280,30 @@
   flex: none;
   align-items: center;
   gap: 6px;
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: 13px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 4%);
   color: var(--fg-2);
   font-size: 12px;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 .chip span {
   color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
 .chip:hover {
-  background: var(--hover);
+  background: rgb(255 255 255 / 10%);
+  color: var(--fg);
 }
 .chip.selected {
   border-color: transparent;
-  background: var(--fg);
-  color: var(--chrome);
+  background: #fff;
+  color: #0b0c0e;
 }
 .chip.selected span {
   color: rgb(0 0 0 / 55%);
@@ -278,9 +312,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: var(--radius-sm);
+  height: 19px;
+  padding: 0 7px;
+  border-radius: 999px;
   background: rgb(255 255 255 / 7%);
   color: var(--fg-2);
   font-size: 10.5px;

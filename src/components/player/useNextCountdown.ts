@@ -14,7 +14,7 @@ export function useNextCountdown(options: { ended: boolean; available: boolean; 
       return;
     }
     setCountdown(seconds);
-    const timer = setInterval(() => setCountdown((value) => (value === null ? null : value - 1)), 1000);
+    const timer = setInterval(() => setCountdown((value) => (value === null ? null : Math.max(0, value - 1))), 1000);
     return () => clearInterval(timer);
   }, [autoNext, available, dismissed, ended, seconds]);
   return countdown;

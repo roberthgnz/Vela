@@ -3,7 +3,7 @@
   --poster: 156px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--poster), 1fr));
-  gap: 22px 16px;
+  gap: 26px 18px;
 }
 .poster-grid.compact {
   --poster: 116px;

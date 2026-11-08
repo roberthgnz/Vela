@@ -1,15 +1,15 @@
-import { useDeferredValue, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { CornerDownLeft, History, Search, X } from "lucide-react";
+import { CornerDownLeft, History, Search, Star, X } from "lucide-react";
 import type { InstalledAddon, MediaItem } from "../lib/contracts";
-import { getCatalog, getCatalogSources } from "../lib/protocol";
+import { getCatalog, getCatalogSources, getMeta } from "../lib/protocol";
 import { activeFilters, applySearchFilters, decades, noSearchFilters, type SearchFilters } from "../lib/searchFilters";
 import { searchHistory, useSearchHistory } from "../lib/searchHistory";
-import { usePrefetchTranslation } from "../lib/tmdb";
+import { usePrefetchTranslation, useTranslatedMeta } from "../lib/tmdb";
 import { useContentCategories, useContentFilter, type ContentCategory } from "../lib/contentFilter";
 import { useKidsMode } from "../lib/profiles";
 import { mediaKey, usePreferences } from "../lib/store";
-import { errorMessage, yearOf } from "../lib/utils";
+import { errorMessage, safeImage, yearOf } from "../lib/utils";
 import { typeLabel } from "./MediaCard";
 import { Artwork, Dialog, EmptyState, ErrorState, Spinner } from "./Primitives";
 import { plural, t } from "../lib/i18n";
@@ -22,6 +22,91 @@ export type Command = {
   run: () => void;
 };
 
+
+type Result = { meta: MediaItem; addon: InstalledAddon };
+
+/** The title with the searched text marked, when it appears in it. */
+function Highlight({ text, needle }: { text: string; needle: string }) {
+  const lower = text.toLocaleLowerCase();
+  const index = needle ? lower.indexOf(needle.toLocaleLowerCase()) : -1;
+  // Lowercasing can change the length of some characters; then the positions would not match.
+  if (index < 0 || lower.length !== text.length) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, index)}
+      <mark>{text.slice(index, index + needle.length)}</mark>
+      {text.slice(index + needle.length)}
+    </>
+  );
+}
+
+/**
+ * The highlighted result, larger: its backdrop, logo, facts and synopsis. Search results carry
+ * little more than the name and the art, so the full entry is read from the addon once the
+ * selection rests on it for a moment (the title page reuses it from the cache).
+ */
+function Preview({ meta: item, addon }: Result) {
+  const key = mediaKey(item.type, item.id);
+  const [ready, setReady] = useState<string>();
+  useEffect(() => {
+    const timer = setTimeout(() => setReady(key), 180);
+    return () => clearTimeout(timer);
+  }, [key]);
+  const full = useQuery({
+    queryKey: ["meta", addon.manifestUrl, item.type, item.id],
+    queryFn: ({ signal }) => getMeta(addon, item.type, item.id, signal),
+    enabled: ready === key && addon.manifest.id !== "saved",
+  });
+  const { meta, translated } = useTranslatedMeta(full.data ?? item);
+  const [failedLogo, setFailedLogo] = useState<string>();
+  // Logos carry the original name: a translated title is written out instead.
+  const logoUrl = translated ? undefined : safeImage(meta.logo);
+  const logo = logoUrl && logoUrl !== failedLogo ? logoUrl : undefined;
+  const art = safeImage(meta.background || item.background || meta.poster);
+  const facts = [typeLabel(meta.type), yearOf(meta), meta.runtime].filter(Boolean);
+  const loading = !meta.description && (ready !== key || full.isFetching);
+  return (
+    <aside className="palette-preview" aria-hidden="true">
+      <div className="palette-preview-art">{art && <img src={art} alt="" key={art} draggable={false} />}</div>
+      <div className="palette-preview-body" key={key}>
+        {logo ? (
+          <img className="palette-preview-logo" src={logo} alt="" draggable={false} onError={() => setFailedLogo(logo)} />
+        ) : (
+          <strong className="palette-preview-title">{meta.name}</strong>
+        )}
+        <div className="facts">
+          {facts.map((fact) => (
+            <span key={fact}>{fact}</span>
+          ))}
+          {meta.imdbRating && (
+            <span className="rating">
+              <Star size={11} fill="currentColor" /> {meta.imdbRating}
+            </span>
+          )}
+        </div>
+        {meta.genres?.length ? (
+          <div className="genres">
+            {meta.genres.slice(0, 3).map((genre) => (
+              <span key={genre}>{genre}</span>
+            ))}
+          </div>
+        ) : null}
+        {meta.description ? (
+          <p>{meta.description}</p>
+        ) : loading ? (
+          <div className="palette-preview-lines">
+            <span className="skeleton skeleton-line" />
+            <span className="skeleton skeleton-line" />
+            <span className="skeleton skeleton-line short" />
+          </div>
+        ) : null}
+        <span className="palette-preview-hint">
+          <kbd>{t("search.enterKey")}</kbd> {t("search.open")} · {addon.manifest.name}
+        </span>
+      </div>
+    </aside>
+  );
+}
 
 function moveFocus(event: KeyboardEvent<HTMLElement>) {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -115,8 +200,18 @@ export function SearchPalette({
         ])
         .filter((group) => group.items.length)
     : [];
+  // The result the preview shows: the one under the pointer or the focus, else the first.
+  const [activeKey, setActiveKey] = useState<string>();
+  const results = search.length >= 2 ? groups.flatMap((group) => group.items) : [];
+  const active = results.find(({ meta }) => mediaKey(meta.type, meta.id) === activeKey) ?? results[0];
   return (
-    <Dialog title={t("common.search")} className="palette" onClose={onClose} hideClose>
+    <Dialog
+      title={t("common.search")}
+      className={`palette${active ? " with-preview" : ""}`}
+      onClose={onClose}
+      hideClose
+    >
+      <div className="palette-main">
       <div className="palette-field">
         <Search size={17} />
         <input
@@ -132,10 +227,11 @@ export function SearchPalette({
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
-              event.currentTarget
-                .closest(".palette")
-                ?.querySelector<HTMLElement>("[data-palette-item]")
-                ?.click();
+              const root = event.currentTarget.closest(".palette");
+              (
+                root?.querySelector<HTMLElement>("[data-palette-item].active") ??
+                root?.querySelector<HTMLElement>("[data-palette-item]")
+              )?.click();
             } else moveFocus(event);
           }}
         />
@@ -237,11 +333,17 @@ export function SearchPalette({
                   {group.items.map(({ meta, addon }) => (
                     <button
                       key={mediaKey(meta.type, meta.id)}
-                      className="palette-item"
+                      className={`palette-item result${active?.meta === meta ? " active" : ""}`}
                       data-palette-item
                       aria-label={t("library.open", { name: meta.name })}
-                      onPointerEnter={() => prefetch(meta)}
-                      onFocus={() => prefetch(meta)}
+                      onPointerEnter={() => {
+                        prefetch(meta);
+                        setActiveKey(mediaKey(meta.type, meta.id));
+                      }}
+                      onFocus={() => {
+                        prefetch(meta);
+                        setActiveKey(mediaKey(meta.type, meta.id));
+                      }}
                       onKeyDown={moveFocus}
                       onClick={() => {
                         searchHistory.add(search);
@@ -251,7 +353,9 @@ export function SearchPalette({
                     >
                       <Artwork src={meta.poster} name={meta.name} className="thumb" />
                       <span className="palette-text">
-                        <strong>{meta.name}</strong>
+                        <strong>
+                          <Highlight text={meta.name} needle={search} />
+                        </strong>
                         <small>
                           {[typeLabel(meta.type), yearOf(meta), meta.imdbRating && `★ ${meta.imdbRating}`, addon.manifest.name]
                             .filter(Boolean)
@@ -373,6 +477,8 @@ export function SearchPalette({
         <span><kbd>{t("search.enterKey")}</kbd> {t("search.open")}</span>
         <span><kbd>Esc</kbd> {t("search.close")}</span>
       </footer>
+      </div>
+      {active && <Preview key={mediaKey(active.meta.type, active.meta.id)} {...active} />}
     </Dialog>
   );
 }

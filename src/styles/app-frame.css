@@ -58,9 +58,9 @@
 .titlebar-button {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 28px;
-  border-radius: var(--radius);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   color: var(--fg-2);
 }
 .titlebar-button:hover:not(:disabled) {
@@ -74,19 +74,26 @@
   opacity: 0.3;
 }
 .search-trigger {
-  flex: 0 1 440px;
+  flex: 0 1 460px;
   display: flex;
   align-items: center;
   gap: 8px;
   height: 30px;
   margin: 0 12px;
-  padding: 0 6px 0 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgb(255 255 255 / 4%);
+  padding: 0 5px 0 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 5%);
   color: var(--muted);
   font-size: 12.5px;
   text-align: left;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.search-trigger kbd {
+  border-radius: 999px;
 }
 .search-trigger span {
   flex: 1;
@@ -95,8 +102,8 @@
   text-overflow: ellipsis;
 }
 .search-trigger:hover {
-  border-color: var(--line-strong);
-  background: rgb(255 255 255 / 6%);
+  border-color: rgb(255 255 255 / 18%);
+  background: rgb(255 255 255 / 9%);
   color: var(--fg-2);
 }
 .window-controls {

@@ -548,6 +548,11 @@ export const en: Record<keyof typeof es, string> = {
   "player.fullscreen": "Fullscreen",
   "player.exitFullscreenKey": "Exit fullscreen (F)",
   "player.fullscreenKey": "Fullscreen (F)",
+  "player.youreWatching": "You're watching",
+  "player.endsAt": "Ends at {time}",
+  "player.timeModeTitle": "Switch between time left and end time",
+  "player.segment.intro": "Intro",
+  "player.segment.credits": "Credits",
 
   // Speed panel and intro/credits marks
   "player.speedAndMarks": "Speed, intro and credits",

@@ -7,11 +7,12 @@
   display: grid;
   gap: 8px;
   width: min(360px, calc(100vw - 40px));
-  padding: 14px 16px;
-  border: 1px solid var(--line, rgb(255 255 255 / 10%));
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  box-shadow: var(--shadow-pop);
+  padding: 16px 18px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  background: rgb(26 28 33 / 82%);
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: var(--glass-shadow), 0 20px 50px rgb(0 0 0 / 45%);
   animation: fade 0.2s var(--ease);
 }
 .update-heading {
@@ -34,7 +35,7 @@
 .update-progress {
   height: 4px;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: 999px;
   background: rgb(255 255 255 / 12%);
 }
 .update-progress span {

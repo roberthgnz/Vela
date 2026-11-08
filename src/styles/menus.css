@@ -5,19 +5,20 @@
   min-width: 200px;
   max-width: 320px;
   margin: 0;
-  padding: 4px;
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--popover);
+  padding: 6px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 16px;
+  background: rgb(26 28 33 / 82%);
+  backdrop-filter: blur(30px) saturate(180%);
   color: var(--fg);
-  box-shadow: var(--shadow-pop);
-  animation: menu-in 0.12s var(--ease);
+  box-shadow: var(--glass-shadow), 0 20px 50px rgb(0 0 0 / 45%);
+  animation: menu-in 0.16s var(--ease);
   user-select: none;
 }
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-6px) scale(0.98);
   }
 }
 .menu-item {
@@ -25,9 +26,9 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: 30px;
+  height: 32px;
   padding: 0 10px 0 8px;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   text-align: left;
 }
 .menu-item:hover:not(:disabled),
@@ -62,6 +63,6 @@
 }
 .menu-separator {
   height: 1px;
-  margin: 4px -4px;
-  background: var(--line);
+  margin: 5px 4px;
+  background: rgb(255 255 255 / 8%);
 }

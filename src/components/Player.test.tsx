@@ -215,6 +215,51 @@ describe("Player", () => {
     expect(onStarted).toHaveBeenCalledTimes(1);
   });
 
+  it("covers the video with what is playing after a while paused, until the pointer moves", () => {
+    vi.useFakeTimers();
+    try {
+      const playing = series();
+      playing.meta.description = "Una serie de prueba.";
+      const { video } = setup(playing);
+      fireEvent.playing(video);
+      Object.defineProperty(video, "paused", { configurable: true, value: true });
+      fireEvent.pause(video);
+      expect(document.querySelector(".player-away")).toBeNull();
+      act(() => vi.advanceTimersByTime(5000));
+      const away = document.querySelector(".player-away")!;
+      expect(away.textContent).toContain("Estás viendo");
+      expect(away.textContent).toContain("La serie");
+      expect(away.textContent).toContain("Una serie de prueba.");
+      fireEvent.mouseMove(document.querySelector(".player")!);
+      expect(document.querySelector(".player-away")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("switches the clock after the seek bar between time left and end time", () => {
+    const { video } = setup(movie());
+    Object.defineProperty(video, "duration", { configurable: true, value: 600 });
+    fireEvent.loadedMetadata(video);
+    const clock = screen.getByTitle("Alternar entre tiempo restante y hora de fin");
+    const left = clock.textContent;
+    expect(left).toMatch(/^−10:00$/);
+    fireEvent.click(clock);
+    expect(clock.textContent).toMatch(/^Termina a las /);
+    fireEvent.click(clock);
+    expect(clock.textContent).toBe(left);
+  });
+
+  it("sets the volume with the wheel and shows it", () => {
+    const { video } = setup(movie());
+    const before = video.volume;
+    fireEvent.wheel(video, { deltaY: 100 });
+    expect(video.volume).toBeCloseTo(before - 0.05);
+    expect(document.querySelector(".player-hud")?.textContent).toContain(
+      `Volumen ${Math.round((before - 0.05) * 100)} %`,
+    );
+  });
+
   it("offers Stremio's fast profile for a file above its limit, and opens the torrent again with it", async () => {
     const service = "http://127.0.0.1:11470";
     const hash = "f015156e0a766402900ae7a006fba36af3a4df0c";

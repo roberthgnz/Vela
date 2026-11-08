@@ -215,6 +215,12 @@ export function DetailView({
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [trailer, setTrailer] = useState<number | null>(null);
   const backdrop = safeImage(meta.background || meta.poster);
+  // With a real backdrop the page leads with it (no poster); the logo stands for the title unless
+  // the title was translated, since logos carry the original name.
+  const cinematic = Boolean(safeImage(meta.background));
+  const [failedLogo, setFailedLogo] = useState<string>();
+  const logoUrl = translated ? undefined : safeImage(meta.logo);
+  const logo = logoUrl && logoUrl !== failedLogo ? logoUrl : undefined;
   const chooseEpisode = (episode: Episode) => {
     onVideoChange(episode.id);
     setShowSources(true);
@@ -330,19 +336,23 @@ export function DetailView({
       </section>
     );
   return (
-    <section className="detail" aria-label={meta.name} role="region">
+    <section className={`detail${cinematic ? " cinematic" : ""}`} aria-label={meta.name} role="region">
       <div className="detail-backdrop" aria-hidden="true">
-        {backdrop && <img src={backdrop} alt="" draggable={false} />}
+        {backdrop && <img src={backdrop} alt="" draggable={false} key={backdrop} />}
       </div>
       <div className="detail-layout">
         <div className="detail-main">
           <div className="detail-header">
-            <Artwork src={meta.poster} name={meta.name} className="detail-poster" />
+            {!cinematic && <Artwork src={meta.poster} name={meta.name} className="detail-poster" />}
             <div className="detail-info">
               {translating ? (
                 <h1 className="title-pending" aria-busy="true">
                   <span className="skeleton skeleton-title" />
                   <span className="sr-only">{meta.name}</span>
+                </h1>
+              ) : logo ? (
+                <h1 className="detail-title-logo">
+                  <img src={logo} alt={meta.name} draggable={false} onError={() => setFailedLogo(logo)} />
                 </h1>
               ) : (
                 <h1>{meta.name}</h1>

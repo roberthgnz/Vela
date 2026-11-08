@@ -550,6 +550,11 @@ export const es = {
   "player.fullscreen": "Pantalla completa",
   "player.exitFullscreenKey": "Salir de pantalla completa (F)",
   "player.fullscreenKey": "Pantalla completa (F)",
+  "player.youreWatching": "Estás viendo",
+  "player.endsAt": "Termina a las {time}",
+  "player.timeModeTitle": "Alternar entre tiempo restante y hora de fin",
+  "player.segment.intro": "Intro",
+  "player.segment.credits": "Créditos",
 
   // Speed panel and intro/credits marks
   "player.speedAndMarks": "Velocidad, intro y créditos",
